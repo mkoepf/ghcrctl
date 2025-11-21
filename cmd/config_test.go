@@ -209,14 +209,21 @@ func TestConfigShowWithNoConfigFile(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Save current HOME and restore after test
+	// Save current HOME and USERPROFILE (for Windows) and restore after test
 	originalHome := os.Getenv("HOME")
+	originalUserProfile := os.Getenv("USERPROFILE")
 	defer func() {
 		os.Setenv("HOME", originalHome)
+		if originalUserProfile != "" {
+			os.Setenv("USERPROFILE", originalUserProfile)
+		} else {
+			os.Unsetenv("USERPROFILE")
+		}
 	}()
 
-	// Set HOME to temp dir so config.New() uses it
+	// Set HOME and USERPROFILE to temp dir so config.New() uses it
 	os.Setenv("HOME", tempDir)
+	os.Setenv("USERPROFILE", tempDir)
 
 	// Execute config show - should show "No configuration found"
 	rootCmd.SetArgs([]string{"config", "show"})

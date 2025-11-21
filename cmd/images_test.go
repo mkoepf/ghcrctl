@@ -33,14 +33,21 @@ func TestImagesCommandWithoutConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Save original HOME
+	// Save original HOME and USERPROFILE (for Windows)
 	originalHome := os.Getenv("HOME")
+	originalUserProfile := os.Getenv("USERPROFILE")
 	defer func() {
 		os.Setenv("HOME", originalHome)
+		if originalUserProfile != "" {
+			os.Setenv("USERPROFILE", originalUserProfile)
+		} else {
+			os.Unsetenv("USERPROFILE")
+		}
 	}()
 
-	// Set HOME to temp dir (no config)
+	// Set HOME and USERPROFILE to temp dir (no config)
 	os.Setenv("HOME", tempDir)
+	os.Setenv("USERPROFILE", tempDir)
 
 	// Execute images command - should fail with helpful error
 	rootCmd.SetArgs([]string{"images"})

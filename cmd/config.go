@@ -44,6 +44,12 @@ var configOrgCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+
+		// Validate that name is not empty
+		if name == "" {
+			return fmt.Errorf("owner name cannot be empty")
+		}
+
 		cfg := config.New()
 
 		if err := cfg.SetOwner(name, "org"); err != nil {
@@ -62,6 +68,12 @@ var configUserCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+
+		// Validate that name is not empty
+		if name == "" {
+			return fmt.Errorf("owner name cannot be empty")
+		}
+
 		cfg := config.New()
 
 		if err := cfg.SetOwner(name, "user"); err != nil {

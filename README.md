@@ -1,8 +1,8 @@
 # ghcrctl
 
-[![CI](https://github.com/mhk/ghcrctl/actions/workflows/ci.yml/badge.svg)](https://github.com/mhk/ghcrctl/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mhk/ghcrctl)](https://goreportcard.com/report/github.com/mhk/ghcrctl)
-[![codecov](https://codecov.io/gh/mhk/ghcrctl/branch/main/graph/badge.svg)](https://codecov.io/gh/mhk/ghcrctl)
+[![CI](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml/badge.svg)](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mkoepf/ghcrctl)](https://goreportcard.com/report/github.com/mkoepf/ghcrctl)
+[![codecov](https://codecov.io/gh/mkoepf/ghcrctl/branch/main/graph/badge.svg)](https://codecov.io/gh/mkoepf/ghcrctl)
 
 A command-line tool for interacting with GitHub Container Registry (GHCR).
 

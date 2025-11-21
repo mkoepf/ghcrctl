@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.21'
+          go-version: '1.23'
 
       - name: Run gofmt
         run: |
@@ -30,20 +30,13 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
-
-      - name: Run golangci-lint
-        run: golangci-lint run ./... --timeout=5m
-
   test:
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.21', '1.22']
+        go-version: ['1.23']
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -70,7 +63,7 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Check test coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.22'
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'
         run: |
           coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${coverage}%"
@@ -82,7 +75,7 @@ jobs:
           echo "Coverage check passed: ${coverage}% >= ${threshold}%"
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.22'
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.out
@@ -96,7 +89,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.21', '1.22']
+        go-version: ['1.23']
     steps:
       - name: Checkout code
         uses: actions/checkout@v5

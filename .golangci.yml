@@ -17,8 +17,11 @@ linters:
     - revive        # Fast, configurable, extensible linter
     - gosec         # Security-focused linter
     - bodyclose     # Check HTTP response bodies are closed
-    - exportloopref # Check for loop variable references
+    - copyloopvar   # Replacement for deprecated exportloopref
     - gocritic      # Comprehensive linter with many checks
+
+  disable:
+    - exportloopref # Deprecated since Go 1.22
 
 linters-settings:
   errcheck:

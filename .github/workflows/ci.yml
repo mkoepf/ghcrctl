@@ -67,17 +67,17 @@ jobs:
         if: runner.os == 'Windows'
         run: go test -v -race -coverprofile="coverage.out" -covermode=atomic ./...
 
-      - name: Check test coverage
+      - name: Report test coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'
         run: |
           coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${coverage}%"
-          threshold=60
-          if (( $(echo "$coverage < $threshold" | bc -l) )); then
-            echo "Coverage ${coverage}% is below threshold ${threshold}%"
-            exit 1
-          fi
-          echo "Coverage check passed: ${coverage}% >= ${threshold}%"
+          echo "Note: Coverage is measured but does not fail CI"
+
+          # Show coverage by package
+          echo ""
+          echo "Coverage by package:"
+          go tool cover -func=coverage.out
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'

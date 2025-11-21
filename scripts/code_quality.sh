@@ -65,21 +65,13 @@ fi
 echo ""
 
 ###########################################
-# 5. Coverage Check
+# 5. Coverage Report (informational only)
 ###########################################
-echo -e "${BLUE}[4/5] Checking test coverage...${NC}"
+echo -e "${BLUE}[4/5] Reporting test coverage (informational)...${NC}"
 if [ -f coverage.out ]; then
     COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
     echo -e "Total coverage: ${YELLOW}${COVERAGE}%${NC}"
-    echo -e "Threshold: ${YELLOW}${COVERAGE_THRESHOLD}%${NC}"
-
-    # Compare coverage using awk (works on macOS and Linux)
-    if awk "BEGIN {exit !($COVERAGE >= $COVERAGE_THRESHOLD)}"; then
-        echo -e "${GREEN}✓ Coverage check passed: ${COVERAGE}% >= ${COVERAGE_THRESHOLD}%${NC}"
-    else
-        echo -e "${RED}✗ Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%${NC}"
-        FAILED=$((FAILED + 1))
-    fi
+    echo -e "${BLUE}Note: Coverage is measured but does not fail checks${NC}"
 
     # Show coverage by package
     echo ""

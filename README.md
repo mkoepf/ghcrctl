@@ -47,6 +47,28 @@ View current configuration:
 ghcrctl config show
 ```
 
+### Authentication
+
+Set your GitHub token as an environment variable:
+
+```bash
+export GITHUB_TOKEN=ghp_your_token_here
+```
+
+### List Container Images
+
+List all container images for the configured owner:
+
+```bash
+ghcrctl images
+```
+
+Get output in JSON format:
+
+```bash
+ghcrctl images --json
+```
+
 ### Getting Help
 
 ```bash
@@ -58,10 +80,10 @@ ghcrctl config --help
 
 This project is under active development following an iterative approach:
 
-- ✅ **Iteration 1**: Project setup & configuration foundation (COMPLETE)
-- ⏳ **Iteration 2**: GitHub Authentication & Basic Connection
-- ⏳ **Iteration 3**: List Container Images
-- ⏳ **Iteration 4**: ORAS Integration & Tag Resolution
+- ✅ **Iteration 1**: Project setup & configuration foundation
+- ✅ **Iteration 2**: GitHub authentication & basic connection
+- ✅ **Iteration 3**: List container images
+- ✅ **Iteration 4**: ORAS integration & tag resolution
 - ⏳ **Iteration 5**: OCI Graph Discovery
 - ⏳ **Iteration 6**: Tagging Functionality
 - ⏳ **Iteration 7**: Labeling Functionality
@@ -92,8 +114,8 @@ golangci-lint run ./...
 
 - **CLI Layer**: Built with [Cobra](https://github.com/spf13/cobra)
 - **Configuration**: Managed with [Viper](https://github.com/spf13/viper)
-- **GHCR API**: Will use [go-github](https://github.com/google/go-github)
-- **OCI Layer**: Will use [ORAS Go SDK](https://oras.land/docs/category/oras-go-library)
+- **GHCR API**: Using [go-github](https://github.com/google/go-github) for package management
+- **OCI Layer**: Using [ORAS Go SDK](https://oras.land/docs/category/oras-go-library) for tag resolution
 
 ## Configuration File
 

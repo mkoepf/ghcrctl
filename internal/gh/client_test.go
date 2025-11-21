@@ -128,50 +128,9 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-func TestValidateToken(t *testing.T) {
-	// Note: This test requires mocking or a real token for integration testing
-	// For now, we test that the function exists and handles context properly
-
-	tests := []struct {
-		name      string
-		token     string
-		skipTest  bool
-		wantError bool
-	}{
-		{
-			name:      "validation with mock token (will fail without real GitHub access)",
-			token:     "ghp_fake_token_for_testing",
-			skipTest:  true, // Skip unless we have integration test setup
-			wantError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.skipTest {
-				t.Skip("Skipping test that requires real GitHub API access")
-			}
-
-			client, err := NewClient(tt.token)
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
-
-			ctx := context.Background()
-			err = client.ValidateToken(ctx)
-
-			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-			}
-		})
-	}
-}
+// TestValidateToken is tested via TestValidateTokenWithRealToken
+// Unit testing ValidateToken requires mocking the GitHub API
+// For now, we rely on the integration test with real tokens
 
 func TestValidateTokenWithRealToken(t *testing.T) {
 	// This test only runs if GITHUB_TOKEN is set in the environment
@@ -190,5 +149,160 @@ func TestValidateTokenWithRealToken(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Token validation failed with real token: %v", err)
+	}
+}
+
+func TestListPackages(t *testing.T) {
+	// Test input validation for ListPackages
+
+	tests := []struct {
+		name      string
+		owner     string
+		ownerType string
+		wantError bool
+	}{
+		{
+			name:      "empty owner",
+			owner:     "",
+			ownerType: "org",
+			wantError: true,
+		},
+		{
+			name:      "invalid owner type",
+			owner:     "test",
+			ownerType: "invalid",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient("ghp_fake_token")
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ctx := context.Background()
+			packages, err := client.ListPackages(ctx, tt.owner, tt.ownerType)
+
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if packages == nil {
+					t.Error("Expected non-nil packages slice")
+				}
+			}
+		})
+	}
+}
+
+func TestListPackagesWithRealToken(t *testing.T) {
+	// Integration test with real GitHub token
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	// Get owner from environment or use a default
+	owner := os.Getenv("TEST_OWNER")
+	if owner == "" {
+		t.Skip("Skipping integration test - TEST_OWNER not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	packages, err := client.ListPackages(ctx, owner, "user")
+
+	if err != nil {
+		t.Errorf("ListPackages failed with real token: %v", err)
+	}
+
+	// Packages should be a valid slice (may be empty)
+	if packages == nil {
+		t.Error("Expected non-nil packages slice")
+	}
+
+	// If we have packages, verify they're sorted
+	if len(packages) > 1 {
+		for i := 0; i < len(packages)-1; i++ {
+			if packages[i] > packages[i+1] {
+				t.Errorf("Packages not in alphabetical order: %s > %s", packages[i], packages[i+1])
+			}
+		}
+	}
+}
+
+func TestSortPackages(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "already sorted",
+			input:    []string{"alpha", "beta", "gamma"},
+			expected: []string{"alpha", "beta", "gamma"},
+		},
+		{
+			name:     "reverse order",
+			input:    []string{"gamma", "beta", "alpha"},
+			expected: []string{"alpha", "beta", "gamma"},
+		},
+		{
+			name:     "random order",
+			input:    []string{"zeta", "alpha", "delta", "beta"},
+			expected: []string{"alpha", "beta", "delta", "zeta"},
+		},
+		{
+			name:     "single element",
+			input:    []string{"only"},
+			expected: []string{"only"},
+		},
+		{
+			name:     "empty slice",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "duplicates",
+			input:    []string{"beta", "alpha", "beta", "alpha"},
+			expected: []string{"alpha", "alpha", "beta", "beta"},
+		},
+		{
+			name:     "case sensitive sorting",
+			input:    []string{"Zebra", "apple", "Banana"},
+			expected: []string{"Banana", "Zebra", "apple"}, // Uppercase comes before lowercase in ASCII
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy to avoid modifying the test case
+			packages := make([]string, len(tt.input))
+			copy(packages, tt.input)
+
+			// Sort the packages
+			sortPackages(packages)
+
+			// Verify the result
+			if len(packages) != len(tt.expected) {
+				t.Fatalf("Length mismatch: got %d, want %d", len(packages), len(tt.expected))
+			}
+
+			for i := range packages {
+				if packages[i] != tt.expected[i] {
+					t.Errorf("Position %d: got %s, want %s", i, packages[i], tt.expected[i])
+				}
+			}
+		})
 	}
 }

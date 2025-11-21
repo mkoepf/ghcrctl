@@ -53,3 +53,71 @@ func (c *Client) ValidateToken(ctx context.Context) error {
 
 	return nil
 }
+
+// ListPackages lists all container packages for the specified owner
+func (c *Client) ListPackages(ctx context.Context, owner string, ownerType string) ([]string, error) {
+	// Validate inputs
+	if owner == "" {
+		return nil, fmt.Errorf("owner cannot be empty")
+	}
+
+	if ownerType != "org" && ownerType != "user" {
+		return nil, fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+
+	// Set up options for listing packages
+	opts := &github.PackageListOptions{
+		PackageType: github.String("container"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var allPackages []string
+
+	// List packages based on owner type
+	for {
+		var packages []*github.Package
+		var resp *github.Response
+		var err error
+
+		if ownerType == "org" {
+			packages, resp, err = c.client.Organizations.ListPackages(ctx, owner, opts)
+		} else {
+			packages, resp, err = c.client.Users.ListPackages(ctx, owner, opts)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to list packages: %w", err)
+		}
+
+		// Extract package names
+		for _, pkg := range packages {
+			if pkg.Name != nil {
+				allPackages = append(allPackages, *pkg.Name)
+			}
+		}
+
+		// Check if there are more pages
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	// Sort packages alphabetically
+	sortPackages(allPackages)
+
+	return allPackages, nil
+}
+
+// sortPackages sorts a slice of package names alphabetically
+func sortPackages(packages []string) {
+	// Simple bubble sort (good enough for small lists)
+	n := len(packages)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			if packages[j] > packages[j+1] {
+				packages[j], packages[j+1] = packages[j+1], packages[j]
+			}
+		}
+	}
+}

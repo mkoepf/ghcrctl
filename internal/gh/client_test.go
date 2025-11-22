@@ -306,3 +306,71 @@ func TestSortPackages(t *testing.T) {
 		})
 	}
 }
+
+func TestGetVersionIDByDigest(t *testing.T) {
+	tests := []struct {
+		name      string
+		owner     string
+		ownerType string
+		pkg       string
+		digest    string
+		wantError bool
+	}{
+		{
+			name:      "empty owner",
+			owner:     "",
+			ownerType: "org",
+			pkg:       "test-package",
+			digest:    "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantError: true,
+		},
+		{
+			name:      "invalid owner type",
+			owner:     "test",
+			ownerType: "invalid",
+			pkg:       "test-package",
+			digest:    "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantError: true,
+		},
+		{
+			name:      "empty package name",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "",
+			digest:    "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantError: true,
+		},
+		{
+			name:      "empty digest",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "test-package",
+			digest:    "",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient("ghp_fake_token")
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ctx := context.Background()
+			versionID, err := client.GetVersionIDByDigest(ctx, tt.owner, tt.ownerType, tt.pkg, tt.digest)
+
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				// Can't verify actual version ID without real API call
+				_ = versionID
+			}
+		})
+	}
+}

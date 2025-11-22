@@ -121,3 +121,63 @@ func sortPackages(packages []string) {
 		}
 	}
 }
+
+// GetVersionIDByDigest finds the GHCR version ID for a specific OCI digest
+// This allows mapping from OCI digest to GitHub package version for deletion operations
+func (c *Client) GetVersionIDByDigest(ctx context.Context, owner, ownerType, packageName, digest string) (int64, error) {
+	// Validate inputs
+	if owner == "" {
+		return 0, fmt.Errorf("owner cannot be empty")
+	}
+	if ownerType != "org" && ownerType != "user" {
+		return 0, fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+	if packageName == "" {
+		return 0, fmt.Errorf("package name cannot be empty")
+	}
+	if digest == "" {
+		return 0, fmt.Errorf("digest cannot be empty")
+	}
+
+	// List all versions for this package
+	opts := &github.PackageListOptions{
+		PackageType: github.String("container"),
+		State:       github.String("active"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var allVersions []*github.PackageVersion
+	for {
+		var versions []*github.PackageVersion
+		var resp *github.Response
+		var err error
+
+		if ownerType == "org" {
+			versions, resp, err = c.client.Organizations.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
+		} else {
+			versions, resp, err = c.client.Users.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
+		}
+
+		if err != nil {
+			return 0, fmt.Errorf("failed to list package versions: %w", err)
+		}
+
+		allVersions = append(allVersions, versions...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	// Search for version with matching digest
+	for _, version := range allVersions {
+		if version.Name != nil && *version.Name == digest {
+			if version.ID != nil {
+				return *version.ID, nil
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("no version found with digest %s", digest)
+}

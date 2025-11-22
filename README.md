@@ -71,11 +71,16 @@ ghcrctl images --json
 
 ### Display OCI Artifact Graph
 
-Display the OCI artifact graph for an image (shows SBOM, provenance, etc.):
+Display the OCI artifact graph for an image, including SBOM and provenance attestations:
 
 ```bash
 ghcrctl graph myimage
 ```
+
+This command discovers:
+- **SBOM (Software Bill of Materials)** - SPDX and CycloneDX formats
+- **Provenance** - SLSA provenance attestations
+- **Multi-platform attestations** - Supports Docker buildx multi-layer attestations
 
 Specify a tag (default is `latest`):
 
@@ -87,6 +92,29 @@ Get output in JSON format:
 
 ```bash
 ghcrctl graph myimage --json
+```
+
+**Example output:**
+```
+OCI Artifact Graph for myimage
+
+Image:
+  Digest: sha256:1234567890abcdef...
+  Tags: [v1.0.0]
+  Version ID: 12345
+
+Referrers:
+
+  sbom:
+    Digest: sha256:abcdef1234567890...
+
+  provenance:
+    Digest: sha256:fedcba0987654321...
+
+Summary:
+  SBOM: true
+  Provenance: true
+  Total artifacts: 3
 ```
 
 ### Getting Help
@@ -135,7 +163,10 @@ golangci-lint run ./...
 - **CLI Layer**: Built with [Cobra](https://github.com/spf13/cobra)
 - **Configuration**: Managed with [Viper](https://github.com/spf13/viper)
 - **GHCR API**: Using [go-github](https://github.com/google/go-github) for package management
-- **OCI Layer**: Using [ORAS Go SDK](https://oras.land/docs/category/oras-go-library) for tag resolution
+- **OCI Layer**: Using [ORAS Go SDK](https://oras.land/docs/category/oras-go-library) for tag resolution and artifact discovery
+  - Supports OCI Referrers API and fallback to referrers tag schema
+  - Discovers Docker buildx attestations stored in image indexes
+  - Handles multi-layer attestation manifests (SBOM + provenance in single manifest)
 
 ## Configuration File
 

@@ -69,6 +69,26 @@ Get output in JSON format:
 ghcrctl images --json
 ```
 
+### Display OCI Artifact Graph
+
+Display the OCI artifact graph for an image (shows SBOM, provenance, etc.):
+
+```bash
+ghcrctl graph myimage
+```
+
+Specify a tag (default is `latest`):
+
+```bash
+ghcrctl graph myimage --tag v1.0.0
+```
+
+Get output in JSON format:
+
+```bash
+ghcrctl graph myimage --json
+```
+
 ### Getting Help
 
 ```bash
@@ -84,7 +104,7 @@ This project is under active development following an iterative approach:
 - ✅ **Iteration 2**: GitHub authentication & basic connection
 - ✅ **Iteration 3**: List container images
 - ✅ **Iteration 4**: ORAS integration & tag resolution
-- ⏳ **Iteration 5**: OCI Graph Discovery
+- ✅ **Iteration 5**: OCI graph discovery
 - ⏳ **Iteration 6**: Tagging Functionality
 - ⏳ **Iteration 7**: Labeling Functionality
 - ⏳ **Iteration 8**: Basic Deletion with Safety

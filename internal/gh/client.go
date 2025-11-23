@@ -43,17 +43,6 @@ func NewClient(token string) (*Client, error) {
 	}, nil
 }
 
-// ValidateToken validates the token by making a test API call
-func (c *Client) ValidateToken(ctx context.Context) error {
-	// Try to get the authenticated user as a simple validation
-	_, _, err := c.client.Users.Get(ctx, "")
-	if err != nil {
-		return fmt.Errorf("token validation failed: %w", err)
-	}
-
-	return nil
-}
-
 // ListPackages lists all container packages for the specified owner
 func (c *Client) ListPackages(ctx context.Context, owner string, ownerType string) ([]string, error) {
 	// Validate inputs

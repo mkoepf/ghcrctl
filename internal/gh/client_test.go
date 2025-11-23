@@ -128,30 +128,6 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-// TestValidateToken is tested via TestValidateTokenWithRealToken
-// Unit testing ValidateToken requires mocking the GitHub API
-// For now, we rely on the integration test with real tokens
-
-func TestValidateTokenWithRealToken(t *testing.T) {
-	// This test only runs if GITHUB_TOKEN is set in the environment
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
-
-	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	ctx := context.Background()
-	err = client.ValidateToken(ctx)
-
-	if err != nil {
-		t.Errorf("Token validation failed with real token: %v", err)
-	}
-}
-
 func TestListPackages(t *testing.T) {
 	// Test input validation for ListPackages
 

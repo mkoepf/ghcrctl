@@ -32,6 +32,9 @@ jobs:
 
   test:
     name: Test
+    env:
+      # Token for integration tests, auth to GHCR within the repo scope
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

@@ -14,55 +14,6 @@ import (
 
 // ===[ Version ID Mapping Tests ]===
 
-// TestGetVersionIDByDigestIntegration verifies mapping digest to GitHub package version ID
-func TestGetVersionIDByDigestIntegration(t *testing.T) {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
-
-	// Create client
-	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	ctx := context.Background()
-
-	// We need a real digest from a real image
-	// This test assumes the integration test workflow has created these images
-	owner := "mkoepf"
-	ownerType := "user"
-	packageName := "ghcrctl-test-with-sbom"
-
-	// First, we need to get a known digest
-	// We'll use the ORAS resolver to get a digest for a known tag
-	// Import is not possible here since it would create a circular dependency
-	// So we'll use a known digest or skip if we can't determine it
-
-	// For now, we'll test with a digest that should exist
-	// The actual digest will vary, so we'll list versions and pick the first one
-	// to verify the mapping works
-
-	testDigest := os.Getenv("TEST_DIGEST")
-	if testDigest == "" {
-		t.Skip("Skipping test - TEST_DIGEST not set (run resolver tests first to get a digest)")
-	}
-
-	// Map digest to version ID
-	versionID, err := client.GetVersionIDByDigest(ctx, owner, ownerType, packageName, testDigest)
-	if err != nil {
-		t.Fatalf("Failed to map digest to version ID: %v", err)
-	}
-
-	// Verify we got a non-zero version ID
-	if versionID == 0 {
-		t.Error("Expected non-zero version ID")
-	}
-
-	t.Logf("✓ Successfully mapped digest to version ID: %d", versionID)
-}
-
 // TestGetVersionIDByDigestWithRealImage uses a complete workflow
 func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")

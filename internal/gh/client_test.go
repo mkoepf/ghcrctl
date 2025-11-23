@@ -177,46 +177,6 @@ func TestListPackages(t *testing.T) {
 	}
 }
 
-func TestListPackagesWithRealToken(t *testing.T) {
-	// Integration test with real GitHub token
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
-
-	// Get owner from environment or use a default
-	owner := os.Getenv("TEST_OWNER")
-	if owner == "" {
-		t.Skip("Skipping integration test - TEST_OWNER not set")
-	}
-
-	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	ctx := context.Background()
-	packages, err := client.ListPackages(ctx, owner, "user")
-
-	if err != nil {
-		t.Errorf("ListPackages failed with real token: %v", err)
-	}
-
-	// Packages should be a valid slice (may be empty)
-	if packages == nil {
-		t.Error("Expected non-nil packages slice")
-	}
-
-	// If we have packages, verify they're sorted
-	if len(packages) > 1 {
-		for i := 0; i < len(packages)-1; i++ {
-			if packages[i] > packages[i+1] {
-				t.Errorf("Packages not in alphabetical order: %s > %s", packages[i], packages[i+1])
-			}
-		}
-	}
-}
-
 func TestSortPackages(t *testing.T) {
 	tests := []struct {
 		name     string

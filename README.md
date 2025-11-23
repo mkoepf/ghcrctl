@@ -158,6 +158,89 @@ go test ./... -cover
 golangci-lint run ./...
 ```
 
+### Integration Testing
+
+This project includes integration tests that verify functionality against real
+GitHub Container Registry images.
+
+#### How Integration Tests Work
+
+Integration tests require real GHCR images with attestations. These are built
+and pushed to ghcr by the [prepare-integration-test
+workflow](.github/workflows/prepare-integration-test.yml). The workflow is
+triggered manually and does not need to be re-run, unless new tests require 
+more or different images.
+
+
+#### Authentication Requirements
+
+Integration tests use the `GITHUB_TOKEN` environment variable for
+authentication:
+
+**In GitHub Actions CI:**
+```yaml
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The `GITHUB_TOKEN` automatically provided by GitHub Actions has access to
+packages within the repository scope.
+
+**For Local Development:**
+
+Since the test images are packages of the ghcrctl repository, you need a token
+with `read:packages` scope for the repo `https://github.com/mkoepf/ghcrct`:
+
+**Option 1: Fine-Grained Personal Access Token (Recommended)**
+1. Create a fine-grained PAT at https://github.com/settings/tokens?type=beta
+2. Set **Repository access** to "Only select repositories" → `mkoepf/ghcrctl`
+3. Under **Permissions** → **Repository permissions**, grant:
+   - `packages: read` (to read test images)
+4. Export the token:
+   ```bash
+   export GITHUB_TOKEN=github_pat_xxx...
+   ```
+
+**Option 2: GitHub App Installation Token**
+Configure a GitHub App with `packages:read` permission for the repository.
+
+**Running Integration Tests:**
+```bash
+# With GITHUB_TOKEN set, integration tests run as part of all tests
+go test ./...
+
+# Run only integration tests
+go test ./... -run Integration
+
+# Without GITHUB_TOKEN, integration tests are skipped
+unset GITHUB_TOKEN
+go test ./...  # Integration tests will be skipped
+```
+
+#### Limitations
+
+The scoped token used in the integration tests allows to test
+
+- Tag resolution (latest, semantic versions, multiple tags)
+- SBOM and provenance discovery
+- Multi-layer attestation detection (Docker buildx pattern)
+- Graph command end-to-end functionality
+- JSON and table output formats
+
+However, the following tests are **not possible**:
+
+1. **Listing all user/org packages** - `ghcrctl images` requires broader `read:packages` access
+2. **Cross-repository operations** - Can only access packages within the ghcrctl repository
+3. **Package deletion** - Would require `write:packages` and `delete:packages` permissions
+4. **Private registry access** - Tests only work with packages in the ghcrctl repository scope
+
+These limitations are intentional to maintain security - integration tests use
+minimally-scoped tokens that can safely run in CI without risking access to
+other repositories or packages.
+
+For testing broader functionality, use unit tests with mocked responses or
+manual testing with appropriate credentials.
+
 ## Architecture
 
 - **CLI Layer**: Built with [Cobra](https://github.com/spf13/cobra)

@@ -97,9 +97,9 @@ var graphCmd = &cobra.Command{
 
 		// Output results
 		if graphJSONOutput {
-			return outputGraphJSON(os.Stdout, g)
+			return outputGraphJSON(cmd.OutOrStdout(), g)
 		}
-		return outputGraphTable(os.Stdout, g, imageName)
+		return outputGraphTable(cmd.OutOrStdout(), g, imageName)
 	},
 }
 

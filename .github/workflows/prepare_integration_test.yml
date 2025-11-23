@@ -1,4 +1,4 @@
-name: Integration Test
+name: Prepare Integration Test
 
 on:
   workflow_dispatch:
@@ -126,59 +126,3 @@ jobs:
           echo "# View graph for image with SBOM" >> $GITHUB_STEP_SUMMARY
           echo "ghcrctl graph ${{ inputs.image_prefix }}-with-sbom" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-  test-with-ghcrctl:
-    name: Test with ghcrctl
-    runs-on: ubuntu-latest
-    needs: setup-test-images
-    permissions:
-      contents: read
-      packages: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.23'
-
-      - name: Build ghcrctl
-        run: go build -v -o ghcrctl .
-
-      - name: Configure ghcrctl
-        run: |
-          ./ghcrctl config user ${{ github.repository_owner }}
-
-      - name: Test listing images
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Listing images..."
-          ./ghcrctl images --json | jq .
-
-      - name: Test graph for image without SBOM
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Checking graph for image without SBOM..."
-          ./ghcrctl graph ${{ inputs.image_prefix }}-no-sbom --tag latest --json | jq .
-
-      - name: Test graph for image with SBOM
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Checking graph for image with SBOM..."
-          ./ghcrctl graph ${{ inputs.image_prefix }}-with-sbom --tag latest --json | jq .
-
-      - name: Verify SBOM presence
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Check that the image with SBOM has attestations
-          output=$(./ghcrctl graph ${{ inputs.image_prefix }}-with-sbom --tag latest --json)
-          echo "$output"
-
-          # This is a simple check - expand as needed based on ghcrctl output format
-          echo "$output" | jq '.summary.sbom' | grep -q true && echo "✓ SBOM found" || echo "✗ SBOM not found"

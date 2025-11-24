@@ -24,22 +24,26 @@ var imagesCmd = &cobra.Command{
 		cfg := config.New()
 		owner, ownerType, err := cfg.GetOwner()
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to read configuration: %w", err)
 		}
 
 		if owner == "" || ownerType == "" {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 		}
 
 		// Get GitHub token
 		token, err := gh.GetToken()
 		if err != nil {
+			cmd.SilenceUsage = true
 			return err
 		}
 
 		// Create GitHub client
 		client, err := gh.NewClient(token)
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
@@ -47,6 +51,7 @@ var imagesCmd = &cobra.Command{
 		ctx := context.Background()
 		packages, err := client.ListPackages(ctx, owner, ownerType)
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to list packages: %w", err)
 		}
 

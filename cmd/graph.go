@@ -31,16 +31,19 @@ var graphCmd = &cobra.Command{
 		cfg := config.New()
 		owner, ownerType, err := cfg.GetOwner()
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to read configuration: %w", err)
 		}
 
 		if owner == "" || ownerType == "" {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 		}
 
 		// Get GitHub token
 		token, err := gh.GetToken()
 		if err != nil {
+			cmd.SilenceUsage = true
 			return err
 		}
 
@@ -51,12 +54,14 @@ var graphCmd = &cobra.Command{
 		ctx := context.Background()
 		digest, err := oras.ResolveTag(ctx, fullImage, graphTag)
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to resolve tag '%s': %w", graphTag, err)
 		}
 
 		// Create graph with root image
 		g, err := graph.NewGraph(digest)
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create graph: %w", err)
 		}
 
@@ -66,6 +71,7 @@ var graphCmd = &cobra.Command{
 		// Get GitHub client to map digest to version ID
 		ghClient, err := gh.NewClient(token)
 		if err != nil {
+			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 

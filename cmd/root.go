@@ -17,6 +17,7 @@ It provides functionality for:
 - Managing GHCR version metadata (labels, tags)
 - Safe deletion of package versions
 - Configuration of owner/org and authentication`,
+	SilenceErrors: true,
 }
 
 // Execute runs the root command

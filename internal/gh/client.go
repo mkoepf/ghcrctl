@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/go-github/v58/github"
 )
@@ -75,6 +76,16 @@ func (c *Client) ListPackages(ctx context.Context, owner string, ownerType strin
 		}
 
 		if err != nil {
+			// Check for 400 Invalid argument error (token type limitation)
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "400") && strings.Contains(errMsg, "Invalid argument") {
+				namespace := "user namespace"
+				if ownerType == "org" {
+					namespace = "organization"
+				}
+				return nil, fmt.Errorf("cannot list packages for %s %s. Your token might be either a fine-grained personal access token or repository-scoped.\nTo list all packages, you need the read:packages scope and the %s must be readable by you.\nYou might still have access to specific packages, e.g., 'ghcrctl graph <image-name>' might work with your token",
+					ownerType, owner, namespace)
+			}
 			return nil, fmt.Errorf("failed to list packages: %w", err)
 		}
 

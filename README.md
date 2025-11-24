@@ -51,11 +51,18 @@ ghcrctl config show
 
 ### Authentication
 
-Set your GitHub token as an environment variable:
+Set your GitHub Personal Access Token (PAT) as an environment variable:
 
 ```bash
 export GITHUB_TOKEN=ghp_your_token_here
 ```
+
+**Required token type:** Classic Personal Access Token (PAT) or Fine-grained PAT
+**Required scopes:**
+- `read:packages` - for read operations (list, graph, sbom, provenance)
+- `write:packages` - for write operations (tag command)
+
+**Note:** GitHub App installation tokens (`ghs_*` prefix) are not supported for write operations to GHCR via the OCI registry API.
 
 ### List Container Images
 
@@ -223,14 +230,34 @@ ghcrctl provenance myimage --json
 - in-toto attestations
 - Docker buildx provenance
 
+### Add Tags to Images
+
+Add a new tag to an existing image version:
+
+```bash
+ghcrctl tag myimage v1.0.0 latest
+```
+
+This command creates a new tag reference pointing to the same image digest as the existing tag, using the OCI registry API. It works like `docker tag` but operates directly on GHCR.
+
+**Requirements:**
+- GITHUB_TOKEN with `write:packages` scope
+- Must use Personal Access Token (not GitHub App installation token)
+
+**Example use cases:**
+- Promote a version to `latest`: `ghcrctl tag myapp v2.1.0 latest`
+- Add semantic version alias: `ghcrctl tag myapp v1.2.3 v1.2`
+- Tag for environment: `ghcrctl tag myapp sha256:abc123... production`
+
 ### Getting Help
 
 ```bash
 ghcrctl --help
+ghcrctl config --help
 ghcrctl graph --help
 ghcrctl sbom --help
 ghcrctl provenance --help
-ghcrctl config --help
+ghcrctl tag --help
 ```
 
 ## Development Status
@@ -242,7 +269,7 @@ This project is under active development following an iterative approach:
 - ✅ **Iteration 3**: List container images
 - ✅ **Iteration 4**: ORAS integration & tag resolution
 - ✅ **Iteration 5**: OCI graph discovery
-- ⏳ **Iteration 6**: Tagging Functionality
+- ✅ **Iteration 6**: Tagging Functionality
 - ⏳ **Iteration 7**: Labeling Functionality
 - ⏳ **Iteration 8**: Basic Deletion with Safety
 - ⏳ **Iteration 9**: Advanced Deletion Operations
@@ -305,13 +332,18 @@ with `read:packages` scope for the repo `https://github.com/mkoepf/ghcrct`:
 2. Set **Repository access** to "Only select repositories" → `mkoepf/ghcrctl`
 3. Under **Permissions** → **Repository permissions**, grant:
    - `packages: read` (to read test images)
+   - `packages: write` (to change tags, labels)
 4. Export the token:
    ```bash
-   export GITHUB_TOKEN=github_pat_xxx...
+   export GITHUB_TOKEN=ghp...
    ```
 
 **Option 2: GitHub App Installation Token**
-Configure a GitHub App with `packages:read` permission for the repository.
+Configure a GitHub App with `packages:read` and `packages:write` permission for
+the repository. Note that even with `packages:write`, an installation token is
+not sufficient to modify / add tags in GHCR. This is because GitHub API does not
+support adding tags and installation tokens are not supported (yet?) by GHCR's
+OCI registration API. 
 
 **Running Integration Tests:**
 ```bash

@@ -608,6 +608,53 @@ func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[s
 	return attestations, nil
 }
 
+// CopyTag copies a tag by fetching the manifest from the source tag and pushing it with the destination tag
+// This effectively creates a new tag pointing to the same digest as the source tag
+func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {
+	// Validate inputs
+	if image == "" {
+		return fmt.Errorf("image cannot be empty")
+	}
+	if sourceTag == "" {
+		return fmt.Errorf("source tag cannot be empty")
+	}
+	if destTag == "" {
+		return fmt.Errorf("destination tag cannot be empty")
+	}
+
+	// Parse image reference
+	registry, path, err := parseImageReference(image)
+	if err != nil {
+		return err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(repo); err != nil {
+		return fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the source tag to get its descriptor
+	sourceDesc, err := repo.Resolve(ctx, sourceTag)
+	if err != nil {
+		return fmt.Errorf("failed to resolve source tag '%s': %w", sourceTag, err)
+	}
+
+	// Tag the descriptor with the destination tag
+	// This creates a new tag reference pointing to the same digest
+	err = repo.Tag(ctx, sourceDesc, destTag)
+	if err != nil {
+		return fmt.Errorf("failed to tag with '%s': %w", destTag, err)
+	}
+
+	return nil
+}
+
 // configureAuth configures authentication for GHCR using GitHub token
 func configureAuth(repo *remote.Repository) error {
 	// Get GitHub token from environment

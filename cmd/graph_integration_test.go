@@ -60,9 +60,14 @@ func TestGraphCommandWithSBOM(t *testing.T) {
 		t.Error("Expected 'SBOM: true' in summary")
 	}
 
-	// Verify total artifacts count
-	if !strings.Contains(output, "Total artifacts:") {
-		t.Error("Expected 'Total artifacts:' in summary")
+	// Verify total versions count
+	if !strings.Contains(output, "Total versions:") {
+		t.Error("Expected 'Total versions:' in summary")
+	}
+
+	// Verify platform manifests are shown
+	if !strings.Contains(output, "Platform Manifests") {
+		t.Error("Expected 'Platform Manifests' in output")
 	}
 
 	// Reset args
@@ -106,9 +111,9 @@ func TestGraphCommandWithoutSBOM(t *testing.T) {
 	}
 
 	// Note: The "no-sbom" image may still have provenance, so we just verify SBOM is false
-	// Total artifacts will be >= 1
-	if !strings.Contains(output, "Total artifacts:") {
-		t.Error("Expected 'Total artifacts:' in summary")
+	// Total versions will be >= 1
+	if !strings.Contains(output, "Total versions:") {
+		t.Error("Expected 'Total versions:' in summary")
 	}
 
 	// Reset args
@@ -236,13 +241,14 @@ func TestGraphTableOutputFormat(t *testing.T) {
 	// Verify expected sections are present
 	expectedSections := []string{
 		"OCI Artifact Graph for ghcrctl-test-with-sbom",
-		"Image:",
+		"Image Index:",
 		"Digest:",
-		"Referrers:",
+		"Platform Manifests",
+		"Attestations",
 		"Summary:",
 		"SBOM:",
 		"Provenance:",
-		"Total artifacts:",
+		"Total versions:",
 	}
 
 	for _, section := range expectedSections {

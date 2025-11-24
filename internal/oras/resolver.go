@@ -124,6 +124,16 @@ type ReferrerInfo struct {
 	MediaType    string // Original OCI media type
 }
 
+// PlatformInfo contains information about a platform-specific manifest
+type PlatformInfo struct {
+	Platform     string // Platform string (e.g., "linux/amd64", "linux/arm64")
+	Digest       string // Digest of the platform-specific manifest
+	Size         int64  // Size of the manifest in bytes
+	OS           string // Operating system
+	Architecture string // CPU architecture
+	Variant      string // Optional variant (e.g., "v7" for ARM)
+}
+
 // DiscoverReferrers discovers all referrer artifacts for a given image digest
 // Returns a list of referrers (SBOM, provenance, etc.) or an error
 func DiscoverReferrers(ctx context.Context, image, digest string) ([]ReferrerInfo, error) {
@@ -412,6 +422,108 @@ func parseDigest(digestStr string) (ocispec.Descriptor, error) {
 	}
 
 	return desc, nil
+}
+
+// GetPlatformManifests extracts platform-specific manifests from an image index
+// Returns a list of platform manifests, or empty list if the image is single-arch
+func GetPlatformManifests(ctx context.Context, image, digest string) ([]PlatformInfo, error) {
+	// Validate inputs
+	if image == "" {
+		return nil, fmt.Errorf("image cannot be empty")
+	}
+	if digest == "" {
+		return nil, fmt.Errorf("digest cannot be empty")
+	}
+	if !validateDigestFormat(digest) {
+		return nil, fmt.Errorf("invalid digest format: %s", digest)
+	}
+
+	// Parse image reference
+	registry, path, err := parseImageReference(image)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(repo); err != nil {
+		return nil, fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the digest to get the full descriptor
+	desc, err := repo.Resolve(ctx, digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve digest: %w", err)
+	}
+
+	// Check if this is a manifest list/image index
+	if desc.MediaType != "application/vnd.docker.distribution.manifest.list.v2+json" &&
+		desc.MediaType != "application/vnd.oci.image.index.v1+json" {
+		// Single-arch image (just a manifest, not an index)
+		// Return empty list - no platform manifests
+		return []PlatformInfo{}, nil
+	}
+
+	// Fetch the image index
+	indexBytes, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch image index: %w", err)
+	}
+	defer indexBytes.Close()
+
+	// Read the index content
+	var index ocispec.Index
+	if err := json.NewDecoder(indexBytes).Decode(&index); err != nil {
+		return nil, fmt.Errorf("failed to decode image index: %w", err)
+	}
+
+	platforms := []PlatformInfo{}
+
+	// Extract platform manifests
+	for _, manifest := range index.Manifests {
+		// Skip attestation manifests (platform unknown/unknown)
+		if manifest.Platform != nil {
+			if manifest.Platform.OS == "unknown" && manifest.Platform.Architecture == "unknown" {
+				continue
+			}
+		}
+
+		// Check for attestation annotation
+		if manifest.Annotations != nil {
+			if refType, ok := manifest.Annotations["vnd.docker.reference.type"]; ok {
+				if refType == "attestation-manifest" {
+					continue
+				}
+			}
+		}
+
+		// Skip if no platform info (likely an attestation)
+		if manifest.Platform == nil {
+			continue
+		}
+
+		// Build platform string
+		platformStr := manifest.Platform.OS + "/" + manifest.Platform.Architecture
+		if manifest.Platform.Variant != "" {
+			platformStr += "/" + manifest.Platform.Variant
+		}
+
+		platforms = append(platforms, PlatformInfo{
+			Platform:     platformStr,
+			Digest:       manifest.Digest.String(),
+			Size:         manifest.Size,
+			OS:           manifest.Platform.OS,
+			Architecture: manifest.Platform.Architecture,
+			Variant:      manifest.Platform.Variant,
+		})
+	}
+
+	return platforms, nil
 }
 
 // FetchArtifactContent fetches the full content of an artifact (SBOM, provenance, etc.) by digest

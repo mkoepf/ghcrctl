@@ -10,7 +10,9 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 
 ghcrctl provides functionality for:
 
-- **Exploring images** and their OCI artifact graph (image, SBOM, provenance)
+- **Exploring images** and their OCI artifact graph (multi-arch platforms, SBOM, provenance)
+- **Viewing SBOM** (Software Bill of Materials) attestations
+- **Viewing provenance** attestations (SLSA)
 - **Managing GHCR version metadata** (labels, tags)
 - **Safe deletion** of package versions
 - **Configuration** of owner/org and authentication
@@ -71,16 +73,53 @@ ghcrctl images --json
 
 ### Display OCI Artifact Graph
 
-Display the OCI artifact graph for an image, including SBOM and provenance attestations:
+Display the complete OCI artifact graph for an image, showing all related package versions:
 
 ```bash
 ghcrctl graph myimage
 ```
 
-This command discovers:
-- **SBOM (Software Bill of Materials)** - SPDX and CycloneDX formats
-- **Provenance** - SLSA provenance attestations
-- **Multi-platform attestations** - Supports Docker buildx multi-layer attestations
+This command reveals the complete structure of your container image, explaining all those "untagged" package versions you see in GHCR:
+
+**What it shows:**
+- **Image Index** (manifest list) or **Manifest** (single-arch)
+- **Platform Manifests** (references) - Each architecture creates an untagged version (linux/amd64, linux/arm64, etc.)
+- **Attestations** (referrers) - SBOM and provenance attestations
+- **Version breakdown** - Shows which versions are tagged vs. untagged
+
+**Example: Multi-arch image with attestations**
+```
+OCI Artifact Graph for myimage
+
+Image Index: sha256:01af50cc8b0d33e...
+  Tags: [latest]
+  Version ID: 585861918
+  │
+  ├─ Platform Manifests (references):
+  │    ├─ linux/amd64
+  │    │  Digest: sha256:62f946a8267d...
+  │    │  Size: 669 bytes
+  │    └─ linux/arm64
+  │       Digest: sha256:89c3b5f1a432...
+  │       Size: 672 bytes
+  │
+  └─ Attestations (referrers):
+         ├─ sbom
+         │  Digest: sha256:9a1636d22702...
+         └─ provenance
+            Digest: sha256:9a1636d22702...
+
+Summary:
+  Platforms: 2
+  SBOM: true
+  Provenance: true
+  Total versions: 5 (1 tagged, 4 untagged)
+```
+
+**Understanding the output:**
+- **References** (inside image index): Platform-specific manifests that the multi-arch image consists of
+- **Referrers** (external): Attestations that reference the image (SBOM, provenance, signatures)
+- **Total versions**: Complete count explaining all package versions in GHCR for this image
 
 Specify a tag (default is `latest`):
 
@@ -94,33 +133,103 @@ Get output in JSON format:
 ghcrctl graph myimage --json
 ```
 
-**Example output:**
+### View SBOM (Software Bill of Materials)
+
+Display the SBOM attestation for a container image:
+
+```bash
+ghcrctl sbom myimage
 ```
-OCI Artifact Graph for myimage
 
-Image:
-  Digest: sha256:1234567890abcdef...
-  Tags: [v1.0.0]
-  Version ID: 12345
+The command automatically handles multiple SBOMs:
+- **One SBOM found**: Displays it automatically
+- **Multiple SBOMs found**: Lists them and prompts you to select one
+- **No SBOM found**: Clear error message
 
-Referrers:
+**Options:**
 
-  sbom:
-    Digest: sha256:abcdef1234567890...
+```bash
+# Use a specific tag (default: latest)
+ghcrctl sbom myimage --tag v1.0.0
 
-  provenance:
-    Digest: sha256:fedcba0987654321...
+# Select a specific SBOM by digest
+ghcrctl sbom myimage --digest abc123def456
 
-Summary:
-  SBOM: true
-  Provenance: true
-  Total artifacts: 3
+# Show all SBOMs
+ghcrctl sbom myimage --all
+
+# Output as raw JSON
+ghcrctl sbom myimage --json
 ```
+
+**Example with multiple SBOMs:**
+```
+Multiple SBOMs found for myimage
+
+Use --digest <digest> to select one, or --all to show all:
+
+  1. sha256:abc123def456...
+     Type: application/vnd.in-toto+json
+  2. sha256:789xyz123456...
+     Type: application/spdx+json
+
+Example: ghcrctl sbom myimage --digest abc123def456
+```
+
+**Supported formats:**
+- SPDX (JSON)
+- CycloneDX (JSON)
+- Syft native format
+- Docker buildx attestations (in-toto DSSE envelopes)
+
+### View Provenance Attestation
+
+Display the provenance attestation for a container image:
+
+```bash
+ghcrctl provenance myimage
+```
+
+Provenance attestations contain build information including:
+- Builder details (GitHub Actions, GitLab CI, etc.)
+- Source repository and commit
+- Build invocation and parameters
+- SLSA provenance level
+
+**Options:**
+
+```bash
+# Use a specific tag (default: latest)
+ghcrctl provenance myimage --tag v1.0.0
+
+# Select specific provenance by digest
+ghcrctl provenance myimage --digest abc123def456
+
+# Show all provenance documents
+ghcrctl provenance myimage --all
+
+# Output as raw JSON
+ghcrctl provenance myimage --json
+```
+
+**Smart behavior:**
+- Automatically displays if only one provenance found
+- Lists multiple provenances if more than one exists
+- Clear error if no provenance attestation found
+
+**Supported formats:**
+- SLSA Provenance v0.2
+- SLSA Provenance v1.0
+- in-toto attestations
+- Docker buildx provenance
 
 ### Getting Help
 
 ```bash
 ghcrctl --help
+ghcrctl graph --help
+ghcrctl sbom --help
+ghcrctl provenance --help
 ghcrctl config --help
 ```
 
@@ -227,8 +336,11 @@ The scoped token used in the integration tests allows to test
 - Tag resolution (latest, semantic versions, multiple tags)
 - SBOM and provenance discovery
 - Multi-layer attestation detection (Docker buildx pattern)
-- Graph command end-to-end functionality
-- JSON and table output formats
+- Platform manifest extraction (multi-arch images)
+- Graph command with tree-style output
+- SBOM command end-to-end functionality
+- Provenance command end-to-end functionality
+- JSON and table/tree output formats
 
 However, the following tests are **not possible**:
 

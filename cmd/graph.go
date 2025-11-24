@@ -84,6 +84,13 @@ var graphCmd = &cobra.Command{
 			g.Root.SetVersionID(versionID)
 		}
 
+		// Get platform manifests (if multi-arch image)
+		platforms, err := oras.GetPlatformManifests(ctx, fullImage, digest)
+		if err != nil {
+			// Non-fatal: platforms are optional
+			fmt.Fprintf(os.Stderr, "Warning: could not get platform manifests: %v\n", err)
+		}
+
 		// Discover referrers (SBOM, provenance, etc.)
 		referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
 		if err != nil {
@@ -103,13 +110,13 @@ var graphCmd = &cobra.Command{
 
 		// Output results
 		if graphJSONOutput {
-			return outputGraphJSON(cmd.OutOrStdout(), g)
+			return outputGraphJSON(cmd.OutOrStdout(), g, platforms)
 		}
-		return outputGraphTable(cmd.OutOrStdout(), g, imageName)
+		return outputGraphTree(cmd.OutOrStdout(), g, imageName, platforms)
 	},
 }
 
-func outputGraphJSON(w io.Writer, g *graph.Graph) error {
+func outputGraphJSON(w io.Writer, g *graph.Graph, platforms []oras.PlatformInfo) error {
 	// Create JSON-friendly structure
 	output := map[string]interface{}{
 		"root": map[string]interface{}{
@@ -118,9 +125,23 @@ func outputGraphJSON(w io.Writer, g *graph.Graph) error {
 			"tags":       g.Root.Tags,
 			"version_id": g.Root.VersionID,
 		},
+		"platforms": []map[string]interface{}{},
 		"referrers": []map[string]interface{}{},
 	}
 
+	// Add platform manifests
+	for _, p := range platforms {
+		output["platforms"] = append(output["platforms"].([]map[string]interface{}), map[string]interface{}{
+			"platform":     p.Platform,
+			"digest":       p.Digest,
+			"size":         p.Size,
+			"os":           p.OS,
+			"architecture": p.Architecture,
+			"variant":      p.Variant,
+		})
+	}
+
+	// Add referrers
 	for _, ref := range g.Referrers {
 		output["referrers"] = append(output["referrers"].([]map[string]interface{}), map[string]interface{}{
 			"digest":     ref.Digest,
@@ -138,12 +159,19 @@ func outputGraphJSON(w io.Writer, g *graph.Graph) error {
 	return nil
 }
 
-func outputGraphTable(w io.Writer, g *graph.Graph, imageName string) error {
+func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []oras.PlatformInfo) error {
 	fmt.Fprintf(w, "OCI Artifact Graph for %s\n\n", imageName)
 
-	// Display root image
-	fmt.Fprintf(w, "Image:\n")
-	fmt.Fprintf(w, "  Digest: %s\n", g.Root.Digest)
+	// Determine if multi-arch
+	isMultiArch := len(platforms) > 0
+
+	// Display root (manifest list or single manifest)
+	rootType := "Manifest"
+	if isMultiArch {
+		rootType = "Image Index"
+	}
+
+	fmt.Fprintf(w, "%s: %s\n", rootType, g.Root.Digest)
 	if len(g.Root.Tags) > 0 {
 		fmt.Fprintf(w, "  Tags: %v\n", g.Root.Tags)
 	}
@@ -151,25 +179,73 @@ func outputGraphTable(w io.Writer, g *graph.Graph, imageName string) error {
 		fmt.Fprintf(w, "  Version ID: %d\n", g.Root.VersionID)
 	}
 
-	// Display referrers
-	if len(g.Referrers) == 0 {
-		fmt.Fprintf(w, "\nNo referrers found (SBOM, provenance, etc.)\n")
-	} else {
-		fmt.Fprintf(w, "\nReferrers:\n")
-		for _, ref := range g.Referrers {
-			fmt.Fprintf(w, "\n  %s:\n", ref.Type)
-			fmt.Fprintf(w, "    Digest: %s\n", ref.Digest)
+	// Display platform manifests (references)
+	if len(platforms) > 0 {
+		fmt.Fprintf(w, "  │\n")
+		fmt.Fprintf(w, "  ├─ Platform Manifests (references):\n")
+		for i, p := range platforms {
+			isLast := i == len(platforms)-1
+			prefix := "│  "
+			if isLast && len(g.Referrers) == 0 {
+				prefix = "   "
+			}
+
+			connector := "├"
+			if isLast {
+				connector = "└"
+			}
+
+			shortDigest := p.Digest
+			if len(shortDigest) > 19 {
+				shortDigest = shortDigest[:19] + "..."
+			}
+
+			fmt.Fprintf(w, "  %s  %s─ %s\n", prefix, connector, p.Platform)
+			fmt.Fprintf(w, "  %s     Digest: %s\n", prefix, shortDigest)
+			if p.Size > 0 {
+				fmt.Fprintf(w, "  %s     Size: %d bytes\n", prefix, p.Size)
+			}
+		}
+	}
+
+	// Display referrers (attestations)
+	if len(g.Referrers) > 0 {
+		fmt.Fprintf(w, "  │\n")
+		fmt.Fprintf(w, "  └─ Attestations (referrers):\n")
+		for i, ref := range g.Referrers {
+			isLast := i == len(g.Referrers)-1
+			prefix := "     "
+
+			connector := "├"
+			if isLast {
+				connector = "└"
+			}
+
+			shortDigest := ref.Digest
+			if len(shortDigest) > 19 {
+				shortDigest = shortDigest[:19] + "..."
+			}
+
+			fmt.Fprintf(w, "  %s  %s─ %s\n", prefix, connector, ref.Type)
+			fmt.Fprintf(w, "  %s     Digest: %s\n", prefix, shortDigest)
 			if ref.VersionID != 0 {
-				fmt.Fprintf(w, "    Version ID: %d\n", ref.VersionID)
+				fmt.Fprintf(w, "  %s     Version ID: %d\n", prefix, ref.VersionID)
 			}
 		}
 	}
 
 	// Display summary
 	fmt.Fprintf(w, "\nSummary:\n")
+	if isMultiArch {
+		fmt.Fprintf(w, "  Platforms: %d\n", len(platforms))
+	} else {
+		fmt.Fprintf(w, "  Type: Single-arch image\n")
+	}
 	fmt.Fprintf(w, "  SBOM: %v\n", g.HasSBOM())
 	fmt.Fprintf(w, "  Provenance: %v\n", g.HasProvenance())
-	fmt.Fprintf(w, "  Total artifacts: %d\n", g.UniqueArtifactCount())
+	totalVersions := 1 + len(platforms) + len(g.Referrers)
+	untaggedVersions := len(platforms) + len(g.Referrers)
+	fmt.Fprintf(w, "  Total versions: %d (%d tagged, %d untagged)\n", totalVersions, 1, untaggedVersions)
 
 	return nil
 }

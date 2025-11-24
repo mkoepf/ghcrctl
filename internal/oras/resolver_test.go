@@ -355,6 +355,68 @@ func TestDetermineArtifactType(t *testing.T) {
 	}
 }
 
+func TestGetPlatformManifests(t *testing.T) {
+	tests := []struct {
+		name      string
+		image     string
+		digest    string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "empty image",
+			image:     "",
+			digest:    "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantError: true,
+			errorMsg:  "image cannot be empty",
+		},
+		{
+			name:      "empty digest",
+			image:     "ghcr.io/owner/image",
+			digest:    "",
+			wantError: true,
+			errorMsg:  "digest cannot be empty",
+		},
+		{
+			name:      "invalid digest format",
+			image:     "ghcr.io/owner/image",
+			digest:    "invalid-digest",
+			wantError: true,
+			errorMsg:  "invalid digest format",
+		},
+		{
+			name:      "invalid image format",
+			image:     "owner/image",
+			digest:    "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantError: true,
+			errorMsg:  "invalid image format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			platforms, err := GetPlatformManifests(ctx, tt.image, tt.digest)
+
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+				if platforms != nil {
+					t.Errorf("Expected nil platforms on error, got %v", platforms)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				// For success case, platforms can be empty list (single-arch) or populated (multi-arch)
+			}
+		})
+	}
+}
+
 func TestFetchArtifactContent(t *testing.T) {
 	tests := []struct {
 		name      string

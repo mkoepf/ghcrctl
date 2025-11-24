@@ -378,4 +378,3 @@ func TestGetVersionTags(t *testing.T) {
 		})
 	}
 }
-

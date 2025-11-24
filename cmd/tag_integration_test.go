@@ -17,39 +17,27 @@ func TestTagCommandIntegration(t *testing.T) {
 	// without a token with write permissions
 
 	tests := []struct {
-		name           string
-		args           []string
-		wantError      bool
-		errorContains  string
-		skipReason     string
+		name          string
+		args          []string
+		wantError     bool
+		errorContains string
 	}{
 		{
-			name:           "missing arguments",
-			args:           []string{"tag", "myimage"},
-			wantError:      true,
-			errorContains:  "accepts 3 arg",
+			name:          "missing arguments",
+			args:          []string{"tag", "myimage"},
+			wantError:     true,
+			errorContains: "accepts 3 arg",
 		},
 		{
-			name:           "too many arguments",
-			args:           []string{"tag", "myimage", "v1.0", "v2.0", "extra"},
-			wantError:      true,
-			errorContains:  "accepts 3 arg",
-		},
-		{
-			name:           "requires write permission",
-			args:           []string{"tag", "ghcrctl-test-with-sbom", "latest", "test-tag"},
-			wantError:      true,
-			errorContains:  "permission",
-			skipReason:     "Requires write:packages token which integration tests don't have",
+			name:          "too many arguments",
+			args:          []string{"tag", "myimage", "v1.0", "v2.0", "extra"},
+			wantError:     true,
+			errorContains: "accepts 3 arg",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.skipReason != "" {
-				t.Skip(tt.skipReason)
-			}
-
 			rootCmd.SetArgs(tt.args)
 			var outBuf, errBuf bytes.Buffer
 			rootCmd.SetOut(&outBuf)
@@ -73,29 +61,4 @@ func TestTagCommandIntegration(t *testing.T) {
 			rootCmd.SetArgs([]string{})
 		})
 	}
-}
-
-// TestTagCommandWithWriteToken tests the actual tag creation functionality
-// This test is skipped by default as it requires a token with write:packages permission
-func TestTagCommandWithWriteToken(t *testing.T) {
-	t.Skip("This test requires write:packages permission - run manually with appropriate token")
-
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Skip("GITHUB_TOKEN not set, skipping integration test")
-	}
-
-	// This test would verify:
-	// 1. Tag command successfully creates a new tag
-	// 2. New tag points to same digest as source tag
-	// 3. Both tags are visible in subsequent operations
-
-	// Example test structure (commented out):
-	// args := []string{"tag", "ghcrctl-test-with-sbom", "latest", "integration-test-tag"}
-	// rootCmd.SetArgs(args)
-	// err := rootCmd.Execute()
-	// if err != nil {
-	//     t.Fatalf("Tag command failed: %v", err)
-	// }
-	//
-	// Verify the new tag exists and points to same digest...
 }

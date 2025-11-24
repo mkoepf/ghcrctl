@@ -72,15 +72,3 @@ func TestTagCommandArguments(t *testing.T) {
 		})
 	}
 }
-
-func TestTagCommandRequiresConfiguration(t *testing.T) {
-	// This test verifies that the tag command fails when owner is not configured
-	// We can't easily test this without mocking, so this is a placeholder for future enhancement
-	t.Skip("Requires mocking config - will be tested in integration tests")
-}
-
-func TestTagCommandRequiresToken(t *testing.T) {
-	// This test verifies that the tag command fails when GITHUB_TOKEN is not set
-	// We can't easily test this without mocking, so this is a placeholder for future enhancement
-	t.Skip("Requires environment manipulation - will be tested in integration tests")
-}

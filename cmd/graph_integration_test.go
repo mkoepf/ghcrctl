@@ -341,3 +341,102 @@ func TestGraphJSONOutputStructure(t *testing.T) {
 	// Reset args
 	rootCmd.SetArgs([]string{})
 }
+
+// TestGraphShowsAllTagsForDigest verifies that graph displays all tags pointing to a digest
+func TestGraphShowsAllTagsForDigest(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	// Set up config
+	cfg := config.New()
+	err := cfg.SetOwner("mkoepf", "user")
+	if err != nil {
+		t.Fatalf("Failed to set owner: %v", err)
+	}
+
+	// Note: This test assumes ghcrctl-test-with-sbom has been tagged with both "latest" and "newest"
+	// pointing to the same digest (via: ghcrctl tag ghcrctl-test-with-sbom latest newest)
+
+	// Test querying with "latest" tag - should show ALL tags for that digest
+	rootCmd.SetArgs([]string{"graph", "ghcrctl-test-with-sbom", "--tag", "latest"})
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+
+	err = rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("graph command failed: %v\nStderr: %s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	t.Logf("Graph output for --tag latest:\n%s", output)
+
+	// Verify both tags are shown
+	if !strings.Contains(output, "latest") {
+		t.Error("Expected output to contain 'latest' tag")
+	}
+	if !strings.Contains(output, "newest") {
+		t.Error("Expected output to contain 'newest' tag (all tags for digest should be shown)")
+	}
+
+	// Test with JSON output as well
+	rootCmd.SetArgs([]string{"graph", "ghcrctl-test-with-sbom", "--tag", "latest", "--json"})
+	stdout.Reset()
+	stderr.Reset()
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+
+	err = rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("graph command failed: %v", err)
+	}
+
+	jsonOutput := stdout.String()
+	var result map[string]interface{}
+	err = json.Unmarshal([]byte(jsonOutput), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON output: %v", err)
+	}
+
+	root, ok := result["root"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected 'root' to be an object")
+	}
+
+	tags, ok := root["tags"].([]interface{})
+	if !ok {
+		t.Fatal("Expected 'tags' to be an array")
+	}
+
+	// Verify tags array contains both "latest" and "newest"
+	tagStrings := make([]string, len(tags))
+	for i, tag := range tags {
+		tagStrings[i] = tag.(string)
+	}
+
+	hasLatest := false
+	hasNewest := false
+	for _, tag := range tagStrings {
+		if tag == "latest" {
+			hasLatest = true
+		}
+		if tag == "newest" {
+			hasNewest = true
+		}
+	}
+
+	if !hasLatest {
+		t.Errorf("Expected tags to contain 'latest', got: %v", tagStrings)
+	}
+	if !hasNewest {
+		t.Errorf("Expected tags to contain 'newest', got: %v", tagStrings)
+	}
+
+	t.Logf("✓ Graph correctly shows all tags for digest: %v", tagStrings)
+
+	// Reset args
+	rootCmd.SetArgs([]string{})
+}

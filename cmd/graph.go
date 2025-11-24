@@ -65,10 +65,7 @@ var graphCmd = &cobra.Command{
 			return fmt.Errorf("failed to create graph: %w", err)
 		}
 
-		// Add the tag to the root
-		g.Root.AddTag(graphTag)
-
-		// Get GitHub client to map digest to version ID
+		// Get GitHub client to map digest to version ID and fetch all tags
 		ghClient, err := gh.NewClient(token)
 		if err != nil {
 			cmd.SilenceUsage = true
@@ -80,8 +77,23 @@ var graphCmd = &cobra.Command{
 		if err != nil {
 			// Non-fatal: version ID is optional
 			fmt.Fprintf(os.Stderr, "Warning: could not map digest to version ID: %v\n", err)
+			// Fall back to just adding the queried tag
+			g.Root.AddTag(graphTag)
 		} else {
 			g.Root.SetVersionID(versionID)
+
+			// Fetch all tags for this version
+			allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+			if err != nil {
+				// Non-fatal: if we can't get all tags, fall back to just the queried tag
+				fmt.Fprintf(os.Stderr, "Warning: could not fetch all tags for version: %v\n", err)
+				g.Root.AddTag(graphTag)
+			} else {
+				// Add all tags to the graph
+				for _, tag := range allTags {
+					g.Root.AddTag(tag)
+				}
+			}
 		}
 
 		// Get platform manifests (if multi-arch image)
@@ -104,6 +116,21 @@ var graphCmd = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "Warning: skipping invalid referrer: %v\n", err)
 					continue
 				}
+
+				// Try to get version ID and all tags for this referrer
+				refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
+				if err == nil {
+					artifact.SetVersionID(refVersionID)
+
+					// Fetch all tags for this referrer version
+					refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
+					if err == nil {
+						for _, tag := range refTags {
+							artifact.AddTag(tag)
+						}
+					}
+				}
+
 				g.AddReferrer(artifact)
 			}
 		}
@@ -159,6 +186,21 @@ func outputGraphJSON(w io.Writer, g *graph.Graph, platforms []oras.PlatformInfo)
 	return nil
 }
 
+func formatTags(tags []string) string {
+	if len(tags) == 0 {
+		return "[]"
+	}
+	result := "["
+	for i, tag := range tags {
+		if i > 0 {
+			result += ", "
+		}
+		result += tag
+	}
+	result += "]"
+	return result
+}
+
 func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []oras.PlatformInfo) error {
 	fmt.Fprintf(w, "OCI Artifact Graph for %s\n\n", imageName)
 
@@ -173,7 +215,7 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []
 
 	fmt.Fprintf(w, "%s: %s\n", rootType, g.Root.Digest)
 	if len(g.Root.Tags) > 0 {
-		fmt.Fprintf(w, "  Tags: %v\n", g.Root.Tags)
+		fmt.Fprintf(w, "  Tags: %s\n", formatTags(g.Root.Tags))
 	}
 	if g.Root.VersionID != 0 {
 		fmt.Fprintf(w, "  Version ID: %d\n", g.Root.VersionID)

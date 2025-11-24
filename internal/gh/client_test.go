@@ -311,14 +311,13 @@ func TestGetVersionIDByDigest(t *testing.T) {
 	}
 }
 
-func TestAddTagToVersion(t *testing.T) {
+func TestGetVersionTags(t *testing.T) {
 	tests := []struct {
 		name      string
 		owner     string
 		ownerType string
 		pkg       string
 		versionID int64
-		newTag    string
 		wantError bool
 	}{
 		{
@@ -327,7 +326,6 @@ func TestAddTagToVersion(t *testing.T) {
 			ownerType: "org",
 			pkg:       "test-package",
 			versionID: 12345,
-			newTag:    "v2.0",
 			wantError: true,
 		},
 		{
@@ -336,7 +334,6 @@ func TestAddTagToVersion(t *testing.T) {
 			ownerType: "invalid",
 			pkg:       "test-package",
 			versionID: 12345,
-			newTag:    "v2.0",
 			wantError: true,
 		},
 		{
@@ -345,7 +342,6 @@ func TestAddTagToVersion(t *testing.T) {
 			ownerType: "org",
 			pkg:       "",
 			versionID: 12345,
-			newTag:    "v2.0",
 			wantError: true,
 		},
 		{
@@ -354,16 +350,6 @@ func TestAddTagToVersion(t *testing.T) {
 			ownerType: "org",
 			pkg:       "test-package",
 			versionID: 0,
-			newTag:    "v2.0",
-			wantError: true,
-		},
-		{
-			name:      "empty new tag",
-			owner:     "test",
-			ownerType: "org",
-			pkg:       "test-package",
-			versionID: 12345,
-			newTag:    "",
 			wantError: true,
 		},
 	}
@@ -376,7 +362,7 @@ func TestAddTagToVersion(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err = client.AddTagToVersion(ctx, tt.owner, tt.ownerType, tt.pkg, tt.versionID, tt.newTag)
+			tags, err := client.GetVersionTags(ctx, tt.owner, tt.ownerType, tt.pkg, tt.versionID)
 
 			if tt.wantError {
 				if err == nil {
@@ -386,7 +372,10 @@ func TestAddTagToVersion(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
+				// Can't verify actual tags without real API call
+				_ = tags
 			}
 		})
 	}
 }
+

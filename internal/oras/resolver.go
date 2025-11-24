@@ -414,6 +414,88 @@ func parseDigest(digestStr string) (ocispec.Descriptor, error) {
 	return desc, nil
 }
 
+// FetchArtifactContent fetches the full content of an artifact (SBOM, provenance, etc.) by digest
+// Returns the parsed content as a map which can be marshaled to JSON
+// The content includes all layers/blobs in the attestation manifest
+func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[string]interface{}, error) {
+	// Validate inputs
+	if image == "" {
+		return nil, fmt.Errorf("image cannot be empty")
+	}
+	if digestStr == "" {
+		return nil, fmt.Errorf("digest cannot be empty")
+	}
+	if !validateDigestFormat(digestStr) {
+		return nil, fmt.Errorf("invalid digest format: %s", digestStr)
+	}
+
+	// Parse image reference
+	registry, path, err := parseImageReference(image)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(repo); err != nil {
+		return nil, fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the digest to get the full descriptor (with media type)
+	// ORAS Resolve can accept both tags and digests
+	desc, err := repo.Resolve(ctx, digestStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve digest: %w", err)
+	}
+
+	// Fetch the manifest
+	manifestBytes, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
+	}
+	defer manifestBytes.Close()
+
+	// Parse the manifest
+	var manifest ocispec.Manifest
+	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
+		return nil, fmt.Errorf("failed to decode manifest: %w", err)
+	}
+
+	// Collect all attestation blobs
+	var attestations []map[string]interface{}
+
+	// Fetch each layer (attestations are stored in layers)
+	for _, layer := range manifest.Layers {
+		// Fetch the layer blob
+		layerBytes, err := repo.Fetch(ctx, layer)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to fetch layer %s: %v\n", layer.Digest.String(), err)
+			continue
+		}
+		defer layerBytes.Close()
+
+		// Parse as JSON
+		var attestation map[string]interface{}
+		if err := json.NewDecoder(layerBytes).Decode(&attestation); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to decode layer %s as JSON: %v\n", layer.Digest.String(), err)
+			continue
+		}
+
+		attestations = append(attestations, attestation)
+	}
+
+	if len(attestations) == 0 {
+		return nil, fmt.Errorf("no attestation content found in artifact")
+	}
+
+	return attestations, nil
+}
+
 // configureAuth configures authentication for GHCR using GitHub token
 func configureAuth(repo *remote.Repository) error {
 	// Get GitHub token from environment

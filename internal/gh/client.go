@@ -181,3 +181,88 @@ func (c *Client) GetVersionIDByDigest(ctx context.Context, owner, ownerType, pac
 
 	return 0, fmt.Errorf("no version found with digest %s", digest)
 }
+
+// AddTagToVersion adds a new tag to an existing package version
+// It retrieves the current tags for the version and adds the new tag to the list
+func (c *Client) AddTagToVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64, newTag string) error {
+	// Validate inputs
+	if owner == "" {
+		return fmt.Errorf("owner cannot be empty")
+	}
+	if ownerType != "org" && ownerType != "user" {
+		return fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+	if packageName == "" {
+		return fmt.Errorf("package name cannot be empty")
+	}
+	if versionID == 0 {
+		return fmt.Errorf("version ID cannot be zero")
+	}
+	if newTag == "" {
+		return fmt.Errorf("new tag cannot be empty")
+	}
+
+	// First, get the current version to retrieve existing tags
+	var version *github.PackageVersion
+	var err error
+
+	if ownerType == "org" {
+		version, _, err = c.client.Organizations.PackageGetVersion(ctx, owner, "container", packageName, versionID)
+	} else {
+		version, _, err = c.client.Users.PackageGetVersion(ctx, owner, "container", packageName, versionID)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to get package version: %w", err)
+	}
+
+	// Build list of tags including the new one
+	existingTags := []string{}
+	if version.Metadata != nil && version.Metadata.Container != nil && version.Metadata.Container.Tags != nil {
+		existingTags = version.Metadata.Container.Tags
+	}
+
+	// Check if tag already exists
+	for _, tag := range existingTags {
+		if tag == newTag {
+			return fmt.Errorf("tag '%s' already exists on this version", newTag)
+		}
+	}
+
+	// Add new tag
+	updatedTags := append(existingTags, newTag)
+
+	// Prepare the update request body
+	type updateRequest struct {
+		Metadata struct {
+			Container struct {
+				Tags []string `json:"tags"`
+			} `json:"container"`
+		} `json:"metadata"`
+	}
+
+	reqBody := updateRequest{}
+	reqBody.Metadata.Container.Tags = updatedTags
+
+	// Build the URL for the PATCH request
+	var url string
+	if ownerType == "org" {
+		url = fmt.Sprintf("orgs/%s/packages/container/%s/versions/%d", owner, packageName, versionID)
+	} else {
+		url = fmt.Sprintf("user/packages/container/%s/versions/%d", packageName, versionID)
+	}
+
+	// Create the PATCH request
+	req, err := c.client.NewRequest("PATCH", url, reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Execute the request
+	_, err = c.client.Do(ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update package version: %w", err)
+	}
+
+	return nil
+}

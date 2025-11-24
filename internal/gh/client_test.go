@@ -310,3 +310,83 @@ func TestGetVersionIDByDigest(t *testing.T) {
 		})
 	}
 }
+
+func TestAddTagToVersion(t *testing.T) {
+	tests := []struct {
+		name      string
+		owner     string
+		ownerType string
+		pkg       string
+		versionID int64
+		newTag    string
+		wantError bool
+	}{
+		{
+			name:      "empty owner",
+			owner:     "",
+			ownerType: "org",
+			pkg:       "test-package",
+			versionID: 12345,
+			newTag:    "v2.0",
+			wantError: true,
+		},
+		{
+			name:      "invalid owner type",
+			owner:     "test",
+			ownerType: "invalid",
+			pkg:       "test-package",
+			versionID: 12345,
+			newTag:    "v2.0",
+			wantError: true,
+		},
+		{
+			name:      "empty package name",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "",
+			versionID: 12345,
+			newTag:    "v2.0",
+			wantError: true,
+		},
+		{
+			name:      "zero version ID",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "test-package",
+			versionID: 0,
+			newTag:    "v2.0",
+			wantError: true,
+		},
+		{
+			name:      "empty new tag",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "test-package",
+			versionID: 12345,
+			newTag:    "",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient("ghp_fake_token")
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ctx := context.Background()
+			err = client.AddTagToVersion(ctx, tt.owner, tt.ownerType, tt.pkg, tt.versionID, tt.newTag)
+
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}

@@ -49,6 +49,15 @@ View current configuration:
 ghcrctl config show
 ```
 
+#### Configuration File
+
+Configuration is stored in `~/.ghcrctl/config.yaml`:
+
+```yaml
+owner-name: myorg
+owner-type: org
+```
+
 #### Environment Variables (Recommended for Parallel Sessions)
 
 You can override the config file by setting environment variables. This is particularly useful for working with multiple owners in parallel terminal sessions:
@@ -632,19 +641,6 @@ manual testing with appropriate credentials.
   - Supports OCI Referrers API and fallback to referrers tag schema
   - Discovers Docker buildx attestations stored in image indexes
   - Handles multi-layer attestation manifests (SBOM + provenance in single manifest)
-
-## Configuration File
-
-Configuration is stored in `~/.ghcrctl/config.yaml`:
-
-```yaml
-owner-name: myorg
-owner-type: org
-```
-
-## Contributing
-
-This project follows a Test-Driven Development (TDD) approach with comprehensive test coverage (>80% target).
 
 ## License
 

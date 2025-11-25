@@ -1,25 +1,11 @@
 # Performance / usability 
 
-"./ghcrctl versions" is very slow and becomes unusable with more than 5
-versions.
-
-untagged versions can still be part of a graph, but this is not resolved by
-"ghcrctl versions". Also, "ghcrctl graph" cannot resolve it, because it always a
-tagged image (default is latest)! How about ghcrctl graph --version <versionid>?
-
-A lot of downloads happen, as can be seen in the github packages web ui (e.g.
-https://github.com/mkoepf/ghcrctl/pkgs/container/ghcrctl-test-no-sbom/versions).
-Find out, which parts of ghcrctl actually cause these downloads and if that can
-be reduced / optimized.
-
-if there are several arch manifests, there are also several attestation versions. This is actually another level of the graph and should be represented that way.
-
 There should be several filter options to filter out versions, e.g.:
 - N days old or younger
 - at least N days old
 - tag patterns
 
-## Deletion
+## Delete behavior when deleting single package versions
 
 When an attestation version is deleted from a graph, then ghcrctl triggers a warning (issued by oras or gh api?):
 ```

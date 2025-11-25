@@ -152,6 +152,22 @@ var graphCmd = &cobra.Command{
 			versionCache[ver.Name] = ver
 		}
 
+		// Create version ID→tags cache to avoid duplicate GetVersionTags calls
+		// This eliminates duplicate calls (2× per attestation → 1×)
+		tagsCache := make(map[int64][]string)
+
+		// Helper function to get tags for a version ID (with caching)
+		getTagsForVersion := func(versionID int64) ([]string, error) {
+			if tags, cached := tagsCache[versionID]; cached {
+				return tags, nil
+			}
+			tags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+			if err == nil {
+				tagsCache[versionID] = tags
+			}
+			return tags, err
+		}
+
 		// Map digest to version ID using cache
 		versionInfo, found := versionCache[digest]
 		if !found {
@@ -163,8 +179,8 @@ var graphCmd = &cobra.Command{
 			versionID := versionInfo.ID
 			g.Root.SetVersionID(versionID)
 
-			// Fetch all tags for this version
-			allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+			// Fetch all tags for this version (with caching)
+			allTags, err := getTagsForVersion(versionID)
 			if err != nil {
 				// Non-fatal: if we can't get all tags, fall back to just the queried tag
 				fmt.Fprintf(os.Stderr, "Warning: could not fetch all tags for version: %v\n", err)
@@ -211,7 +227,7 @@ var graphCmd = &cobra.Command{
 				// Map parent digest to version ID and fetch tags using cache
 				if parentVersionInfo, found := versionCache[digest]; found {
 					g.Root.SetVersionID(parentVersionInfo.ID)
-					allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, parentVersionInfo.ID)
+					allTags, err := getTagsForVersion(parentVersionInfo.ID)
 					if err == nil {
 						for _, tag := range allTags {
 							g.Root.AddTag(tag)
@@ -321,8 +337,8 @@ var graphCmd = &cobra.Command{
 				if refVersionInfo, found := versionCache[ref.Digest]; found {
 					artifact.SetVersionID(refVersionInfo.ID)
 
-					// Fetch all tags for this referrer version
-					refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionInfo.ID)
+					// Fetch all tags for this referrer version (with caching)
+					refTags, err := getTagsForVersion(refVersionInfo.ID)
 					if err == nil {
 						for _, tag := range refTags {
 							artifact.AddTag(tag)

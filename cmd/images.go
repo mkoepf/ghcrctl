@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/mhk/ghcrctl/internal/config"
 	"github.com/mhk/ghcrctl/internal/gh"
@@ -57,9 +56,9 @@ var imagesCmd = &cobra.Command{
 
 		// Output results
 		if jsonOutput {
-			return outputJSON(os.Stdout, packages)
+			return outputJSON(cmd.OutOrStdout(), packages)
 		}
-		return outputTable(os.Stdout, packages, owner)
+		return outputTable(cmd.OutOrStdout(), packages, owner)
 	},
 }
 

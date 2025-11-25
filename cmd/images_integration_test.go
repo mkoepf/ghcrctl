@@ -9,8 +9,10 @@ import (
 	"github.com/mhk/ghcrctl/internal/config"
 )
 
-// TestImagesCommandWithRepoScopedToken tests that images command fails with helpful error
-// when using a repository-scoped token (like GitHub Actions GITHUB_TOKEN)
+// TestImagesCommandWithRepoScopedToken tests that images command works with valid token
+// Note: The tested path differs depending on the token's permissions. It is not
+// possible to provide the exact same token type for local development and CI
+// environments due to GitHub limitations.
 func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -33,16 +35,39 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 	rootCmd.SetOut(stdout)
 	rootCmd.SetErr(stderr)
 
-	// Execute command - should fail with repo-scoped token
+	// Execute command
 	err = rootCmd.Execute()
 
-	// We expect an error because the repo-scoped token doesn't have broad read:packages access
+	// If token has sufficient permissions (access to user / org namespace and
+	// read:packages), command should succeed. If it's a repo-scoped token (e.g.
+	// installation token from a GitHub App) it is expected to fail due to
+	// insufficient permissions.
+	//
+	// Both cases are handled here to allow testing in different environments.
 	if err == nil {
-		t.Error("Expected error with repo-scoped token, got none")
-		t.Logf("Stdout: %s", stdout.String())
-		t.Logf("Stderr: %s", stderr.String())
+		// Case 1: 
+		// In the GitHub Actions CI, a personal access token with broad
+		// read:packages permissions is used, so the command should succeed
+		// there.
+
+		// Success case - token has sufficient permissions
+		t.Logf("Command succeeded with current token (has read:packages access)")
+		stdoutStr := stdout.String()
+
+		// Should show at least the test images
+		if !strings.Contains(stdoutStr, "ghcrctl-test") {
+			t.Error("Expected to see test images in output")
+			t.Logf("Stdout: %s", stdoutStr)
+		}
 	} else {
-		t.Logf("Got expected error: %v", err)
+		// Case 2:
+		// In local development, a fine-grained personal access token or a
+		// GitHub App installation token with repository-scoped permissions is
+		// typically used, which is expected to fail due to insufficient
+		// permissions.
+
+		// Failure case - token lacks permissions
+		t.Logf("Command failed (token lacks broad read:packages): %v", err)
 
 		// Verify error message is helpful
 		errMsg := err.Error()

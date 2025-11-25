@@ -88,6 +88,12 @@ func ResolveTag(ctx context.Context, image, tag string) (string, error) {
 		return "", fmt.Errorf("invalid digest format returned: %s", digest)
 	}
 
+	// Cache the descriptor to avoid redundant HEAD requests
+	// When cachedResolve() is later called with this digest, it will use this cached descriptor
+	manifestDescCacheMu.Lock()
+	manifestDescCache[digest] = descriptor
+	manifestDescCacheMu.Unlock()
+
 	return digest, nil
 }
 

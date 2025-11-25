@@ -152,23 +152,9 @@ var graphCmd = &cobra.Command{
 			versionCache[ver.Name] = ver
 		}
 
-		// Create version ID→tags cache to avoid duplicate GetVersionTags calls
-		// This eliminates duplicate calls (2× per attestation → 1×)
-		tagsCache := make(map[int64][]string)
-
-		// Helper function to get tags for a version ID (with caching)
-		getTagsForVersion := func(versionID int64) ([]string, error) {
-			if tags, cached := tagsCache[versionID]; cached {
-				return tags, nil
-			}
-			tags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
-			if err == nil {
-				tagsCache[versionID] = tags
-			}
-			return tags, err
-		}
-
 		// Map digest to version ID using cache
+		// Note: The cache already includes tags from ListPackageVersions,
+		// so we don't need to make additional GetVersionTags API calls
 		versionInfo, found := versionCache[digest]
 		if !found {
 			// Non-fatal: version ID is optional
@@ -176,20 +162,17 @@ var graphCmd = &cobra.Command{
 			// Fall back to just adding the queried tag
 			g.Root.AddTag(graphTag)
 		} else {
-			versionID := versionInfo.ID
-			g.Root.SetVersionID(versionID)
+			g.Root.SetVersionID(versionInfo.ID)
 
-			// Fetch all tags for this version (with caching)
-			allTags, err := getTagsForVersion(versionID)
-			if err != nil {
-				// Non-fatal: if we can't get all tags, fall back to just the queried tag
-				fmt.Fprintf(os.Stderr, "Warning: could not fetch all tags for version: %v\n", err)
-				g.Root.AddTag(graphTag)
-			} else {
-				// Add all tags to the graph
-				for _, tag := range allTags {
+			// Use tags from cached version data (already fetched by ListPackageVersions)
+			// This eliminates the need for separate GetVersionTags API calls
+			if len(versionInfo.Tags) > 0 {
+				for _, tag := range versionInfo.Tags {
 					g.Root.AddTag(tag)
 				}
+			} else {
+				// If no tags in cache, fall back to the queried tag
+				g.Root.AddTag(graphTag)
 			}
 		}
 
@@ -224,14 +207,12 @@ var graphCmd = &cobra.Command{
 					return fmt.Errorf("failed to create graph with parent digest: %w", err)
 				}
 
-				// Map parent digest to version ID and fetch tags using cache
+				// Map parent digest to version ID and use cached tags
 				if parentVersionInfo, found := versionCache[digest]; found {
 					g.Root.SetVersionID(parentVersionInfo.ID)
-					allTags, err := getTagsForVersion(parentVersionInfo.ID)
-					if err == nil {
-						for _, tag := range allTags {
-							g.Root.AddTag(tag)
-						}
+					// Use tags from cached version data (no API call needed)
+					for _, tag := range parentVersionInfo.Tags {
+						g.Root.AddTag(tag)
 					}
 				}
 
@@ -337,12 +318,9 @@ var graphCmd = &cobra.Command{
 				if refVersionInfo, found := versionCache[ref.Digest]; found {
 					artifact.SetVersionID(refVersionInfo.ID)
 
-					// Fetch all tags for this referrer version (with caching)
-					refTags, err := getTagsForVersion(refVersionInfo.ID)
-					if err == nil {
-						for _, tag := range refTags {
-							artifact.AddTag(tag)
-						}
+					// Use tags from cached version data (no API call needed)
+					for _, tag := range refVersionInfo.Tags {
+						artifact.AddTag(tag)
 					}
 				}
 

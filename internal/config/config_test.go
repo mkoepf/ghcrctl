@@ -210,3 +210,101 @@ func TestNewWithPath(t *testing.T) {
 		t.Errorf("Config file was not created at custom path %s", customPath)
 	}
 }
+
+func TestGetOwnerWithEnvVars(t *testing.T) {
+	// Create temporary config directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Create config with file-based owner
+	testConfig := "owner-name: fileorg\nowner-type: org\n"
+	err := os.WriteFile(configPath, []byte(testConfig), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg := NewWithPath(configPath)
+
+	// Test case 1: Env vars override config file
+	t.Setenv("GHCRCTL_OWNER", "envorg")
+	t.Setenv("GHCRCTL_OWNER_TYPE", "org")
+
+	name, ownerType, err := cfg.GetOwner()
+	if err != nil {
+		t.Errorf("GetOwner() with env vars error = %v, want nil", err)
+	}
+	if name != "envorg" {
+		t.Errorf("GetOwner() with env vars name = %s, want envorg", name)
+	}
+	if ownerType != "org" {
+		t.Errorf("GetOwner() with env vars type = %s, want org", ownerType)
+	}
+
+	// Test case 2: Only GHCRCTL_OWNER set, should default to "user" type
+	os.Unsetenv("GHCRCTL_OWNER_TYPE")
+	t.Setenv("GHCRCTL_OWNER", "envuser")
+
+	name, ownerType, err = cfg.GetOwner()
+	if err != nil {
+		t.Errorf("GetOwner() with only GHCRCTL_OWNER error = %v, want nil", err)
+	}
+	if name != "envuser" {
+		t.Errorf("GetOwner() with only GHCRCTL_OWNER name = %s, want envuser", name)
+	}
+	if ownerType != "user" {
+		t.Errorf("GetOwner() with only GHCRCTL_OWNER type = %s, want user (default)", ownerType)
+	}
+
+	// Test case 3: No env vars, should fall back to config file
+	os.Unsetenv("GHCRCTL_OWNER")
+	os.Unsetenv("GHCRCTL_OWNER_TYPE")
+
+	name, ownerType, err = cfg.GetOwner()
+	if err != nil {
+		t.Errorf("GetOwner() fallback to file error = %v, want nil", err)
+	}
+	if name != "fileorg" {
+		t.Errorf("GetOwner() fallback to file name = %s, want fileorg", name)
+	}
+	if ownerType != "org" {
+		t.Errorf("GetOwner() fallback to file type = %s, want org", ownerType)
+	}
+
+	// Test case 4: Both GHCRCTL_OWNER and GHCRCTL_OWNER_TYPE set to user
+	t.Setenv("GHCRCTL_OWNER", "anotheruser")
+	t.Setenv("GHCRCTL_OWNER_TYPE", "user")
+
+	name, ownerType, err = cfg.GetOwner()
+	if err != nil {
+		t.Errorf("GetOwner() with user type env vars error = %v, want nil", err)
+	}
+	if name != "anotheruser" {
+		t.Errorf("GetOwner() with user type name = %s, want anotheruser", name)
+	}
+	if ownerType != "user" {
+		t.Errorf("GetOwner() with user type = %s, want user", ownerType)
+	}
+}
+
+func TestGetOwnerEnvVarsNoConfigFile(t *testing.T) {
+	// Create temporary config directory but don't create config file
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := NewWithPath(configPath)
+
+	// Test env vars work even when config file doesn't exist
+	t.Setenv("GHCRCTL_OWNER", "envonly")
+	t.Setenv("GHCRCTL_OWNER_TYPE", "org")
+
+	name, ownerType, err := cfg.GetOwner()
+	if err != nil {
+		t.Errorf("GetOwner() with env vars but no file error = %v, want nil", err)
+	}
+	if name != "envonly" {
+		t.Errorf("GetOwner() with env vars but no file name = %s, want envonly", name)
+	}
+	if ownerType != "org" {
+		t.Errorf("GetOwner() with env vars but no file type = %s, want org", ownerType)
+	}
+}

@@ -69,8 +69,20 @@ func (c *Config) Save() error {
 }
 
 // GetOwner returns the configured GHCR owner name and type (org or user)
+// Priority order:
+// 1. Environment variables (GHCRCTL_OWNER, GHCRCTL_OWNER_TYPE)
+// 2. Config file (~/.ghcrctl/config.yaml)
 func (c *Config) GetOwner() (string, string, error) {
-	// Load current config
+	// Check environment variables first
+	if envOwner := os.Getenv("GHCRCTL_OWNER"); envOwner != "" {
+		envOwnerType := os.Getenv("GHCRCTL_OWNER_TYPE")
+		if envOwnerType == "" {
+			envOwnerType = "user" // default to user if not specified
+		}
+		return envOwner, envOwnerType, nil
+	}
+
+	// Fall back to config file
 	if err := c.Load(); err != nil {
 		return "", "", err
 	}

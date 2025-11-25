@@ -394,6 +394,33 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []
 	return nil
 }
 
+// sortByIDProximity sorts versions by their ID proximity to a target ID
+// Versions with IDs closest to targetID come first
+func sortByIDProximity(versions []gh.PackageVersionInfo, targetID int64) []gh.PackageVersionInfo {
+	// Create a copy to avoid modifying the original slice
+	sorted := make([]gh.PackageVersionInfo, len(versions))
+	copy(sorted, versions)
+
+	// Sort by absolute distance from targetID
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			distI := sorted[i].ID - targetID
+			if distI < 0 {
+				distI = -distI
+			}
+			distJ := sorted[j].ID - targetID
+			if distJ < 0 {
+				distJ = -distJ
+			}
+			if distJ < distI {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	return sorted
+}
+
 // findParentDigest searches for a parent digest that references the given child digest
 // Returns the parent digest if found, or empty string if not found
 func findParentDigest(ctx context.Context, ghClient *gh.Client, owner, ownerType, imageName, fullImage, childDigest string) (string, error) {
@@ -401,6 +428,21 @@ func findParentDigest(ctx context.Context, ghClient *gh.Client, owner, ownerType
 	versions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
 	if err != nil {
 		return "", fmt.Errorf("failed to list package versions: %w", err)
+	}
+
+	// Find the child version's ID to optimize search order
+	var childID int64
+	for _, ver := range versions {
+		if ver.Name == childDigest {
+			childID = ver.ID
+			break
+		}
+	}
+
+	// Sort versions by proximity to child ID - related artifacts are typically created together
+	// and have IDs within a small range (typically ±4-20)
+	if childID != 0 {
+		versions = sortByIDProximity(versions, childID)
 	}
 
 	// For each version, check if it references the child digest

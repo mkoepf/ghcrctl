@@ -3,6 +3,8 @@ package cmd
 import (
 	"strings"
 	"testing"
+
+	"github.com/mhk/ghcrctl/internal/gh"
 )
 
 func TestGraphCommandStructure(t *testing.T) {
@@ -164,4 +166,45 @@ func containsAny(s string, substrs []string) bool {
 		}
 	}
 	return false
+}
+
+// TestSortVersionsByProximity verifies that versions are sorted by proximity to a given ID
+func TestSortVersionsByProximity(t *testing.T) {
+	// Mock version list
+	versions := []gh.PackageVersionInfo{
+		{ID: 100, Name: "sha256:version100"},
+		{ID: 105, Name: "sha256:version105"},
+		{ID: 95, Name: "sha256:version95"},
+		{ID: 110, Name: "sha256:version110"},
+		{ID: 90, Name: "sha256:version90"},
+	}
+
+	targetID := int64(100)
+
+	// Sort by proximity to targetID
+	sorted := sortByIDProximity(versions, targetID)
+
+	// Expected order: 100 (0 away), 105 (5 away), 95 (5 away), 110 (10 away), 90 (10 away)
+	// When distances are equal, order is stable (original order preserved)
+	if sorted[0].ID != 100 {
+		t.Errorf("Expected first element to be ID 100, got %d", sorted[0].ID)
+	}
+
+	// Check that distances are non-decreasing
+	prevDist := int64(0)
+	for i, ver := range sorted {
+		dist := abs(ver.ID - targetID)
+		if dist < prevDist {
+			t.Errorf("Element %d (ID=%d, dist=%d) is closer than previous (dist=%d)", i, ver.ID, dist, prevDist)
+		}
+		prevDist = dist
+	}
+}
+
+// Helper to calculate absolute value
+func abs(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
 }

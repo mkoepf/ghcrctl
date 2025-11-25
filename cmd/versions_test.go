@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"testing"
 )
 
@@ -70,22 +69,4 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 	if jsonFlag == nil {
 		t.Error("Expected --json flag to exist")
 	}
-}
-
-// TestDiscoverRelatedVersionsByDigest verifies digest-based discovery works
-func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
-	// This test verifies that discoverRelatedVersionsByDigest exists and has
-	// the correct signature. Actual behavior is tested via integration tests.
-
-	// The function should accept (ctx, fullImage, digest, rootDigest)
-	// and return ([]DiscoveredArtifact, string)
-	// This is a compile-time check that the function exists with the right signature
-
-	// Call the function with dummy values to verify it compiles
-	ctx := context.Background()
-	artifacts, graphType := discoverRelatedVersionsByDigest(ctx, "", "", "")
-
-	// Verify return types (should compile even if values are empty/nil)
-	_ = artifacts // []DiscoveredArtifact
-	_ = graphType // string
 }

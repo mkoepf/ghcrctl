@@ -19,12 +19,30 @@ import (
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-// Package-level cache for OCI auth clients to avoid redundant token fetches
+// Package-level caches to avoid redundant API calls
 var (
+	// Auth client cache to avoid redundant token fetches
 	authClientCache     *auth.Client
 	authClientCacheMu   sync.RWMutex
 	authClientCacheInit sync.Once
+
+	// Manifest descriptor cache to avoid redundant Resolve/Fetch calls
+	// Key: digest string (e.g., "sha256:abc123...")
+	// Value: descriptor from repo.Resolve()
+	manifestDescCache   map[string]ocispec.Descriptor
+	manifestDescCacheMu sync.RWMutex
+
+	// Manifest content cache to avoid redundant Fetch calls
+	// Key: digest string
+	// Value: parsed OCI index
+	manifestIndexCache   map[string]*ocispec.Index
+	manifestIndexCacheMu sync.RWMutex
 )
+
+func init() {
+	manifestDescCache = make(map[string]ocispec.Descriptor)
+	manifestIndexCache = make(map[string]*ocispec.Index)
+}
 
 // ResolveTag resolves an image tag to its digest using ORAS
 // image should be in format: registry/owner/repo (e.g., ghcr.io/owner/repo)
@@ -176,71 +194,46 @@ func DiscoverReferrers(ctx context.Context, image, digest string) ([]ReferrerInf
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
-	// Resolve the digest to get a full descriptor
-	// ORAS Resolve can accept both tags and digests
-	desc, err := repo.Resolve(ctx, digest)
+	// Resolve the digest to get a full descriptor (uses cache to avoid duplicate HEAD requests)
+	desc, err := cachedResolve(ctx, repo, digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve digest: %w", err)
 	}
 
 	referrers := []ReferrerInfo{}
 
+	// GHCR-specific optimization: GHCR does not support OCI 1.1 Referrers API
 	// Docker buildx stores attestations in the image index, not as OCI referrers
-	// Check if this is a manifest list/image index
+	// For GHCR, we only need to check attestations within the image index
+	// This skips the 3 failed API calls (OCI 1.1 attempt → redirect → 404 fallback)
 	if desc.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" ||
 		desc.MediaType == "application/vnd.oci.image.index.v1+json" {
-		// Fetch and parse the image index to find attestations
+		// Fetch and parse the image index to find attestations (uses cache)
 		indexReferrers, err := discoverAttestationsInIndex(ctx, repo, desc)
 		if err != nil {
-			// Non-fatal: continue with OCI Referrers API fallback
+			// Non-fatal: image may not have attestations
 			fmt.Fprintf(os.Stderr, "Warning: failed to discover attestations in image index: %v\n", err)
 		} else {
 			referrers = append(referrers, indexReferrers...)
 		}
 	}
 
-	// Also check for OCI Referrers (for registries that support it)
-	// This will automatically fall back to the referrers tag schema if the
-	// OCI Referrers API is not supported by the registry
-	err = repo.Referrers(ctx, desc, "", func(referrerDescriptors []ocispec.Descriptor) error {
-		for _, ref := range referrerDescriptors {
-			// Determine artifact type from media type
-			artifactType := determineArtifactType(ref.ArtifactType)
-			if artifactType == "unknown" && ref.MediaType != "" {
-				// Fall back to media type if artifact type is unknown
-				artifactType = determineArtifactType(ref.MediaType)
-			}
-
-			referrers = append(referrers, ReferrerInfo{
-				Digest:       ref.Digest.String(),
-				ArtifactType: artifactType,
-				MediaType:    ref.MediaType,
-			})
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to query referrers: %w", err)
-	}
+	// Note: We skip the OCI 1.1 Referrers API check (repo.Referrers) because:
+	// 1. GHCR does not implement OCI 1.1 Referrers API (always returns 404)
+	// 2. Docker buildx attestations are stored in the image index (checked above)
+	// 3. This eliminates 3 unnecessary API calls: OCI 1.1 attempt (303) → GHCR endpoint (404) → legacy tag (404)
 
 	return referrers, nil
 }
 
 // discoverAttestationsInIndex fetches an image index and extracts attestation manifests
 // Docker buildx stores SBOM and provenance as manifests within the image index
+// Now uses cached fetch to avoid redundant GET requests
 func discoverAttestationsInIndex(ctx context.Context, repo *remote.Repository, indexDesc ocispec.Descriptor) ([]ReferrerInfo, error) {
-	// Fetch the image index
-	indexBytes, err := repo.Fetch(ctx, indexDesc)
+	// Fetch and parse the image index (uses cache to avoid duplicate GET requests)
+	index, err := cachedFetchIndex(ctx, repo, indexDesc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch image index: %w", err)
-	}
-	defer indexBytes.Close()
-
-	// Read the index content
-	var index ocispec.Index
-	if err := json.NewDecoder(indexBytes).Decode(&index); err != nil {
-		return nil, fmt.Errorf("failed to decode image index: %w", err)
+		return nil, err // Error already wrapped by cachedFetchIndex
 	}
 
 	referrers := []ReferrerInfo{}
@@ -466,8 +459,8 @@ func GetPlatformManifests(ctx context.Context, image, digest string) ([]Platform
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
-	// Resolve the digest to get the full descriptor
-	desc, err := repo.Resolve(ctx, digest)
+	// Resolve the digest to get the full descriptor (uses cache to avoid duplicate HEAD requests)
+	desc, err := cachedResolve(ctx, repo, digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve digest: %w", err)
 	}
@@ -480,17 +473,10 @@ func GetPlatformManifests(ctx context.Context, image, digest string) ([]Platform
 		return []PlatformInfo{}, nil
 	}
 
-	// Fetch the image index
-	indexBytes, err := repo.Fetch(ctx, desc)
+	// Fetch and parse the image index (uses cache to avoid duplicate GET requests)
+	index, err := cachedFetchIndex(ctx, repo, desc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch image index: %w", err)
-	}
-	defer indexBytes.Close()
-
-	// Read the index content
-	var index ocispec.Index
-	if err := json.NewDecoder(indexBytes).Decode(&index); err != nil {
-		return nil, fmt.Errorf("failed to decode image index: %w", err)
+		return nil, err // Error already wrapped by cachedFetchIndex
 	}
 
 	platforms := []PlatformInfo{}
@@ -845,4 +831,63 @@ func getOrCreateAuthClient(ctx context.Context) *auth.Client {
 func configureAuth(ctx context.Context, repo *remote.Repository) error {
 	repo.Client = getOrCreateAuthClient(ctx)
 	return nil
+}
+
+// cachedResolve resolves a digest and caches the result to avoid redundant HEAD requests
+// This eliminates duplicate repo.Resolve() calls across GetPlatformManifests and DiscoverReferrers
+func cachedResolve(ctx context.Context, repo *remote.Repository, digestStr string) (ocispec.Descriptor, error) {
+	// Fast path: check cache
+	manifestDescCacheMu.RLock()
+	if desc, found := manifestDescCache[digestStr]; found {
+		manifestDescCacheMu.RUnlock()
+		return desc, nil
+	}
+	manifestDescCacheMu.RUnlock()
+
+	// Slow path: resolve and cache
+	desc, err := repo.Resolve(ctx, digestStr)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+
+	// Cache the result
+	manifestDescCacheMu.Lock()
+	manifestDescCache[digestStr] = desc
+	manifestDescCacheMu.Unlock()
+
+	return desc, nil
+}
+
+// cachedFetchIndex fetches and parses an image index, caching the result
+// This eliminates duplicate repo.Fetch() calls across GetPlatformManifests and DiscoverReferrers
+func cachedFetchIndex(ctx context.Context, repo *remote.Repository, desc ocispec.Descriptor) (*ocispec.Index, error) {
+	digestStr := desc.Digest.String()
+
+	// Fast path: check cache
+	manifestIndexCacheMu.RLock()
+	if index, found := manifestIndexCache[digestStr]; found {
+		manifestIndexCacheMu.RUnlock()
+		return index, nil
+	}
+	manifestIndexCacheMu.RUnlock()
+
+	// Slow path: fetch, parse, and cache
+	indexBytes, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch image index: %w", err)
+	}
+	defer indexBytes.Close()
+
+	// Read the index content
+	var index ocispec.Index
+	if err := json.NewDecoder(indexBytes).Decode(&index); err != nil {
+		return nil, fmt.Errorf("failed to decode image index: %w", err)
+	}
+
+	// Cache the result
+	manifestIndexCacheMu.Lock()
+	manifestIndexCache[digestStr] = &index
+	manifestIndexCacheMu.Unlock()
+
+	return &index, nil
 }

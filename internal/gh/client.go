@@ -219,3 +219,113 @@ func (c *Client) GetVersionTags(ctx context.Context, owner, ownerType, packageNa
 
 	return []string{}, nil
 }
+
+// PackageVersionInfo contains information about a package version
+type PackageVersionInfo struct {
+	ID        int64
+	Name      string
+	Tags      []string
+	CreatedAt string
+	UpdatedAt string
+}
+
+// ListPackageVersions lists all versions of a package
+func (c *Client) ListPackageVersions(ctx context.Context, owner, ownerType, packageName string) ([]PackageVersionInfo, error) {
+	// Validate inputs
+	if owner == "" {
+		return nil, fmt.Errorf("owner cannot be empty")
+	}
+	if ownerType != "org" && ownerType != "user" {
+		return nil, fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+	if packageName == "" {
+		return nil, fmt.Errorf("package name cannot be empty")
+	}
+
+	// Set up options for listing versions
+	opts := &github.PackageListOptions{
+		PackageType: github.String("container"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var allVersions []PackageVersionInfo
+
+	// List versions based on owner type
+	for {
+		var versions []*github.PackageVersion
+		var resp *github.Response
+		var err error
+
+		if ownerType == "org" {
+			versions, resp, err = c.client.Organizations.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
+		} else {
+			versions, resp, err = c.client.Users.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to list package versions: %w", err)
+		}
+
+		// Extract version info
+		for _, ver := range versions {
+			info := PackageVersionInfo{
+				ID:   *ver.ID,
+				Name: *ver.Name,
+			}
+
+			// Extract tags if available
+			if ver.Metadata != nil && ver.Metadata.Container != nil {
+				info.Tags = ver.Metadata.Container.Tags
+			}
+
+			// Extract timestamps if available
+			if ver.CreatedAt != nil {
+				info.CreatedAt = ver.CreatedAt.Format("2006-01-02 15:04:05")
+			}
+			if ver.UpdatedAt != nil {
+				info.UpdatedAt = ver.UpdatedAt.Format("2006-01-02 15:04:05")
+			}
+
+			allVersions = append(allVersions, info)
+		}
+
+		// Check if there are more pages
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return allVersions, nil
+}
+
+// DeletePackageVersion deletes a specific package version
+func (c *Client) DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error {
+	// Validate inputs
+	if owner == "" {
+		return fmt.Errorf("owner cannot be empty")
+	}
+	if ownerType != "org" && ownerType != "user" {
+		return fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+	if packageName == "" {
+		return fmt.Errorf("package name cannot be empty")
+	}
+	if versionID <= 0 {
+		return fmt.Errorf("version ID must be positive, got %d", versionID)
+	}
+
+	// Delete the version based on owner type
+	var err error
+	if ownerType == "org" {
+		_, err = c.client.Organizations.PackageDeleteVersion(ctx, owner, "container", packageName, versionID)
+	} else {
+		_, err = c.client.Users.PackageDeleteVersion(ctx, owner, "container", packageName, versionID)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to delete version: %w", err)
+	}
+
+	return nil
+}

@@ -191,6 +191,47 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.Pac
 		}
 	}
 
+	// Process untagged versions as potential graph roots
+	for _, ver := range versions {
+		if len(ver.Tags) == 0 && !assigned[ver.ID] {
+			// Try to discover children using the digest directly
+			relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
+
+			// Only create a graph if this version has children
+			if len(relatedArtifacts) > 0 {
+				graph := VersionGraph{
+					RootVersion: ver,
+					Children:    []VersionChild{},
+					Type:        graphType,
+				}
+				assigned[ver.ID] = true
+
+				// Find child versions by digest
+				childMap := make(map[int64]*VersionChild)
+				for _, artifact := range relatedArtifacts {
+					if childVer, found := digestToVersion[artifact.Digest]; found && !assigned[childVer.ID] {
+						if existing, exists := childMap[childVer.ID]; exists {
+							existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
+						} else {
+							childMap[childVer.ID] = &VersionChild{
+								Version:      childVer,
+								ArtifactType: artifact.ArtifactType,
+								Platform:     artifact.Platform,
+							}
+						}
+					}
+				}
+
+				for _, child := range childMap {
+					graph.Children = append(graph.Children, *child)
+					assigned[child.Version.ID] = true
+				}
+
+				graphs = append(graphs, graph)
+			}
+		}
+	}
+
 	// Add remaining unassigned versions as standalone
 	for _, ver := range versions {
 		if !assigned[ver.ID] {
@@ -222,6 +263,14 @@ func discoverRelatedVersions(ctx context.Context, fullImage, tag, rootDigest str
 	if err != nil {
 		return artifacts, graphType
 	}
+
+	return discoverRelatedVersionsByDigest(ctx, fullImage, digest, rootDigest)
+}
+
+// discoverRelatedVersionsByDigest discovers children using a digest directly
+func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, rootDigest string) ([]DiscoveredArtifact, string) {
+	var artifacts []DiscoveredArtifact
+	graphType := "manifest"
 
 	// Get platform manifests
 	platforms, err := oras.GetPlatformManifests(ctx, fullImage, digest)

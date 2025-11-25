@@ -54,10 +54,10 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test-output.txt
-          if grep -q "SKIP" test-output.txt; then
+          if grep -q "SKIP:" test-output.txt; then
             echo "ERROR: Tests were skipped in CI. All integration tests must run."
             echo "Skipped tests:"
-            grep "SKIP" test-output.txt
+            grep "SKIP:" test-output.txt
             exit 1
           fi
 
@@ -65,10 +65,10 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           go test -v -race -coverprofile="coverage.out" -covermode=atomic ./... 2>&1 | Tee-Object -FilePath test-output.txt
-          if (Select-String -Path test-output.txt -Pattern "SKIP" -Quiet) {
+          if (Select-String -Path test-output.txt -Pattern "SKIP:" -Quiet) {
             Write-Host "ERROR: Tests were skipped in CI. All integration tests must run."
             Write-Host "Skipped tests:"
-            Select-String -Path test-output.txt -Pattern "SKIP"
+            Select-String -Path test-output.txt -Pattern "SKIP:"
             exit 1
           }
 

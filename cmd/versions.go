@@ -72,25 +72,27 @@ Examples:
 		ctx := cmd.Context()
 
 		// List package versions
-		versions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+		allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to list versions: %w", err)
 		}
 
-		// Optimization: Filter versions by tag BEFORE building graphs
-		// This avoids making ORAS API calls for versions we'll filter out anyway
+		// Optimization: Filter versions by tag to determine which graphs to build
+		// Build graphs only for tagged roots, but provide all versions for child lookup
+		versionsToGraph := allVersions
 		if versionsTag != "" {
-			versions = filterVersionsByTag(versions, versionsTag)
-			if len(versions) == 0 {
+			versionsToGraph = filterVersionsByTag(allVersions, versionsTag)
+			if len(versionsToGraph) == 0 {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("no versions found with tag %q", versionsTag)
 			}
 		}
 
-		// Build graph relationships (only for filtered versions if tag specified)
+		// Build graph relationships
+		// Pass versionsToGraph (filtered roots) and allVersions (for child lookup)
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-		versionGraphs, err := buildVersionGraphs(ctx, fullImage, versions, client, owner, ownerType, imageName)
+		versionGraphs, err := buildVersionGraphs(ctx, fullImage, versionsToGraph, allVersions, client, owner, ownerType, imageName)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to build version graphs: %w", err)
@@ -98,7 +100,7 @@ Examples:
 
 		// Output results
 		if versionsJSON {
-			return outputVersionsJSON(cmd.OutOrStdout(), versions)
+			return outputVersionsJSON(cmd.OutOrStdout(), allVersions)
 		}
 		return outputVersionsTableWithGraphs(cmd.OutOrStdout(), versionGraphs, imageName)
 	},
@@ -137,10 +139,10 @@ func filterVersionsByTag(versions []gh.PackageVersionInfo, tagFilter string) []g
 	return filtered
 }
 
-func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
-	// Map digest to version info for quick lookup
+func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph []gh.PackageVersionInfo, allVersions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
+	// Map digest to version info for quick lookup (use ALL versions for child discovery)
 	digestToVersion := make(map[string]gh.PackageVersionInfo)
-	for _, ver := range versions {
+	for _, ver := range allVersions {
 		digestToVersion[ver.Name] = ver
 	}
 
@@ -149,7 +151,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.Pac
 	var graphs []VersionGraph
 
 	// Process tagged versions first (potential graph roots)
-	for _, ver := range versions {
+	for _, ver := range versionsToGraph {
 		if len(ver.Tags) > 0 && !assigned[ver.ID] {
 			// This is a tagged version - potential graph root
 			graph := VersionGraph{
@@ -193,7 +195,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.Pac
 	}
 
 	// Process untagged versions as potential graph roots
-	for _, ver := range versions {
+	for _, ver := range versionsToGraph {
 		if len(ver.Tags) == 0 && !assigned[ver.ID] {
 			// Try to discover children using the digest directly
 			relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
@@ -234,7 +236,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.Pac
 	}
 
 	// Add remaining unassigned versions as standalone
-	for _, ver := range versions {
+	for _, ver := range versionsToGraph {
 		if !assigned[ver.ID] {
 			graph := VersionGraph{
 				RootVersion: ver,

@@ -52,7 +52,7 @@ func TestBuildVersionGraphsUsesDigestDirectly(t *testing.T) {
 
 	// This should use digests directly from ver.Name
 	// and NOT call oras.ResolveTag for each tag
-	graphs, err := buildVersionGraphs(ctx, fullImage, versions, nil, "", "", "")
+	graphs, err := buildVersionGraphs(ctx, fullImage, versions, versions, nil, "", "", "")
 
 	if err != nil {
 		// Error is expected since we're not providing real ORAS connectivity

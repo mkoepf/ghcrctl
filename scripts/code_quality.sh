@@ -22,9 +22,6 @@ echo -e "${BLUE}Running Code Quality Checks${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 
-# Track failures
-FAILED=0
-
 ###########################################
 # 1. Code Formatting Check (gofmt)
 ###########################################
@@ -34,7 +31,7 @@ if [ -n "$UNFORMATTED" ]; then
     echo -e "${RED}✗ The following files are not formatted:${NC}"
     echo "$UNFORMATTED"
     echo -e "${YELLOW}Run: gofmt -s -w .${NC}"
-    FAILED=$((FAILED + 1))
+    exit 1
 else
     echo -e "${GREEN}✓ All files are properly formatted${NC}"
 fi
@@ -48,7 +45,7 @@ if go vet ./... 2>&1; then
     echo -e "${GREEN}✓ go vet passed${NC}"
 else
     echo -e "${RED}✗ go vet found issues${NC}"
-    FAILED=$((FAILED + 1))
+    exit 1
 fi
 echo ""
 
@@ -60,7 +57,7 @@ if go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1; the
     echo -e "${GREEN}✓ All tests passed${NC}"
 else
     echo -e "${RED}✗ Tests failed${NC}"
-    FAILED=$((FAILED + 1))
+    exit 1
 fi
 echo ""
 
@@ -102,14 +99,14 @@ if go build -v -o ghcrctl . 2>&1 > /dev/null; then
         echo -e "${GREEN}✓ Binary verification successful${NC}"
     else
         echo -e "${RED}✗ Binary verification failed${NC}"
-        FAILED=$((FAILED + 1))
+        exit 1
     fi
 
     # Clean up
     rm -f ghcrctl
 else
     echo -e "${RED}✗ Build failed${NC}"
-    FAILED=$((FAILED + 1))
+    exit 1
 fi
 echo ""
 
@@ -117,12 +114,6 @@ echo ""
 # Summary
 ###########################################
 echo -e "${BLUE}================================================${NC}"
-if [ $FAILED -eq 0 ]; then
-    echo -e "${GREEN}✓ All checks passed! Ready to commit.${NC}"
-    echo -e "${BLUE}================================================${NC}"
-    exit 0
-else
-    echo -e "${RED}✗ ${FAILED} check(s) failed. Please fix the issues above.${NC}"
-    echo -e "${BLUE}================================================${NC}"
-    exit 1
-fi
+echo -e "${GREEN}✓ All checks passed! Ready to commit.${NC}"
+echo -e "${BLUE}================================================${NC}"
+exit 0

@@ -126,9 +126,9 @@ Examples:
 
 // VersionGraph represents a group of related versions
 type VersionGraph struct {
-	RootVersion  gh.PackageVersionInfo
-	Children     []VersionChild
-	Type         string // "index", "manifest", or "standalone"
+	RootVersion gh.PackageVersionInfo
+	Children    []VersionChild
+	Type        string // "index", "manifest", or "standalone"
 }
 
 // VersionChild represents a child version with its artifact type

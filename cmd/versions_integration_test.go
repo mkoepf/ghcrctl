@@ -76,8 +76,10 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 		t.Error("Expected 'Total:' in output")
 	}
 
-	// Reset args
+	// Reset args and flags
 	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
 }
 
 // TestVersionsCommandWithTagFilter tests versions command with --tag filter
@@ -122,8 +124,10 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 		t.Error("Expected filtered tag 'v1.0' in output")
 	}
 
-	// Reset args
+	// Reset args and flags
 	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
 }
 
 // TestVersionsCommandJSON tests JSON output format
@@ -183,8 +187,10 @@ func TestVersionsCommandJSON(t *testing.T) {
 		}
 	}
 
-	// Reset args
+	// Reset args and flags
 	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
 }
 
 // TestVersionsCommandSinglePlatform tests versions with single platform image
@@ -230,8 +236,10 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 		t.Error("Expected output to contain 'VERSION ID' header")
 	}
 
-	// Reset args
+	// Reset args and flags
 	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
 }
 
 // TestVersionsCommandWithSBOMOnly tests image with SBOM but no provenance
@@ -264,18 +272,35 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 	}
 
 	output := stdout.String()
-	t.Logf("Versions output (SBOM only):\n%s", output)
+	t.Logf("Versions output (with SBOM, no provenance):\n%s", output)
 
-	// Verify SBOM is shown
-	if !strings.Contains(output, "sbom") {
-		t.Error("Expected 'sbom' in output")
+	// Verify SBOM is shown in the artifact list
+	lines := strings.Split(output, "\n")
+	foundSBOM := false
+	foundProvenance := false
+	for _, line := range lines {
+		// Skip header and separator lines
+		if strings.Contains(line, "VERSION ID") || strings.Contains(line, "---") {
+			continue
+		}
+		// Check if line contains artifact types
+		if strings.Contains(line, "sbom") && !strings.Contains(line, "ghcrctl-test") {
+			foundSBOM = true
+		}
+		if strings.Contains(line, "provenance") && !strings.Contains(line, "ghcrctl-test") {
+			foundProvenance = true
+		}
 	}
 
-	// Verify provenance is NOT shown (since image doesn't have it)
-	if strings.Contains(output, "provenance") {
-		t.Error("Did not expect 'provenance' in output for image without provenance")
+	if !foundSBOM {
+		t.Error("Expected 'sbom' artifact in output")
+	}
+	if foundProvenance {
+		t.Error("Expected provenance artifact to NOT be in output for SBOM-only image")
 	}
 
-	// Reset args
+	// Reset args and flags
 	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
 }

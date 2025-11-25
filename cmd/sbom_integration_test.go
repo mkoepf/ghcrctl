@@ -25,7 +25,8 @@ func TestSBOMCommandWithImage(t *testing.T) {
 	}
 
 	// Reset root command args
-	rootCmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest"})
+	// Use --all flag since the test image is multiarch and has multiple SBOMs (one per platform)
+	rootCmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest", "--all"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

@@ -96,7 +96,11 @@ var sbomCmd = &cobra.Command{
 			return fetchAndDisplaySBOM(cmd.OutOrStdout(), ctx, fullImage, sboms[0].Digest, sbomJSON, token)
 		}
 
-		// Multiple SBOMs: list them
+		// Multiple SBOMs: if JSON output requested, show all; otherwise list them
+		if sbomJSON {
+			return fetchAndDisplayAllSBOMs(cmd.OutOrStdout(), ctx, fullImage, sboms, sbomJSON, token)
+		}
+
 		return listSBOMs(cmd.OutOrStdout(), sboms, imageName)
 	},
 }

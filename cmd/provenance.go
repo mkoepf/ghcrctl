@@ -96,7 +96,11 @@ var provenanceCmd = &cobra.Command{
 			return fetchAndDisplayProvenance(cmd.OutOrStdout(), ctx, fullImage, provenances[0].Digest, provenanceJSON, token)
 		}
 
-		// Multiple provenances: list them
+		// Multiple provenances: if JSON output requested, show all; otherwise list them
+		if provenanceJSON {
+			return fetchAndDisplayAllProvenances(cmd.OutOrStdout(), ctx, fullImage, provenances, provenanceJSON, token)
+		}
+
 		return listProvenances(cmd.OutOrStdout(), provenances, imageName)
 	},
 }

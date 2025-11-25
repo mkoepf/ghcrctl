@@ -14,7 +14,7 @@ ghcrctl provides functionality for:
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Managing GHCR version metadata** (labels, tags)
-- **Safe deletion** of package versions
+- **Safe deletion** of package versions and complete OCI graphs
 - **Configuration** of owner/org and authentication
 
 ## Installation
@@ -251,6 +251,108 @@ This command creates a new tag reference pointing to the same image digest as th
 - Add semantic version alias: `ghcrctl tag myapp v1.2.3 v1.2`
 - Tag for environment: `ghcrctl tag myapp sha256:abc123... production`
 
+### Delete Package Versions
+
+Safely delete package versions or complete OCI artifact graphs from GHCR.
+
+#### Delete a Single Version
+
+Delete an individual package version by version ID or digest:
+
+```bash
+# Delete by version ID
+ghcrctl delete version myimage 12345678
+
+# Delete by digest
+ghcrctl delete version myimage --digest sha256:abc123...
+
+# Skip confirmation prompt
+ghcrctl delete version myimage 12345678 --force
+
+# Preview what would be deleted (dry-run)
+ghcrctl delete version myimage 12345678 --dry-run
+```
+
+**Use cases:**
+- Remove specific untagged versions (e.g., orphaned attestations)
+- Clean up individual failed builds
+- Delete a single platform manifest
+
+**Requirements:**
+- GITHUB_TOKEN with `write:packages` and `delete:packages` scope
+- Must use Personal Access Token (not GitHub App installation token)
+
+#### Delete an Entire Graph
+
+Delete a complete OCI artifact graph including the root image, all platform manifests, and attestations (SBOM, provenance):
+
+```bash
+# Delete by tag (most common)
+ghcrctl delete graph myimage v1.0.0
+
+# Delete by digest
+ghcrctl delete graph myimage --digest sha256:abc123...
+
+# Delete graph containing a specific version
+ghcrctl delete graph myimage --version 12345678
+
+# Skip confirmation
+ghcrctl delete graph myimage v1.0.0 --force
+
+# Preview what would be deleted
+ghcrctl delete graph myimage v1.0.0 --dry-run
+```
+
+**What gets deleted:**
+
+For a multi-arch image with attestations, this command discovers and deletes:
+1. All attestations (SBOM, provenance) - deleted first
+2. All platform manifests (linux/amd64, linux/arm64, etc.)
+3. The root image index or manifest - deleted last
+
+Example output:
+```bash
+$ ghcrctl delete graph myimage v1.0.0
+
+Preparing to delete complete OCI graph:
+  Image: myimage
+  Tag:   v1.0.0
+
+Root (Image): sha256:01af50c...
+  Tags: [v1.0.0]
+  Version ID: 585861918
+
+Platforms (2):
+  - linux/amd64 (version 585861919)
+  - linux/arm64 (version 585861920)
+
+Attestations (2):
+  - sbom (version 585861921)
+  - provenance (version 585861922)
+
+Total: 5 version(s) will be deleted
+
+Are you sure you want to delete this graph? [y/N]:
+```
+
+**Use cases:**
+- Remove an entire release (tag)
+- Clean up complete multi-arch images with all artifacts
+- Delete all versions associated with a specific build
+
+**Safety features:**
+- Automatic graph discovery - you specify the tag, tool finds all related versions
+- Deletion order - children (attestations, platforms) deleted before root
+- Confirmation prompt (unless `--force`)
+- Dry-run mode to preview
+- Clear summary of what will be deleted
+
+**Requirements:**
+- GITHUB_TOKEN with `write:packages` and `delete:packages` scope
+- Must use Personal Access Token (not GitHub App installation token)
+
+**IMPORTANT:** Deletion is permanent and cannot be undone (except within 30 days via the GitHub web UI if the package namespace is still available).
+
 ### Getting Help
 
 ```bash
@@ -260,6 +362,9 @@ ghcrctl graph --help
 ghcrctl sbom --help
 ghcrctl provenance --help
 ghcrctl tag --help
+ghcrctl delete --help
+ghcrctl delete version --help
+ghcrctl delete graph --help
 ```
 
 ### API Call Logging
@@ -305,9 +410,9 @@ This project is under active development following an iterative approach:
 - ✅ **Iteration 4**: ORAS integration & tag resolution
 - ✅ **Iteration 5**: OCI graph discovery
 - ✅ **Iteration 6**: Tagging Functionality
-- ⏳ **Iteration 7**: Labeling Functionality
-- ⏳ **Iteration 8**: Basic Deletion with Safety
-- ⏳ **Iteration 9**: Advanced Deletion Operations
+- ✅ **Iteration 7**: Labeling Functionality
+- ✅ **Iteration 8**: Basic Deletion with Safety
+- ✅ **Iteration 9**: Advanced Deletion Operations (Graph deletion)
 - ⏳ **Iteration 10**: Interactive Mode & Polish
 
 See [spec/plan.md](spec/plan.md) for the detailed development plan.

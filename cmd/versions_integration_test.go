@@ -21,6 +21,10 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
+
 	// Set up config
 	cfg := config.New()
 	err := cfg.SetOwner("mkoepf", "user")
@@ -89,6 +93,10 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
+
 	// Set up config
 	cfg := config.New()
 	err := cfg.SetOwner("mkoepf", "user")
@@ -136,6 +144,10 @@ func TestVersionsCommandJSON(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
 
 	// Set up config
 	cfg := config.New()
@@ -200,6 +212,10 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
+
 	// Set up config
 	cfg := config.New()
 	err := cfg.SetOwner("mkoepf", "user")
@@ -248,6 +264,10 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
 
 	// Set up config
 	cfg := config.New()

@@ -58,15 +58,15 @@ func TestVersionsCommandArguments(t *testing.T) {
 
 // TestVersionsCommandHasFlags verifies required flags exist
 func TestVersionsCommandHasFlags(t *testing.T) {
-	cmd := rootCmd
-	versionsCmd, _, err := cmd.Find([]string{"versions"})
-	if err != nil {
-		t.Fatalf("Failed to find versions command: %v", err)
-	}
-
 	// Check for --json flag
 	jsonFlag := versionsCmd.Flags().Lookup("json")
 	if jsonFlag == nil {
-		t.Error("Expected --json flag to exist")
+		t.Error("versions command should have --json flag")
+	}
+
+	// Check for --tag flag
+	tagFlag := versionsCmd.Flags().Lookup("tag")
+	if tagFlag == nil {
+		t.Error("versions command should have --tag flag")
 	}
 }

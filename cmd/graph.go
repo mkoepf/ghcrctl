@@ -163,14 +163,15 @@ var graphCmd = &cobra.Command{
 		}
 
 		// Get platform manifests (if multi-arch image)
-		platforms, err := oras.GetPlatformManifests(ctx, fullImage, digest)
+		platformInfos, err := oras.GetPlatformManifests(ctx, fullImage, digest)
 		if err != nil {
 			// Non-fatal: platforms are optional
 			fmt.Fprintf(os.Stderr, "Warning: could not get platform manifests: %v\n", err)
 		}
 
-		// Discover referrers (SBOM, provenance, etc.)
-		referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
+		// Discover referrers to check if this digest has children
+		// This helps us determine if we need to find a parent digest
+		initialReferrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
 		if err != nil {
 			// Non-fatal: referrers are optional
 			fmt.Fprintf(os.Stderr, "Warning: could not discover referrers: %v\n", err)
@@ -178,7 +179,7 @@ var graphCmd = &cobra.Command{
 
 		// Check if this digest has no children (no platforms, no referrers)
 		// If so, it might be a child artifact itself, so search for its parent
-		if len(platforms) == 0 && len(referrers) == 0 {
+		if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 			// Try to find the parent graph that contains this digest
 			parentDigest, err := findParentDigest(ctx, ghClient, owner, ownerType, imageName, fullImage, digest)
 			if err == nil && parentDigest != "" && parentDigest != digest {
@@ -204,48 +205,132 @@ var graphCmd = &cobra.Command{
 					}
 				}
 
-				// Get platforms and referrers for the parent
-				platforms, _ = oras.GetPlatformManifests(ctx, fullImage, digest)
-				referrers, _ = oras.DiscoverReferrers(ctx, fullImage, digest)
+				// Get platforms for the parent
+				platformInfos, _ = oras.GetPlatformManifests(ctx, fullImage, digest)
 			}
 		}
 
-		if len(referrers) > 0 {
-			// Add referrers to graph
-			for _, ref := range referrers {
-				artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: skipping invalid referrer: %v\n", err)
-					continue
+		// If multi-arch image, create platform objects and discover their referrers
+		if len(platformInfos) > 0 {
+			// Create platform objects and discover platform-specific referrers
+			for _, pInfo := range platformInfos {
+				// Create platform object
+				platform := graph.NewPlatform(pInfo.Digest, pInfo.Platform, pInfo.Architecture, pInfo.OS, pInfo.Variant)
+				platform.Size = pInfo.Size
+
+				// Try to get version ID for platform manifest
+				platformVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, pInfo.Digest)
+				if err == nil {
+					platform.Manifest.SetVersionID(platformVersionID)
 				}
 
-				// Try to get version ID and all tags for this referrer
-				refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
-				if err == nil {
-					artifact.SetVersionID(refVersionID)
-
-					// Fetch all tags for this referrer version
-					refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
-					if err == nil {
-						for _, tag := range refTags {
-							artifact.AddTag(tag)
+				// Discover platform-specific referrers (attestations that directly reference this platform manifest)
+				platformReferrers, err := oras.DiscoverReferrers(ctx, fullImage, pInfo.Digest)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not discover referrers for platform %s: %v\n", pInfo.Platform, err)
+				} else {
+					// Process all referrers found for this specific platform
+					for _, ref := range platformReferrers {
+						artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "Warning: skipping invalid referrer: %v\n", err)
+							continue
 						}
+
+						// Try to get version ID and all tags for this referrer
+						refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
+						if err == nil {
+							artifact.SetVersionID(refVersionID)
+
+							// Fetch all tags for this referrer version
+							refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
+							if err == nil {
+								for _, tag := range refTags {
+									artifact.AddTag(tag)
+								}
+							}
+						}
+
+						platform.AddReferrer(artifact)
 					}
 				}
 
-				g.AddReferrer(artifact)
+				g.AddPlatform(platform)
+			}
+
+			// Also discover index-level referrers (attestations that reference the image index itself)
+			// These are shown at the root level, not under individual platforms
+			indexReferrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not discover index-level referrers: %v\n", err)
+			} else {
+				for _, ref := range indexReferrers {
+					artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: skipping invalid index referrer: %v\n", err)
+						continue
+					}
+
+					// Try to get version ID and all tags for this referrer
+					refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
+					if err == nil {
+						artifact.SetVersionID(refVersionID)
+
+						// Fetch all tags for this referrer version
+						refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
+						if err == nil {
+							for _, tag := range refTags {
+								artifact.AddTag(tag)
+							}
+						}
+					}
+
+					g.AddReferrer(artifact)
+				}
+			}
+		} else {
+			// Single-arch image: discover referrers for the root manifest
+			referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
+			if err != nil {
+				// Non-fatal: referrers are optional
+				fmt.Fprintf(os.Stderr, "Warning: could not discover referrers: %v\n", err)
+			} else {
+				// Add referrers to graph root
+				for _, ref := range referrers {
+					artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: skipping invalid referrer: %v\n", err)
+						continue
+					}
+
+					// Try to get version ID and all tags for this referrer
+					refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
+					if err == nil {
+						artifact.SetVersionID(refVersionID)
+
+						// Fetch all tags for this referrer version
+						refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
+						if err == nil {
+							for _, tag := range refTags {
+								artifact.AddTag(tag)
+							}
+						}
+					}
+
+					g.AddReferrer(artifact)
+				}
 			}
 		}
 
 		// Output results
 		if graphJSONOutput {
-			return outputGraphJSON(cmd.OutOrStdout(), g, platforms)
+			return outputGraphJSON(cmd.OutOrStdout(), g)
 		}
-		return outputGraphTree(cmd.OutOrStdout(), g, imageName, platforms)
+		return outputGraphTree(cmd.OutOrStdout(), g, imageName)
 	},
 }
 
-func outputGraphJSON(w io.Writer, g *graph.Graph, platforms []oras.PlatformInfo) error {
+func outputGraphJSON(w io.Writer, g *graph.Graph) error {
 	// Create JSON-friendly structure
 	output := map[string]interface{}{
 		"root": map[string]interface{}{
@@ -254,30 +339,50 @@ func outputGraphJSON(w io.Writer, g *graph.Graph, platforms []oras.PlatformInfo)
 			"tags":       g.Root.Tags,
 			"version_id": g.Root.VersionID,
 		},
-		"platforms": []map[string]interface{}{},
-		"referrers": []map[string]interface{}{},
 	}
 
-	// Add platform manifests
-	for _, p := range platforms {
-		output["platforms"] = append(output["platforms"].([]map[string]interface{}), map[string]interface{}{
-			"platform":     p.Platform,
-			"digest":       p.Digest,
-			"size":         p.Size,
-			"os":           p.OS,
-			"architecture": p.Architecture,
-			"variant":      p.Variant,
-		})
+	// Add platforms with nested referrers for multi-arch images
+	if len(g.Platforms) > 0 {
+		platforms := []map[string]interface{}{}
+		for _, p := range g.Platforms {
+			platform := map[string]interface{}{
+				"platform":     p.Platform,
+				"digest":       p.Manifest.Digest,
+				"size":         p.Size,
+				"os":           p.OS,
+				"architecture": p.Architecture,
+				"variant":      p.Variant,
+				"version_id":   p.Manifest.VersionID,
+				"referrers":    []map[string]interface{}{},
+			}
+
+			// Add platform-specific referrers
+			for _, ref := range p.Referrers {
+				platform["referrers"] = append(platform["referrers"].([]map[string]interface{}), map[string]interface{}{
+					"digest":     ref.Digest,
+					"type":       ref.Type,
+					"tags":       ref.Tags,
+					"version_id": ref.VersionID,
+				})
+			}
+
+			platforms = append(platforms, platform)
+		}
+		output["platforms"] = platforms
 	}
 
-	// Add referrers
-	for _, ref := range g.Referrers {
-		output["referrers"] = append(output["referrers"].([]map[string]interface{}), map[string]interface{}{
-			"digest":     ref.Digest,
-			"type":       ref.Type,
-			"tags":       ref.Tags,
-			"version_id": ref.VersionID,
-		})
+	// Add root-level referrers for single-arch images
+	if len(g.Referrers) > 0 {
+		referrers := []map[string]interface{}{}
+		for _, ref := range g.Referrers {
+			referrers = append(referrers, map[string]interface{}{
+				"digest":     ref.Digest,
+				"type":       ref.Type,
+				"tags":       ref.Tags,
+				"version_id": ref.VersionID,
+			})
+		}
+		output["referrers"] = referrers
 	}
 
 	data, err := json.MarshalIndent(output, "", "  ")
@@ -303,11 +408,11 @@ func formatTags(tags []string) string {
 	return result
 }
 
-func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []oras.PlatformInfo) error {
+func outputGraphTree(w io.Writer, g *graph.Graph, imageName string) error {
 	fmt.Fprintf(w, "OCI Artifact Graph for %s\n\n", imageName)
 
 	// Determine if multi-arch
-	isMultiArch := len(platforms) > 0
+	isMultiArch := len(g.Platforms) > 0
 
 	// Display root (manifest list or single manifest)
 	rootType := "Manifest"
@@ -323,37 +428,96 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []
 		fmt.Fprintf(w, "  Version ID: %d\n", g.Root.VersionID)
 	}
 
-	// Display platform manifests (references)
-	if len(platforms) > 0 {
+	// Display platforms with nested attestations (for multi-arch images)
+	if len(g.Platforms) > 0 {
+		hasIndexReferrers := len(g.Referrers) > 0
 		fmt.Fprintf(w, "  │\n")
-		fmt.Fprintf(w, "  ├─ Platform Manifests (references):\n")
-		for i, p := range platforms {
-			isLast := i == len(platforms)-1
-			prefix := "│  "
-			if isLast && len(g.Referrers) == 0 {
-				prefix = "   "
+		for i, p := range g.Platforms {
+			isLastPlatform := i == len(g.Platforms)-1 && !hasIndexReferrers
+			platformConnector := "├"
+			platformPrefix := "│  "
+			if isLastPlatform {
+				platformConnector = "└"
+				platformPrefix = "   "
 			}
 
-			connector := "├"
-			if isLast {
-				connector = "└"
-			}
-
-			shortDigest := p.Digest
+			shortDigest := p.Manifest.Digest
 			if len(shortDigest) > 19 {
 				shortDigest = shortDigest[:19] + "..."
 			}
 
-			fmt.Fprintf(w, "  %s  %s─ %s\n", prefix, connector, p.Platform)
-			fmt.Fprintf(w, "  %s     Digest: %s\n", prefix, shortDigest)
+			fmt.Fprintf(w, "  %s─ Platform: %s\n", platformConnector, p.Platform)
+			fmt.Fprintf(w, "  %s   Digest: %s\n", platformPrefix, shortDigest)
 			if p.Size > 0 {
-				fmt.Fprintf(w, "  %s     Size: %d bytes\n", prefix, p.Size)
+				fmt.Fprintf(w, "  %s   Size: %d bytes\n", platformPrefix, p.Size)
+			}
+			if p.Manifest.VersionID != 0 {
+				fmt.Fprintf(w, "  %s   Version ID: %d\n", platformPrefix, p.Manifest.VersionID)
+			}
+
+			// Display platform-specific attestations
+			if len(p.Referrers) > 0 {
+				fmt.Fprintf(w, "  %s   │\n", platformPrefix)
+				fmt.Fprintf(w, "  %s   └─ Attestations (referrers):\n", platformPrefix)
+				for j, ref := range p.Referrers {
+					isLastRef := j == len(p.Referrers)-1
+					refConnector := "├"
+					refPrefix := "│"
+					if isLastRef {
+						refConnector = "└"
+						refPrefix = " "
+					}
+
+					refShortDigest := ref.Digest
+					if len(refShortDigest) > 19 {
+						refShortDigest = refShortDigest[:19] + "..."
+					}
+
+					fmt.Fprintf(w, "  %s        %s─ %s\n", platformPrefix, refConnector, ref.Type)
+					fmt.Fprintf(w, "  %s        %s    Digest: %s\n", platformPrefix, refPrefix, refShortDigest)
+					if ref.VersionID != 0 {
+						fmt.Fprintf(w, "  %s        %s    Version ID: %d\n", platformPrefix, refPrefix, ref.VersionID)
+					}
+				}
+			}
+
+			// Add spacing between platforms
+			if !isLastPlatform || hasIndexReferrers {
+				fmt.Fprintf(w, "  %s\n", platformPrefix)
+			}
+		}
+
+		// Display index-level attestations (for multiarch images)
+		if hasIndexReferrers {
+			fmt.Fprintf(w, "  │\n")
+			fmt.Fprintf(w, "  └─ Index-level Attestations (referrers):\n")
+			for i, ref := range g.Referrers {
+				isLast := i == len(g.Referrers)-1
+
+				connector := "├"
+				continuePrefix := "│"
+				if isLast {
+					connector = "└"
+					continuePrefix = " "
+				}
+
+				shortDigest := ref.Digest
+				if len(shortDigest) > 19 {
+					shortDigest = shortDigest[:19] + "..."
+				}
+
+				fmt.Fprintf(w, "     %s─ %s\n", connector, ref.Type)
+				fmt.Fprintf(w, "     %s  Digest: %s\n", continuePrefix, shortDigest)
+				if ref.VersionID != 0 {
+					fmt.Fprintf(w, "     %s  Version ID: %d\n", continuePrefix, ref.VersionID)
+				}
 			}
 		}
 	}
 
-	// Display referrers (attestations)
-	if len(g.Referrers) > 0 {
+	// Display root-level attestations (for single-arch images only)
+	// For multiarch images, these are already shown as "Index-level Attestations" above
+	if len(g.Referrers) > 0 && len(g.Platforms) == 0 {
 		fmt.Fprintf(w, "  │\n")
 		fmt.Fprintf(w, "  └─ Attestations (referrers):\n")
 		for i, ref := range g.Referrers {
@@ -381,15 +545,27 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []
 	// Display summary
 	fmt.Fprintf(w, "\nSummary:\n")
 	if isMultiArch {
-		fmt.Fprintf(w, "  Platforms: %d\n", len(platforms))
+		fmt.Fprintf(w, "  Platforms: %d\n", len(g.Platforms))
+
+		// Count total referrers: index-level + platform-specific
+		totalReferrers := len(g.Referrers)
+		for _, p := range g.Platforms {
+			totalReferrers += len(p.Referrers)
+		}
+
+		totalVersions := 1 + len(g.Platforms) + totalReferrers
+		untaggedVersions := len(g.Platforms) + totalReferrers
+		fmt.Fprintf(w, "  SBOM: %v\n", g.HasSBOM())
+		fmt.Fprintf(w, "  Provenance: %v\n", g.HasProvenance())
+		fmt.Fprintf(w, "  Total versions: %d (%d tagged, %d untagged)\n", totalVersions, 1, untaggedVersions)
 	} else {
 		fmt.Fprintf(w, "  Type: Single-arch image\n")
+		fmt.Fprintf(w, "  SBOM: %v\n", g.HasSBOM())
+		fmt.Fprintf(w, "  Provenance: %v\n", g.HasProvenance())
+		totalVersions := 1 + len(g.Referrers)
+		untaggedVersions := len(g.Referrers)
+		fmt.Fprintf(w, "  Total versions: %d (%d tagged, %d untagged)\n", totalVersions, 1, untaggedVersions)
 	}
-	fmt.Fprintf(w, "  SBOM: %v\n", g.HasSBOM())
-	fmt.Fprintf(w, "  Provenance: %v\n", g.HasProvenance())
-	totalVersions := 1 + len(platforms) + len(g.Referrers)
-	untaggedVersions := len(platforms) + len(g.Referrers)
-	fmt.Fprintf(w, "  Total versions: %d (%d tagged, %d untagged)\n", totalVersions, 1, untaggedVersions)
 
 	return nil
 }

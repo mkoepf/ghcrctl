@@ -259,3 +259,117 @@ func TestGraphUniqueArtifactCount(t *testing.T) {
 		t.Errorf("Expected count 3, got %d", count)
 	}
 }
+
+func TestNewPlatform(t *testing.T) {
+	digest := "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	platform := NewPlatform(digest, "linux/amd64", "amd64", "linux", "")
+
+	if platform == nil {
+		t.Fatal("Expected non-nil platform")
+	}
+	if platform.Manifest == nil {
+		t.Error("Expected non-nil manifest artifact")
+	}
+	if platform.Manifest.Digest != digest {
+		t.Errorf("Expected digest %s, got %s", digest, platform.Manifest.Digest)
+	}
+	if platform.Platform != "linux/amd64" {
+		t.Errorf("Expected platform 'linux/amd64', got '%s'", platform.Platform)
+	}
+	if platform.Architecture != "amd64" {
+		t.Errorf("Expected architecture 'amd64', got '%s'", platform.Architecture)
+	}
+	if platform.OS != "linux" {
+		t.Errorf("Expected OS 'linux', got '%s'", platform.OS)
+	}
+	if len(platform.Referrers) != 0 {
+		t.Errorf("Expected 0 referrers, got %d", len(platform.Referrers))
+	}
+}
+
+func TestPlatformAddReferrer(t *testing.T) {
+	platform := NewPlatform(
+		"sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+		"linux/amd64", "amd64", "linux", "",
+	)
+
+	// Add SBOM
+	sbom, _ := NewArtifact("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", ArtifactTypeSBOM)
+	platform.AddReferrer(sbom)
+
+	if len(platform.Referrers) != 1 {
+		t.Errorf("Expected 1 referrer, got %d", len(platform.Referrers))
+	}
+
+	// Add provenance
+	provenance, _ := NewArtifact("sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321", ArtifactTypeProvenance)
+	platform.AddReferrer(provenance)
+
+	if len(platform.Referrers) != 2 {
+		t.Errorf("Expected 2 referrers, got %d", len(platform.Referrers))
+	}
+}
+
+func TestGraphAddPlatform(t *testing.T) {
+	graph, _ := NewGraph("sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+
+	// Add platform
+	platform := NewPlatform(
+		"sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+		"linux/amd64", "amd64", "linux", "",
+	)
+	graph.AddPlatform(platform)
+
+	if len(graph.Platforms) != 1 {
+		t.Errorf("Expected 1 platform, got %d", len(graph.Platforms))
+	}
+	if graph.Platforms[0].Platform != "linux/amd64" {
+		t.Errorf("Expected platform 'linux/amd64', got '%s'", graph.Platforms[0].Platform)
+	}
+}
+
+func TestGraphWithPlatformsAndReferrers(t *testing.T) {
+	// Create a multi-arch graph with platforms and their referrers
+	graph, _ := NewGraph("sha256:1111111111111111111111111111111111111111111111111111111111111111")
+
+	// Add linux/amd64 platform with SBOM and provenance
+	amd64Platform := NewPlatform(
+		"sha256:2222222222222222222222222222222222222222222222222222222222222222",
+		"linux/amd64", "amd64", "linux", "",
+	)
+	amd64SBOM, _ := NewArtifact("sha256:3333333333333333333333333333333333333333333333333333333333333333", ArtifactTypeSBOM)
+	amd64Prov, _ := NewArtifact("sha256:3333333333333333333333333333333333333333333333333333333333333333", ArtifactTypeProvenance)
+	amd64Platform.AddReferrer(amd64SBOM)
+	amd64Platform.AddReferrer(amd64Prov)
+	graph.AddPlatform(amd64Platform)
+
+	// Add linux/arm64 platform with SBOM and provenance
+	arm64Platform := NewPlatform(
+		"sha256:4444444444444444444444444444444444444444444444444444444444444444",
+		"linux/arm64", "arm64", "linux", "",
+	)
+	arm64SBOM, _ := NewArtifact("sha256:5555555555555555555555555555555555555555555555555555555555555555", ArtifactTypeSBOM)
+	arm64Prov, _ := NewArtifact("sha256:5555555555555555555555555555555555555555555555555555555555555555", ArtifactTypeProvenance)
+	arm64Platform.AddReferrer(arm64SBOM)
+	arm64Platform.AddReferrer(arm64Prov)
+	graph.AddPlatform(arm64Platform)
+
+	// Verify structure
+	if len(graph.Platforms) != 2 {
+		t.Errorf("Expected 2 platforms, got %d", len(graph.Platforms))
+	}
+	if len(graph.Platforms[0].Referrers) != 2 {
+		t.Errorf("Expected 2 referrers for amd64, got %d", len(graph.Platforms[0].Referrers))
+	}
+	if len(graph.Platforms[1].Referrers) != 2 {
+		t.Errorf("Expected 2 referrers for arm64, got %d", len(graph.Platforms[1].Referrers))
+	}
+
+	// Verify HasSBOM and HasProvenance work across platforms
+	if !graph.HasSBOM() {
+		t.Error("Expected HasSBOM to be true")
+	}
+	if !graph.HasProvenance() {
+		t.Error("Expected HasProvenance to be true")
+	}
+}

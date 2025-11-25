@@ -22,10 +22,22 @@ type Artifact struct {
 	VersionID int64    // GHCR version ID (for deletion)
 }
 
+// Platform represents a platform-specific manifest and its attestations
+type Platform struct {
+	Manifest     *Artifact   // The platform manifest
+	Platform     string      // Platform string (e.g., "linux/amd64")
+	Architecture string      // Architecture (e.g., "amd64")
+	OS           string      // Operating system (e.g., "linux")
+	Variant      string      // Optional variant (e.g., "v7" for ARM)
+	Size         int64       // Manifest size in bytes
+	Referrers    []*Artifact // Platform-specific attestations (SBOM, provenance, etc.)
+}
+
 // Graph represents the complete OCI artifact graph
 type Graph struct {
-	Root      *Artifact   // The main image artifact
-	Referrers []*Artifact // Related artifacts (SBOM, provenance, etc.)
+	Root      *Artifact   // The main image artifact (index for multi-arch, manifest for single-arch)
+	Platforms []*Platform // Platform-specific manifests and their referrers (for multi-arch images)
+	Referrers []*Artifact // Root-level referrers (for single-arch or index-level attestations)
 }
 
 // NewArtifact creates a new artifact with validation
@@ -66,6 +78,24 @@ func (a *Artifact) SetVersionID(versionID int64) {
 	a.VersionID = versionID
 }
 
+// NewPlatform creates a new platform with a manifest artifact
+func NewPlatform(digest, platform, architecture, os, variant string) *Platform {
+	manifest, _ := NewArtifact(digest, "manifest")
+	return &Platform{
+		Manifest:     manifest,
+		Platform:     platform,
+		Architecture: architecture,
+		OS:           os,
+		Variant:      variant,
+		Referrers:    []*Artifact{},
+	}
+}
+
+// AddReferrer adds a referrer artifact to the platform
+func (p *Platform) AddReferrer(artifact *Artifact) {
+	p.Referrers = append(p.Referrers, artifact)
+}
+
 // NewGraph creates a new graph with the given root digest
 func NewGraph(rootDigest string) (*Graph, error) {
 	root, err := NewArtifact(rootDigest, ArtifactTypeImage)
@@ -75,20 +105,35 @@ func NewGraph(rootDigest string) (*Graph, error) {
 
 	return &Graph{
 		Root:      root,
+		Platforms: []*Platform{},
 		Referrers: []*Artifact{},
 	}, nil
 }
 
-// AddReferrer adds a referrer artifact to the graph
+// AddPlatform adds a platform to the graph
+func (g *Graph) AddPlatform(platform *Platform) {
+	g.Platforms = append(g.Platforms, platform)
+}
+
+// AddReferrer adds a referrer artifact to the graph (root-level)
 func (g *Graph) AddReferrer(artifact *Artifact) {
 	g.Referrers = append(g.Referrers, artifact)
 }
 
 // HasSBOM returns true if the graph contains an SBOM artifact
 func (g *Graph) HasSBOM() bool {
+	// Check root-level referrers
 	for _, r := range g.Referrers {
 		if r.Type == ArtifactTypeSBOM {
 			return true
+		}
+	}
+	// Check platform-level referrers
+	for _, p := range g.Platforms {
+		for _, r := range p.Referrers {
+			if r.Type == ArtifactTypeSBOM {
+				return true
+			}
 		}
 	}
 	return false
@@ -96,9 +141,18 @@ func (g *Graph) HasSBOM() bool {
 
 // HasProvenance returns true if the graph contains a provenance artifact
 func (g *Graph) HasProvenance() bool {
+	// Check root-level referrers
 	for _, r := range g.Referrers {
 		if r.Type == ArtifactTypeProvenance {
 			return true
+		}
+	}
+	// Check platform-level referrers
+	for _, p := range g.Platforms {
+		for _, r := range p.Referrers {
+			if r.Type == ArtifactTypeProvenance {
+				return true
+			}
 		}
 	}
 	return false

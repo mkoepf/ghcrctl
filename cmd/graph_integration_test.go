@@ -67,9 +67,14 @@ func TestGraphCommandWithSBOM(t *testing.T) {
 		t.Error("Expected 'Total versions:' in summary")
 	}
 
-	// Verify platform manifests are shown
-	if !strings.Contains(output, "Platform Manifests") {
-		t.Error("Expected 'Platform Manifests' in output")
+	// Verify platforms are shown with new nested format
+	if !strings.Contains(output, "Platform:") {
+		t.Error("Expected 'Platform:' in output")
+	}
+
+	// Verify nested attestations are shown
+	if !strings.Contains(output, "Attestations (referrers):") {
+		t.Error("Expected nested 'Attestations (referrers):' in output")
 	}
 
 	// Reset args
@@ -169,10 +174,6 @@ func TestGraphCommandJSONOutput(t *testing.T) {
 		t.Error("Expected JSON to have 'root' field")
 	}
 
-	if _, ok := result["referrers"]; !ok {
-		t.Error("Expected JSON to have 'referrers' field")
-	}
-
 	// Verify root structure
 	root, ok := result["root"].(map[string]interface{})
 	if !ok {
@@ -187,17 +188,39 @@ func TestGraphCommandJSONOutput(t *testing.T) {
 		t.Error("Expected root to have 'tags' field")
 	}
 
-	// Verify referrers is an array
-	referrers, ok := result["referrers"].([]interface{})
-	if !ok {
-		t.Fatal("Expected 'referrers' to be an array")
+	// For multiarch images, verify platforms with nested referrers and index-level referrers
+	// For single-arch images, verify root-level referrers
+	totalReferrers := 0
+	if platforms, ok := result["platforms"].([]interface{}); ok {
+		// Multiarch image: check both platform-level and index-level referrers
+		if len(platforms) == 0 {
+			t.Error("Expected at least one platform for multiarch image")
+		}
+
+		for _, p := range platforms {
+			platform := p.(map[string]interface{})
+			if refs, ok := platform["referrers"].([]interface{}); ok {
+				totalReferrers += len(refs)
+			}
+		}
+
+		// Also check index-level referrers for multiarch images
+		if indexRefs, ok := result["referrers"].([]interface{}); ok {
+			totalReferrers += len(indexRefs)
+		}
+
+		t.Logf("✓ JSON structure validated: multiarch with %d platforms, %d total referrers (platform + index)", len(platforms), totalReferrers)
+	} else if referrers, ok := result["referrers"].([]interface{}); ok {
+		// Single-arch image: root-level referrers
+		totalReferrers = len(referrers)
+		t.Logf("✓ JSON structure validated: single-arch with %d referrers", totalReferrers)
+	} else {
+		t.Error("Expected either 'platforms' (multiarch) or 'referrers' (single-arch) field in JSON")
 	}
 
-	if len(referrers) == 0 {
+	if totalReferrers == 0 {
 		t.Error("Expected at least one referrer for image with SBOM")
 	}
-
-	t.Logf("✓ JSON structure validated, found %d referrers", len(referrers))
 
 	// Reset args
 	rootCmd.SetArgs([]string{})
@@ -245,7 +268,7 @@ func TestGraphTableOutputFormat(t *testing.T) {
 		"OCI Artifact Graph for ghcrctl-test-with-sbom",
 		"Image Index:",
 		"Digest:",
-		"Platform Manifests",
+		"Platform:",
 		"Attestations",
 		"Summary:",
 		"SBOM:",
@@ -316,29 +339,68 @@ func TestGraphJSONOutputStructure(t *testing.T) {
 		}
 	}
 
-	// Validate referrers array
-	referrers, ok := result["referrers"].([]interface{})
-	if !ok {
-		t.Fatal("referrers must be an array")
-	}
-
-	// Each referrer should have required fields
-	for i, ref := range referrers {
-		refObj, ok := ref.(map[string]interface{})
-		if !ok {
-			t.Errorf("referrer[%d] must be an object", i)
-			continue
+	// Validate structure based on image type (multiarch vs single-arch)
+	if platforms, ok := result["platforms"].([]interface{}); ok {
+		// Multiarch image: validate platforms array with nested referrers
+		if len(platforms) == 0 {
+			t.Error("platforms array should not be empty for multiarch image")
 		}
 
-		requiredRefFields := []string{"digest", "type", "tags", "version_id"}
-		for _, field := range requiredRefFields {
-			if _, ok := refObj[field]; !ok {
-				t.Errorf("referrer[%d] missing required field: %s", i, field)
+		for i, p := range platforms {
+			platform, ok := p.(map[string]interface{})
+			if !ok {
+				t.Errorf("platform[%d] must be an object", i)
+				continue
+			}
+
+			requiredPlatformFields := []string{"platform", "digest", "architecture", "os", "referrers"}
+			for _, field := range requiredPlatformFields {
+				if _, ok := platform[field]; !ok {
+					t.Errorf("platform[%d] missing required field: %s", i, field)
+				}
+			}
+
+			// Validate nested referrers
+			if refs, ok := platform["referrers"].([]interface{}); ok {
+				for j, ref := range refs {
+					refObj, ok := ref.(map[string]interface{})
+					if !ok {
+						t.Errorf("platform[%d].referrer[%d] must be an object", i, j)
+						continue
+					}
+
+					requiredRefFields := []string{"digest", "type", "tags", "version_id"}
+					for _, field := range requiredRefFields {
+						if _, ok := refObj[field]; !ok {
+							t.Errorf("platform[%d].referrer[%d] missing required field: %s", i, j, field)
+						}
+					}
+				}
 			}
 		}
-	}
 
-	t.Logf("✓ JSON schema validated successfully")
+		t.Logf("✓ JSON schema validated successfully (multiarch)")
+	} else if referrers, ok := result["referrers"].([]interface{}); ok {
+		// Single-arch image: validate root-level referrers
+		for i, ref := range referrers {
+			refObj, ok := ref.(map[string]interface{})
+			if !ok {
+				t.Errorf("referrer[%d] must be an object", i)
+				continue
+			}
+
+			requiredRefFields := []string{"digest", "type", "tags", "version_id"}
+			for _, field := range requiredRefFields {
+				if _, ok := refObj[field]; !ok {
+					t.Errorf("referrer[%d] missing required field: %s", i, field)
+				}
+			}
+		}
+
+		t.Logf("✓ JSON schema validated successfully (single-arch)")
+	} else {
+		t.Error("Expected either 'platforms' (multiarch) or 'referrers' (single-arch)")
+	}
 
 	// Reset args
 	rootCmd.SetArgs([]string{})
@@ -450,6 +512,17 @@ func TestGraphCommandWithVersionFlag(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
+	// Reset flags to clean state
+	graphTag = "latest"
+	graphVersion = 0
+	graphDigest = ""
+	graphJSONOutput = false
+
+	// Reset cobra command flag state from previous tests
+	graphCmd.Flags().Visit(func(f *pflag.Flag) {
+		f.Changed = false
+	})
+
 	// Set up config
 	cfg := config.New()
 	err := cfg.SetOwner("mkoepf", "user")
@@ -494,6 +567,7 @@ func TestGraphCommandWithVersionFlag(t *testing.T) {
 	graphTag = "latest"
 	graphVersion = 0
 	graphDigest = ""
+	graphJSONOutput = false
 
 	// Test 1: Query with root version ID - should show the full graph
 	t.Run("query with root version ID", func(t *testing.T) {
@@ -526,6 +600,7 @@ func TestGraphCommandWithVersionFlag(t *testing.T) {
 		graphTag = "latest"
 		graphVersion = 0
 		graphDigest = ""
+		graphJSONOutput = false
 	})
 
 	// Test 2: Query with child version ID - should show the parent graph
@@ -560,12 +635,14 @@ func TestGraphCommandWithVersionFlag(t *testing.T) {
 		graphTag = "latest"
 		graphVersion = 0
 		graphDigest = ""
+		graphJSONOutput = false
 	})
 
 	// Reset flags at the end
 	graphTag = "latest"
 	graphVersion = 0
 	graphDigest = ""
+	graphJSONOutput = false
 }
 
 // TestGraphCommandWithDigestFlag tests graph command with --digest flag
@@ -579,6 +656,7 @@ func TestGraphCommandWithDigestFlag(t *testing.T) {
 	graphTag = "latest"
 	graphVersion = 0
 	graphDigest = ""
+	graphJSONOutput = false
 
 	// Reset cobra command flag state from previous tests
 	// We need to clear the "changed" state on flags
@@ -629,6 +707,7 @@ func TestGraphCommandWithDigestFlag(t *testing.T) {
 	graphTag = "latest"
 	graphVersion = 0
 	graphDigest = ""
+	graphJSONOutput = false
 
 	// Test 1: Query with full root digest (with sha256: prefix)
 	t.Run("query with full root digest", func(t *testing.T) {
@@ -661,6 +740,7 @@ func TestGraphCommandWithDigestFlag(t *testing.T) {
 		graphTag = "latest"
 		graphVersion = 0
 		graphDigest = ""
+		graphJSONOutput = false
 	})
 
 	// Test 2: Query with root digest without sha256: prefix
@@ -690,6 +770,7 @@ func TestGraphCommandWithDigestFlag(t *testing.T) {
 		graphTag = "latest"
 		graphVersion = 0
 		graphDigest = ""
+		graphJSONOutput = false
 	})
 
 	// Test 3: Query with child digest - should show parent graph
@@ -729,10 +810,12 @@ func TestGraphCommandWithDigestFlag(t *testing.T) {
 		graphTag = "latest"
 		graphVersion = 0
 		graphDigest = ""
+		graphJSONOutput = false
 	})
 
 	// Reset flags at the end
 	graphTag = "latest"
 	graphVersion = 0
 	graphDigest = ""
+	graphJSONOutput = false
 }

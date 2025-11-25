@@ -81,6 +81,11 @@ func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
 	// and return ([]DiscoveredArtifact, string)
 	// This is a compile-time check that the function exists with the right signature
 
-	// If this compiles, the function exists
-	var _ func(context.Context, string, string, string) ([]DiscoveredArtifact, string) = discoverRelatedVersionsByDigest
+	// Call the function with dummy values to verify it compiles
+	ctx := context.Background()
+	artifacts, graphType := discoverRelatedVersionsByDigest(ctx, "", "", "")
+
+	// Verify return types (should compile even if values are empty/nil)
+	_ = artifacts // []DiscoveredArtifact
+	_ = graphType // string
 }

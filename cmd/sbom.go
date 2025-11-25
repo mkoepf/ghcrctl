@@ -53,7 +53,7 @@ var sbomCmd = &cobra.Command{
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
 		// Resolve tag to digest
-		ctx := context.Background()
+		ctx := cmd.Context()
 		digest, err := oras.ResolveTag(ctx, fullImage, sbomTag)
 		if err != nil {
 			cmd.SilenceUsage = true

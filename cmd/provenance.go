@@ -53,7 +53,7 @@ var provenanceCmd = &cobra.Command{
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
 		// Resolve tag to digest
-		ctx := context.Background()
+		ctx := cmd.Context()
 		digest, err := oras.ResolveTag(ctx, fullImage, provenanceTag)
 		if err != nil {
 			cmd.SilenceUsage = true

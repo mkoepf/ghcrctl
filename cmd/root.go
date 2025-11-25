@@ -4,7 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mhk/ghcrctl/internal/logging"
 	"github.com/spf13/cobra"
+)
+
+var (
+	logAPICalls bool
 )
 
 var rootCmd = &cobra.Command{
@@ -18,6 +23,13 @@ It provides functionality for:
 - Safe deletion of package versions
 - Configuration of owner/org and authentication`,
 	SilenceErrors: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Enable API call logging if flag is set
+		if logAPICalls {
+			ctx := logging.EnableLogging(cmd.Context())
+			cmd.SetContext(ctx)
+		}
+	},
 }
 
 // Execute runs the root command
@@ -26,4 +38,9 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	// Add persistent flag for API call logging
+	rootCmd.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 }

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -71,13 +70,13 @@ Examples:
 		}
 
 		// Create GitHub client
-		client, err := gh.NewClient(token)
+		client, err := gh.NewClientWithContext(cmd.Context(), token)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		// Get version tags to show what we're deleting
 		tags, err := client.GetVersionTags(ctx, owner, ownerType, imageName, versionID)

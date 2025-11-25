@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,14 +39,14 @@ var imagesCmd = &cobra.Command{
 		}
 
 		// Create GitHub client
-		client, err := gh.NewClient(token)
+		client, err := gh.NewClientWithContext(cmd.Context(), token)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
 		// List packages
-		ctx := context.Background()
+		ctx := cmd.Context()
 		packages, err := client.ListPackages(ctx, owner, ownerType)
 		if err != nil {
 			cmd.SilenceUsage = true

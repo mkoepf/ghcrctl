@@ -63,7 +63,7 @@ Examples:
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
 		// Get labels from image
-		labels, err := getImageLabels(fullImage, labelsTag)
+		labels, err := getImageLabels(cmd.Context(), fullImage, labelsTag)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to get labels: %w", err)
@@ -87,9 +87,7 @@ Examples:
 	},
 }
 
-func getImageLabels(image, tag string) (map[string]string, error) {
-	ctx := context.Background()
-
+func getImageLabels(ctx context.Context, image, tag string) (map[string]string, error) {
 	// Resolve tag to digest
 	digest, err := oras.ResolveTag(ctx, image, tag)
 	if err != nil {

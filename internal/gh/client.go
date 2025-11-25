@@ -3,10 +3,12 @@ package gh
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/google/go-github/v58/github"
+	"github.com/mhk/ghcrctl/internal/logging"
 )
 
 // Client wraps the GitHub API client
@@ -31,12 +33,26 @@ func GetToken() (string, error) {
 
 // NewClient creates a new GitHub API client with the provided token
 func NewClient(token string) (*Client, error) {
+	return NewClientWithContext(context.Background(), token)
+}
+
+// NewClientWithContext creates a new GitHub API client with the provided token and context
+// If logging is enabled in the context, API calls will be logged
+func NewClientWithContext(ctx context.Context, token string) (*Client, error) {
 	if token == "" {
 		return nil, fmt.Errorf("token cannot be empty")
 	}
 
+	// Create HTTP client with logging if enabled
+	var httpClient *http.Client
+	if logging.IsLoggingEnabled(ctx) {
+		httpClient = &http.Client{
+			Transport: logging.NewLoggingRoundTripper(http.DefaultTransport, os.Stderr),
+		}
+	}
+
 	// Create GitHub client with authentication
-	client := github.NewClient(nil).WithAuthToken(token)
+	client := github.NewClient(httpClient).WithAuthToken(token)
 
 	return &Client{
 		client: client,

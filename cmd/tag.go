@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/mhk/ghcrctl/internal/config"
@@ -42,7 +41,7 @@ Example:
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
 		// Use ORAS to copy the tag (creates new tag pointing to same digest)
-		ctx := context.Background()
+		ctx := cmd.Context()
 		err = oras.CopyTag(ctx, fullImage, existingTag, newTag)
 		if err != nil {
 			cmd.SilenceUsage = true

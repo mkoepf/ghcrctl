@@ -262,6 +262,39 @@ ghcrctl provenance --help
 ghcrctl tag --help
 ```
 
+### API Call Logging
+
+Enable detailed logging of all API calls for performance analysis and debugging:
+
+```bash
+ghcrctl <command> --log-api-calls
+```
+
+This flag logs all HTTP requests to stderr as JSON, including:
+- Timestamp and duration
+- API category (github, oci, other)
+- HTTP method, URL, and path
+- Response status and sizes
+- Source code location (file:line:function)
+
+**Example output:**
+```json
+{"timestamp":"2025-01-15T10:30:45Z","category":"github","method":"GET","url":"https://api.github.com/users/myorg/packages","path":"/users/myorg/packages","status":200,"duration_ms":245,"request_bytes":0,"response_bytes":1523,"caller":"client.go:42:ListPackages"}
+```
+
+**Use cases:**
+- Performance analysis: Identify slow API calls
+- Debugging: Trace API request flow through code
+- Auditing: Track which operations make API calls
+- Optimization: Find opportunities to reduce API calls
+
+**Example: Analyzing graph command performance:**
+```bash
+./ghcrctl graph myimage --log-api-calls 2>api-calls.log
+# Analyze the log to see which API calls take longest
+jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' api-calls.log
+```
+
 ## Development Status
 
 This project is under active development following an iterative approach:

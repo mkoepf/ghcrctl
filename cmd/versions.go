@@ -63,13 +63,13 @@ Examples:
 		}
 
 		// Create GitHub client
-		client, err := gh.NewClient(token)
+		client, err := gh.NewClientWithContext(cmd.Context(), token)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		// List package versions
 		versions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)

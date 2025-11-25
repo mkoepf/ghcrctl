@@ -74,13 +74,13 @@ var graphCmd = &cobra.Command{
 		// Construct full image reference
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-		ctx := context.Background()
+		ctx := cmd.Context()
 		var digest string
 
 		// Determine how to get the digest based on which flag was used
 		if versionChanged {
 			// Get digest from version ID
-			ghClient, err := gh.NewClient(token)
+			ghClient, err := gh.NewClientWithContext(cmd.Context(), token)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to create GitHub client: %w", err)
@@ -132,7 +132,7 @@ var graphCmd = &cobra.Command{
 		}
 
 		// Get GitHub client to map digest to version ID and fetch all tags
-		ghClient, err := gh.NewClient(token)
+		ghClient, err := gh.NewClientWithContext(cmd.Context(), token)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to create GitHub client: %w", err)

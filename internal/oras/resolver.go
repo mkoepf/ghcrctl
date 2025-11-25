@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
 
+	"github.com/mhk/ghcrctl/internal/logging"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
@@ -42,7 +44,7 @@ func ResolveTag(ctx context.Context, image, tag string) (string, error) {
 	}
 
 	// Configure authentication for GHCR using GitHub token
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return "", fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -162,7 +164,7 @@ func DiscoverReferrers(ctx context.Context, image, digest string) ([]ReferrerInf
 	}
 
 	// Configure authentication for GHCR using GitHub token
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -452,7 +454,7 @@ func GetPlatformManifests(ctx context.Context, image, digest string) ([]Platform
 	}
 
 	// Configure authentication
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -555,7 +557,7 @@ func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[s
 	}
 
 	// Configure authentication
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -635,7 +637,7 @@ func FetchImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Im
 	}
 
 	// Configure authentication
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return nil, fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -747,7 +749,7 @@ func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {
 	}
 
 	// Configure authentication
-	if err := configureAuth(repo); err != nil {
+	if err := configureAuth(ctx, repo); err != nil {
 		return fmt.Errorf("failed to configure authentication: %w", err)
 	}
 
@@ -768,14 +770,24 @@ func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {
 }
 
 // configureAuth configures authentication for GHCR using GitHub token
-func configureAuth(repo *remote.Repository) error {
+func configureAuth(ctx context.Context, repo *remote.Repository) error {
+	// Create HTTP client with optional logging
+	var httpClient *http.Client
+	if logging.IsLoggingEnabled(ctx) {
+		httpClient = &http.Client{
+			Transport: logging.NewLoggingRoundTripper(http.DefaultTransport, os.Stderr),
+		}
+	}
+
 	// Get GitHub token from environment
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		// No token - try anonymous access
-		repo.Client = &auth.Client{
-			Cache: auth.NewCache(),
+		authClient := &auth.Client{
+			Cache:  auth.NewCache(),
+			Client: httpClient, // Use logging client if enabled
 		}
+		repo.Client = authClient
 		return nil
 	}
 
@@ -789,15 +801,18 @@ func configureAuth(repo *remote.Repository) error {
 		Password: token,
 	}
 
-	if err := store.Put(context.Background(), "ghcr.io", cred); err != nil {
+	if err := store.Put(ctx, "ghcr.io", cred); err != nil {
 		return fmt.Errorf("failed to store credentials: %w", err)
 	}
 
-	// Create auth client with credential store
-	repo.Client = &auth.Client{
+	// Create auth client with credential store and logging
+	authClient := &auth.Client{
 		Cache:      auth.NewCache(),
 		Credential: credentials.Credential(store),
+		Client:     httpClient, // Use logging client if enabled
 	}
+
+	repo.Client = authClient
 
 	return nil
 }

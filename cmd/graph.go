@@ -138,14 +138,29 @@ var graphCmd = &cobra.Command{
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
-		// Map digest to version ID
-		versionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
+		// Fetch all versions once and cache them for lookups
+		// This avoids redundant API calls (5× → 1×)
+		allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not list package versions: %v\n", err)
+			allVersions = []gh.PackageVersionInfo{} // Empty list, lookups will fail gracefully
+		}
+
+		// Create digest→version map for O(1) lookups
+		versionCache := make(map[string]gh.PackageVersionInfo)
+		for _, ver := range allVersions {
+			versionCache[ver.Name] = ver
+		}
+
+		// Map digest to version ID using cache
+		versionInfo, found := versionCache[digest]
+		if !found {
 			// Non-fatal: version ID is optional
-			fmt.Fprintf(os.Stderr, "Warning: could not map digest to version ID: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: could not map digest %s to version ID\n", digest)
 			// Fall back to just adding the queried tag
 			g.Root.AddTag(graphTag)
 		} else {
+			versionID := versionInfo.ID
 			g.Root.SetVersionID(versionID)
 
 			// Fetch all tags for this version
@@ -181,7 +196,7 @@ var graphCmd = &cobra.Command{
 		// If so, it might be a child artifact itself, so search for its parent
 		if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 			// Try to find the parent graph that contains this digest
-			parentDigest, err := findParentDigest(ctx, ghClient, owner, ownerType, imageName, fullImage, digest)
+			parentDigest, err := findParentDigest(ctx, allVersions, fullImage, digest)
 			if err == nil && parentDigest != "" && parentDigest != digest {
 				// Found a parent! Use the parent digest instead
 				digest = parentDigest
@@ -193,11 +208,10 @@ var graphCmd = &cobra.Command{
 					return fmt.Errorf("failed to create graph with parent digest: %w", err)
 				}
 
-				// Map parent digest to version ID and fetch tags
-				versionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
-				if err == nil {
-					g.Root.SetVersionID(versionID)
-					allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+				// Map parent digest to version ID and fetch tags using cache
+				if parentVersionInfo, found := versionCache[digest]; found {
+					g.Root.SetVersionID(parentVersionInfo.ID)
+					allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, parentVersionInfo.ID)
 					if err == nil {
 						for _, tag := range allTags {
 							g.Root.AddTag(tag)
@@ -303,19 +317,18 @@ var graphCmd = &cobra.Command{
 						continue
 					}
 
-					// Try to get version ID and all tags for this referrer
-					refVersionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, ref.Digest)
-					if err == nil {
-						artifact.SetVersionID(refVersionID)
+				// Try to get version ID and all tags for this referrer using cache
+				if refVersionInfo, found := versionCache[ref.Digest]; found {
+					artifact.SetVersionID(refVersionInfo.ID)
 
-						// Fetch all tags for this referrer version
-						refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionID)
-						if err == nil {
-							for _, tag := range refTags {
-								artifact.AddTag(tag)
-							}
+					// Fetch all tags for this referrer version
+					refTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, refVersionInfo.ID)
+					if err == nil {
+						for _, tag := range refTags {
+							artifact.AddTag(tag)
 						}
 					}
+				}
 
 					g.AddReferrer(artifact)
 				}
@@ -599,13 +612,8 @@ func sortByIDProximity(versions []gh.PackageVersionInfo, targetID int64) []gh.Pa
 
 // findParentDigest searches for a parent digest that references the given child digest
 // Returns the parent digest if found, or empty string if not found
-func findParentDigest(ctx context.Context, ghClient *gh.Client, owner, ownerType, imageName, fullImage, childDigest string) (string, error) {
-	// Get all versions for this image
-	versions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
-	if err != nil {
-		return "", fmt.Errorf("failed to list package versions: %w", err)
-	}
-
+// Uses pre-fetched versions list to avoid redundant API calls
+func findParentDigest(ctx context.Context, versions []gh.PackageVersionInfo, fullImage, childDigest string) (string, error) {
 	// Find the child version's ID to optimize search order
 	var childID int64
 	for _, ver := range versions {

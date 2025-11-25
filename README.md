@@ -88,6 +88,8 @@ ghcrctl graph myimage
 
 This command reveals the complete structure of your container image, explaining all those "untagged" package versions you see in GHCR:
 
+**Performance note:** When querying untagged child artifacts (like platform manifests or attestations) by version ID or digest, the tool must search through all package versions to find the parent graph. This is currently the only reliable method, as neither the OCI `subject` field (not populated by Docker Buildx) nor the GitHub Package API provide parent-child relationship metadata. The search stops as soon as the parent is found, but for packages with many versions, this operation can be slow.
+
 **What it shows:**
 - **Image Index** (manifest list) or **Manifest** (single-arch)
 - **Platform Manifests** (references) - Each architecture creates an untagged version (linux/amd64, linux/arm64, etc.)

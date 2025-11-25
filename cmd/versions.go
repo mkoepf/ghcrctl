@@ -78,42 +78,22 @@ Examples:
 			return fmt.Errorf("failed to list versions: %w", err)
 		}
 
-		// Build graph relationships
+		// Optimization: Filter versions by tag BEFORE building graphs
+		// This avoids making ORAS API calls for versions we'll filter out anyway
+		if versionsTag != "" {
+			versions = filterVersionsByTag(versions, versionsTag)
+			if len(versions) == 0 {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("no versions found with tag %q", versionsTag)
+			}
+		}
+
+		// Build graph relationships (only for filtered versions if tag specified)
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 		versionGraphs, err := buildVersionGraphs(ctx, fullImage, versions, client, owner, ownerType, imageName)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to build version graphs: %w", err)
-		}
-
-		// Filter graphs by tag if specified
-		if versionsTag != "" {
-			filtered := []VersionGraph{}
-			for _, graph := range versionGraphs {
-				for _, tag := range graph.RootVersion.Tags {
-					if tag == versionsTag {
-						filtered = append(filtered, graph)
-						break
-					}
-				}
-			}
-			versionGraphs = filtered
-
-			if len(versionGraphs) == 0 {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("no versions found with tag %q", versionsTag)
-			}
-
-			// Also filter versions list for JSON output
-			if versionsJSON {
-				versions = []gh.PackageVersionInfo{}
-				for _, graph := range versionGraphs {
-					versions = append(versions, graph.RootVersion)
-					for _, child := range graph.Children {
-						versions = append(versions, child.Version)
-					}
-				}
-			}
 		}
 
 		// Output results
@@ -138,6 +118,25 @@ type VersionChild struct {
 	Platform     string // e.g., "linux/amd64" for platform manifests
 }
 
+// filterVersionsByTag filters versions to only those with the specified tag
+// Returns all versions if tagFilter is empty
+func filterVersionsByTag(versions []gh.PackageVersionInfo, tagFilter string) []gh.PackageVersionInfo {
+	if tagFilter == "" {
+		return versions
+	}
+
+	filtered := []gh.PackageVersionInfo{}
+	for _, ver := range versions {
+		for _, tag := range ver.Tags {
+			if tag == tagFilter {
+				filtered = append(filtered, ver)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
 	// Map digest to version info for quick lookup
 	digestToVersion := make(map[string]gh.PackageVersionInfo)
@@ -160,8 +159,10 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versions []gh.Pac
 
 			assigned[ver.ID] = true
 
-			// Discover related versions by resolving the digest
-			relatedArtifacts, graphType := discoverRelatedVersions(ctx, fullImage, ver.Tags[0], ver.Name)
+			// Optimization: Use digest directly from ver.Name instead of resolving tag
+			// This eliminates redundant ORAS ResolveTag calls (2 OCI calls per version)
+			// since GitHub API already provides the digest
+			relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
 			graph.Type = graphType
 
 			// Find child versions by digest and consolidate artifact types
@@ -252,19 +253,6 @@ type DiscoveredArtifact struct {
 	Digest       string
 	ArtifactType string // "platform", "sbom", "provenance", "attestation"
 	Platform     string // e.g., "linux/amd64" for platform manifests
-}
-
-func discoverRelatedVersions(ctx context.Context, fullImage, tag, rootDigest string) ([]DiscoveredArtifact, string) {
-	var artifacts []DiscoveredArtifact
-	graphType := "manifest"
-
-	// Resolve tag to get the digest
-	digest, err := oras.ResolveTag(ctx, fullImage, tag)
-	if err != nil {
-		return artifacts, graphType
-	}
-
-	return discoverRelatedVersionsByDigest(ctx, fullImage, digest, rootDigest)
 }
 
 // discoverRelatedVersionsByDigest discovers children using a digest directly

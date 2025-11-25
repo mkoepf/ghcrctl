@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/mhk/ghcrctl/internal/logging"
 	"github.com/opencontainers/go-digest"
@@ -16,6 +17,13 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/credentials"
+)
+
+// Package-level cache for OCI auth clients to avoid redundant token fetches
+var (
+	authClientCache     *auth.Client
+	authClientCacheMu   sync.RWMutex
+	authClientCacheInit sync.Once
 )
 
 // ResolveTag resolves an image tag to its digest using ORAS
@@ -769,50 +777,72 @@ func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {
 	return nil
 }
 
+// getOrCreateAuthClient returns a cached auth client or creates a new one
+// This ensures token caching across multiple ORAS operations, avoiding redundant auth cycles
+func getOrCreateAuthClient(ctx context.Context) *auth.Client {
+	// Fast path: check if we have a cached client
+	authClientCacheMu.RLock()
+	if authClientCache != nil {
+		client := authClientCache
+		authClientCacheMu.RUnlock()
+		return client
+	}
+	authClientCacheMu.RUnlock()
+
+	// Slow path: create and cache the client (only done once)
+	authClientCacheInit.Do(func() {
+		authClientCacheMu.Lock()
+		defer authClientCacheMu.Unlock()
+
+		// Create HTTP client with optional logging
+		var httpClient *http.Client
+		if logging.IsLoggingEnabled(ctx) {
+			httpClient = &http.Client{
+				Transport: logging.NewLoggingRoundTripper(http.DefaultTransport, os.Stderr),
+			}
+		}
+
+		// Get GitHub token from environment
+		token := os.Getenv("GITHUB_TOKEN")
+		if token == "" {
+			// No token - create anonymous auth client
+			authClientCache = &auth.Client{
+				Cache:  auth.NewCache(),
+				Client: httpClient,
+			}
+			return
+		}
+
+		// Configure credential store with GitHub token
+		store := credentials.NewMemoryStore()
+
+		// Store credentials for ghcr.io
+		cred := auth.Credential{
+			Username: "oauth2", // ghcr.io uses oauth2 as username
+			Password: token,
+		}
+
+		// Store credentials (ignoring errors in initialization)
+		_ = store.Put(context.Background(), "ghcr.io", cred)
+
+		// Create auth client with credential store, cache, and logging
+		// The cache persists tokens across requests, eliminating redundant auth cycles
+		authClientCache = &auth.Client{
+			Cache:      auth.NewCache(),
+			Credential: credentials.Credential(store),
+			Client:     httpClient,
+		}
+	})
+
+	authClientCacheMu.RLock()
+	client := authClientCache
+	authClientCacheMu.RUnlock()
+	return client
+}
+
 // configureAuth configures authentication for GHCR using GitHub token
+// Now uses a cached auth client to avoid redundant token fetches
 func configureAuth(ctx context.Context, repo *remote.Repository) error {
-	// Create HTTP client with optional logging
-	var httpClient *http.Client
-	if logging.IsLoggingEnabled(ctx) {
-		httpClient = &http.Client{
-			Transport: logging.NewLoggingRoundTripper(http.DefaultTransport, os.Stderr),
-		}
-	}
-
-	// Get GitHub token from environment
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		// No token - try anonymous access
-		authClient := &auth.Client{
-			Cache:  auth.NewCache(),
-			Client: httpClient, // Use logging client if enabled
-		}
-		repo.Client = authClient
-		return nil
-	}
-
-	// Configure credential store with GitHub token
-	store := credentials.NewMemoryStore()
-
-	// Store credentials for ghcr.io
-	// Username doesn't matter for GHCR, token is used as password
-	cred := auth.Credential{
-		Username: "oauth2", // ghcr.io uses oauth2 as username
-		Password: token,
-	}
-
-	if err := store.Put(ctx, "ghcr.io", cred); err != nil {
-		return fmt.Errorf("failed to store credentials: %w", err)
-	}
-
-	// Create auth client with credential store and logging
-	authClient := &auth.Client{
-		Cache:      auth.NewCache(),
-		Credential: credentials.Credential(store),
-		Client:     httpClient, // Use logging client if enabled
-	}
-
-	repo.Client = authClient
-
+	repo.Client = getOrCreateAuthClient(ctx)
 	return nil
 }

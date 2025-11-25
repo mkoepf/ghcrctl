@@ -47,55 +47,116 @@ jobs:
       # Create test Dockerfiles
       - name: Create test Dockerfiles
         run: |
-          # Simple test image with minimal content
+          # Test image 1: No SBOM, no provenance, single platform
           cat > Dockerfile.test1 << 'EOF'
           FROM alpine:3.19
           LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image without SBOM"
-          LABEL test.image.type="without-sbom"
-          RUN echo "Test image 1 - no SBOM" > /test.txt
+          LABEL org.opencontainers.image.description="Test image without SBOM or provenance"
+          LABEL test.image.type="no-sbom-no-provenance-single"
+          RUN echo "Test image 1 - no SBOM, no provenance" > /test.txt
           CMD ["cat", "/test.txt"]
           EOF
 
+          # Test image 2: With SBOM and provenance, multiarch (amd64 + arm64)
           cat > Dockerfile.test2 << 'EOF'
           FROM alpine:3.19
           LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image with SBOM"
-          LABEL test.image.type="with-sbom"
-          RUN echo "Test image 2 - with SBOM" > /test.txt
+          LABEL org.opencontainers.image.description="Test image with SBOM and provenance (multiarch)"
+          LABEL test.image.type="with-sbom-with-provenance-multiarch"
+          RUN echo "Test image 2 - with SBOM and provenance" > /test.txt
           CMD ["cat", "/test.txt"]
           EOF
 
-      # Build and push image WITHOUT SBOM
-      - name: Build and push test image 1 (no SBOM)
+          # Test image 3: With SBOM but no provenance, single platform
+          cat > Dockerfile.test3 << 'EOF'
+          FROM alpine:3.19
+          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
+          LABEL org.opencontainers.image.description="Test image with SBOM but no provenance"
+          LABEL test.image.type="with-sbom-no-provenance"
+          RUN echo "Test image 3 - with SBOM, no provenance" > /test.txt
+          CMD ["cat", "/test.txt"]
+          EOF
+
+          # Test image 4: No SBOM, no provenance, multiarch (amd64 + arm64)
+          cat > Dockerfile.test4 << 'EOF'
+          FROM alpine:3.19
+          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
+          LABEL org.opencontainers.image.description="Test image without SBOM or provenance (multiarch)"
+          LABEL test.image.type="no-sbom-no-provenance-multiarch"
+          RUN echo "Test image 4 - no SBOM, no provenance, multiarch" > /test.txt
+          CMD ["cat", "/test.txt"]
+          EOF
+
+      # Build and push image 1: No SBOM, no provenance, single platform
+      - name: Build and push test image 1 (no SBOM, no provenance, single platform)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.test1
           push: true
+          platforms: linux/amd64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:v1.0
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:test-${{ github.run_number }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:test-1
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-      # Build and push image WITH SBOM
-      - name: Build and push test image 2 (with SBOM)
+      # Build and push image 2: With SBOM and provenance, multiarch
+      - name: Build and push test image 2 (with SBOM, with provenance, multiarch)
         id: push-with-sbom
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.test2
           push: true
+          platforms: linux/amd64,linux/arm64
           sbom: true
           provenance: mode=max
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:v1.0
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:test-${{ github.run_number }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:test-1
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:stable
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:newest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:classic-pat-test
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      # Build and push image 3: With SBOM but no provenance, single platform
+      - name: Build and push test image 3 (with SBOM, no provenance, single platform)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.test3
+          push: true
+          platforms: linux/amd64
+          sbom: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom-no-provenance:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom-no-provenance:v1.0
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom-no-provenance:test-1
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      # Build and push image 4: No SBOM, no provenance, multiarch
+      - name: Build and push test image 4 (no SBOM, no provenance, multiarch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.test4
+          push: true
+          platforms: linux/amd64,linux/arm64
+          sbom: false
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom-no-provenance:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom-no-provenance:v1.0
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom-no-provenance:test-1
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
@@ -104,25 +165,37 @@ jobs:
         run: |
           echo "## Integration Test Images Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Image 1: Without SBOM" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:v1.0\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:test-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 1: No SBOM, No Provenance (Single Platform)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-no-sbom\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Image 2: With SBOM and Provenance" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:v1.0\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:test-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:stable\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 2: With SBOM and Provenance (Multiarch)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`, \`stable\`, \`newest\`, \`classic-pat-test\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-with-sbom\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 3: With SBOM, No Provenance (Single Platform)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-with-sbom-no-provenance\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 4: No SBOM, No Provenance (Multiarch)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-no-sbom-no-provenance\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test with ghcrctl" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "# List images" >> $GITHUB_STEP_SUMMARY
           echo "ghcrctl images" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# View graph for image without SBOM" >> $GITHUB_STEP_SUMMARY
+          echo "# View versions for multiarch image with SBOM" >> $GITHUB_STEP_SUMMARY
+          echo "ghcrctl versions ${{ inputs.image_prefix }}-with-sbom" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# View graph for single platform image" >> $GITHUB_STEP_SUMMARY
           echo "ghcrctl graph ${{ inputs.image_prefix }}-no-sbom" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# View graph for image with SBOM" >> $GITHUB_STEP_SUMMARY
+          echo "# View graph for multiarch with SBOM and provenance" >> $GITHUB_STEP_SUMMARY
           echo "ghcrctl graph ${{ inputs.image_prefix }}-with-sbom" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

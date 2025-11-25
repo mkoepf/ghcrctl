@@ -12,17 +12,17 @@ import (
 
 // LogEntry represents a single API call log entry
 type LogEntry struct {
-	Timestamp    time.Time `json:"timestamp"`
-	Category     string    `json:"category"`
-	Method       string    `json:"method"`
-	URL          string    `json:"url"`
-	Path         string    `json:"path"`
-	Status       int       `json:"status"`
-	DurationMs   int64     `json:"duration_ms"`
-	RequestBytes int64     `json:"request_bytes"`
-	ResponseBytes int64    `json:"response_bytes"`
-	Caller       string    `json:"caller"`
-	Error        string    `json:"error,omitempty"`
+	Timestamp     time.Time `json:"timestamp"`
+	Category      string    `json:"category"`
+	Method        string    `json:"method"`
+	URL           string    `json:"url"`
+	Path          string    `json:"path"`
+	Status        int       `json:"status"`
+	DurationMs    int64     `json:"duration_ms"`
+	RequestBytes  int64     `json:"request_bytes"`
+	ResponseBytes int64     `json:"response_bytes"`
+	Caller        string    `json:"caller"`
+	Error         string    `json:"error,omitempty"`
 }
 
 // LoggingRoundTripper is an http.RoundTripper that logs API calls

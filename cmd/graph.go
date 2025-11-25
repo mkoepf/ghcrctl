@@ -314,15 +314,15 @@ var graphCmd = &cobra.Command{
 						continue
 					}
 
-				// Try to get version ID and all tags for this referrer using cache
-				if refVersionInfo, found := versionCache[ref.Digest]; found {
-					artifact.SetVersionID(refVersionInfo.ID)
+					// Try to get version ID and all tags for this referrer using cache
+					if refVersionInfo, found := versionCache[ref.Digest]; found {
+						artifact.SetVersionID(refVersionInfo.ID)
 
-					// Use tags from cached version data (no API call needed)
-					for _, tag := range refVersionInfo.Tags {
-						artifact.AddTag(tag)
+						// Use tags from cached version data (no API call needed)
+						for _, tag := range refVersionInfo.Tags {
+							artifact.AddTag(tag)
+						}
 					}
-				}
 
 					g.AddReferrer(artifact)
 				}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -606,6 +607,117 @@ func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[s
 	}
 
 	return attestations, nil
+}
+
+// FetchImageConfig fetches the image config blob which contains labels and other metadata
+func FetchImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Image, error) {
+	// Validate inputs
+	if image == "" {
+		return nil, fmt.Errorf("image cannot be empty")
+	}
+	if digestStr == "" {
+		return nil, fmt.Errorf("digest cannot be empty")
+	}
+	if !validateDigestFormat(digestStr) {
+		return nil, fmt.Errorf("invalid digest format: %s", digestStr)
+	}
+
+	// Parse image reference
+	registry, path, err := parseImageReference(image)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(repo); err != nil {
+		return nil, fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the digest to get the full descriptor
+	desc, err := repo.Resolve(ctx, digestStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve digest: %w", err)
+	}
+
+	// Fetch the manifest
+	manifestReader, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
+	}
+	defer manifestReader.Close()
+
+	// Read manifest into memory so we can parse it multiple times
+	var manifestData []byte
+	manifestData, err = io.ReadAll(manifestReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read manifest: %w", err)
+	}
+
+	// Check if this is an Image Index (multi-arch) or a simple Manifest
+	// Try to parse as Index first
+	var index ocispec.Index
+	if err := json.Unmarshal(manifestData, &index); err == nil && index.MediaType == ocispec.MediaTypeImageIndex {
+		// This is an Image Index - get the first platform manifest
+		if len(index.Manifests) == 0 {
+			return nil, fmt.Errorf("image index has no manifests")
+		}
+
+		// Fetch the first platform manifest
+		platformDesc := index.Manifests[0]
+		platformManifestBytes, err := repo.Fetch(ctx, platformDesc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch platform manifest: %w", err)
+		}
+		defer platformManifestBytes.Close()
+
+		// Parse platform manifest
+		var platformManifest ocispec.Manifest
+		if err := json.NewDecoder(platformManifestBytes).Decode(&platformManifest); err != nil {
+			return nil, fmt.Errorf("failed to decode platform manifest: %w", err)
+		}
+
+		// Fetch the config blob from the platform manifest
+		configBytes, err := repo.Fetch(ctx, platformManifest.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch config blob: %w", err)
+		}
+		defer configBytes.Close()
+
+		// Parse the config as an OCI Image config
+		var imageConfig ocispec.Image
+		if err := json.NewDecoder(configBytes).Decode(&imageConfig); err != nil {
+			return nil, fmt.Errorf("failed to decode image config: %w", err)
+		}
+
+		return &imageConfig, nil
+	}
+
+	// Not an index, treat as regular manifest
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to decode manifest: %w", err)
+	}
+
+	// Fetch the config blob
+	configBytes, err := repo.Fetch(ctx, manifest.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch config blob: %w", err)
+	}
+	defer configBytes.Close()
+
+	// Parse the config as an OCI Image config
+	var imageConfig ocispec.Image
+	if err := json.NewDecoder(configBytes).Decode(&imageConfig); err != nil {
+		return nil, fmt.Errorf("failed to decode image config: %w", err)
+	}
+
+	return &imageConfig, nil
 }
 
 // CopyTag copies a tag by fetching the manifest from the source tag and pushing it with the destination tag

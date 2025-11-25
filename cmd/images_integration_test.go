@@ -45,7 +45,7 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 	//
 	// Both cases are handled here to allow testing in different environments.
 	if err == nil {
-		// Case 1: 
+		// Case 1:
 		// In the GitHub Actions CI, a personal access token with broad
 		// read:packages permissions is used, so the command should succeed
 		// there.

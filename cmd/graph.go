@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/mhk/ghcrctl/internal/config"
 	"github.com/mhk/ghcrctl/internal/gh"
@@ -16,6 +17,8 @@ import (
 
 var (
 	graphTag        string
+	graphVersion    int64
+	graphDigest     string
 	graphJSONOutput bool
 )
 
@@ -26,6 +29,27 @@ var graphCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Validate flag exclusivity - count how many flags were explicitly set
+		flagsSet := 0
+		tagChanged := cmd.Flags().Changed("tag")
+		versionChanged := cmd.Flags().Changed("version")
+		digestChanged := cmd.Flags().Changed("digest")
+
+		if tagChanged {
+			flagsSet++
+		}
+		if versionChanged {
+			flagsSet++
+		}
+		if digestChanged {
+			flagsSet++
+		}
+
+		if flagsSet > 1 {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("flags --tag, --version, and --digest are mutually exclusive; only one can be used at a time")
+		}
 
 		// Load configuration
 		cfg := config.New()
@@ -50,12 +74,54 @@ var graphCmd = &cobra.Command{
 		// Construct full image reference
 		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-		// Resolve tag to digest
 		ctx := context.Background()
-		digest, err := oras.ResolveTag(ctx, fullImage, graphTag)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to resolve tag '%s': %w", graphTag, err)
+		var digest string
+
+		// Determine how to get the digest based on which flag was used
+		if versionChanged {
+			// Get digest from version ID
+			ghClient, err := gh.NewClient(token)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to create GitHub client: %w", err)
+			}
+
+			// Get all versions for the image
+			versions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to get package versions: %w", err)
+			}
+
+			// Find the version with matching ID
+			var foundVersion *gh.PackageVersionInfo
+			for i := range versions {
+				if versions[i].ID == graphVersion {
+					foundVersion = &versions[i]
+					break
+				}
+			}
+
+			if foundVersion == nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("version ID %d not found for image %s", graphVersion, imageName)
+			}
+
+			digest = foundVersion.Name
+		} else if digestChanged {
+			// Use provided digest directly
+			digest = graphDigest
+			// Normalize digest format (add sha256: prefix if missing)
+			if !strings.HasPrefix(digest, "sha256:") {
+				digest = "sha256:" + digest
+			}
+		} else {
+			// Default: resolve tag to digest
+			digest, err = oras.ResolveTag(ctx, fullImage, graphTag)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to resolve tag '%s': %w", graphTag, err)
+			}
 		}
 
 		// Create graph with root image
@@ -108,7 +174,43 @@ var graphCmd = &cobra.Command{
 		if err != nil {
 			// Non-fatal: referrers are optional
 			fmt.Fprintf(os.Stderr, "Warning: could not discover referrers: %v\n", err)
-		} else {
+		}
+
+		// Check if this digest has no children (no platforms, no referrers)
+		// If so, it might be a child artifact itself, so search for its parent
+		if len(platforms) == 0 && len(referrers) == 0 {
+			// Try to find the parent graph that contains this digest
+			parentDigest, err := findParentDigest(ctx, ghClient, owner, ownerType, imageName, fullImage, digest)
+			if err == nil && parentDigest != "" && parentDigest != digest {
+				// Found a parent! Use the parent digest instead
+				digest = parentDigest
+
+				// Recreate graph with parent digest
+				g, err = graph.NewGraph(digest)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to create graph with parent digest: %w", err)
+				}
+
+				// Map parent digest to version ID and fetch tags
+				versionID, err := ghClient.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
+				if err == nil {
+					g.Root.SetVersionID(versionID)
+					allTags, err := ghClient.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+					if err == nil {
+						for _, tag := range allTags {
+							g.Root.AddTag(tag)
+						}
+					}
+				}
+
+				// Get platforms and referrers for the parent
+				platforms, _ = oras.GetPlatformManifests(ctx, fullImage, digest)
+				referrers, _ = oras.DiscoverReferrers(ctx, fullImage, digest)
+			}
+		}
+
+		if len(referrers) > 0 {
 			// Add referrers to graph
 			for _, ref := range referrers {
 				artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
@@ -292,8 +394,55 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string, platforms []
 	return nil
 }
 
+// findParentDigest searches for a parent digest that references the given child digest
+// Returns the parent digest if found, or empty string if not found
+func findParentDigest(ctx context.Context, ghClient *gh.Client, owner, ownerType, imageName, fullImage, childDigest string) (string, error) {
+	// Get all versions for this image
+	versions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+	if err != nil {
+		return "", fmt.Errorf("failed to list package versions: %w", err)
+	}
+
+	// For each version, check if it references the child digest
+	for _, ver := range versions {
+		candidateDigest := ver.Name
+
+		// Skip if this is the same as the child digest
+		if candidateDigest == childDigest {
+			continue
+		}
+
+		// Check if this candidate has the child digest as a platform manifest
+		platforms, err := oras.GetPlatformManifests(ctx, fullImage, candidateDigest)
+		if err == nil {
+			for _, p := range platforms {
+				if p.Digest == childDigest {
+					// Found a parent! This candidate has the child as a platform manifest
+					return candidateDigest, nil
+				}
+			}
+		}
+
+		// Check if this candidate has the child digest as a referrer (attestation)
+		referrers, err := oras.DiscoverReferrers(ctx, fullImage, candidateDigest)
+		if err == nil {
+			for _, r := range referrers {
+				if r.Digest == childDigest {
+					// Found a parent! This candidate has the child as a referrer
+					return candidateDigest, nil
+				}
+			}
+		}
+	}
+
+	// No parent found
+	return "", nil
+}
+
 func init() {
 	rootCmd.AddCommand(graphCmd)
 	graphCmd.Flags().StringVar(&graphTag, "tag", "latest", "Tag to resolve (default: latest)")
+	graphCmd.Flags().Int64Var(&graphVersion, "version", 0, "Version ID to find graph for")
+	graphCmd.Flags().StringVar(&graphDigest, "digest", "", "Digest to find graph for (accepts sha256:... or just the hash)")
 	graphCmd.Flags().BoolVar(&graphJSONOutput, "json", false, "Output in JSON format")
 }

@@ -336,6 +336,7 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 	// Find column widths
 	maxIDLen := len("VERSION ID")
 	maxTypeLen := len("TYPE")
+	maxDigestLen := len("DIGEST")
 	maxTagsLen := len("TAGS")
 	maxCreatedLen := len("CREATED")
 
@@ -347,6 +348,10 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		}
 		if typeLen := len(determineVersionType(ver, g.Type)); typeLen > maxTypeLen {
 			maxTypeLen = typeLen
+		}
+		digest := shortDigest(ver.Name)
+		if len(digest) > maxDigestLen {
+			maxDigestLen = len(digest)
 		}
 		if tagsStr := formatTags(ver.Tags); len(tagsStr) > maxTagsLen {
 			maxTagsLen = len(tagsStr)
@@ -369,6 +374,10 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 			if typeLen := len(childType); typeLen > maxTypeLen {
 				maxTypeLen = typeLen
 			}
+			digest := shortDigest(ver.Name)
+			if len(digest) > maxDigestLen {
+				maxDigestLen = len(digest)
+			}
 			if tagsStr := formatTags(ver.Tags); len(tagsStr) > maxTagsLen {
 				maxTagsLen = len(tagsStr)
 			}
@@ -379,20 +388,22 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 	}
 
 	// Print header
-	fmt.Fprintf(w, "  %-*s  %-*s  %-*s  %s\n",
+	fmt.Fprintf(w, "  %-*s  %-*s  %-*s  %-*s  %s\n",
 		maxIDLen, "VERSION ID",
 		maxTypeLen, "TYPE",
+		maxDigestLen, "DIGEST",
 		maxTagsLen, "TAGS",
 		"CREATED")
-	fmt.Fprintf(w, "  %s  %s  %s  %s\n",
+	fmt.Fprintf(w, "  %s  %s  %s  %s  %s\n",
 		strings.Repeat("-", maxIDLen),
 		strings.Repeat("-", maxTypeLen),
+		strings.Repeat("-", maxDigestLen),
 		strings.Repeat("-", maxTagsLen),
 		strings.Repeat("-", maxCreatedLen))
 
 	// Print graphs
 	for i, g := range graphs {
-		printVersionGraph(w, g, maxIDLen, maxTypeLen, maxTagsLen, maxCreatedLen)
+		printVersionGraph(w, g, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
 
 		// Add blank line between graphs (but not after the last one)
 		if i < len(graphs)-1 && len(g.Children) > 0 {
@@ -404,7 +415,7 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 	return nil
 }
 
-func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxTagsLen, maxCreatedLen int) {
+func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
 	// Determine tree indicators
 	var rootIndicator, midIndicator, lastIndicator string
 	if len(g.Children) > 0 {
@@ -417,7 +428,7 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxTag
 
 	// Print root version
 	printVersion(w, rootIndicator, g.RootVersion, determineVersionType(g.RootVersion, g.Type),
-		maxIDLen, maxTypeLen, maxTagsLen, maxCreatedLen)
+		maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
 
 	// Print children
 	for i, child := range g.Children {
@@ -432,16 +443,18 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxTag
 			childType = child.Platform
 		}
 
-		printVersion(w, indicator, child.Version, childType, maxIDLen, maxTypeLen, maxTagsLen, maxCreatedLen)
+		printVersion(w, indicator, child.Version, childType, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
 	}
 }
 
-func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, maxTypeLen, maxTagsLen, maxCreatedLen int) {
+func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
 	tagsStr := formatTags(ver.Tags)
-	fmt.Fprintf(w, "%s %-*d  %-*s  %-*s  %s\n",
+	digest := shortDigest(ver.Name)
+	fmt.Fprintf(w, "%s %-*d  %-*s  %-*s  %-*s  %s\n",
 		indicator,
 		maxIDLen, ver.ID,
 		maxTypeLen, vtype,
+		maxDigestLen, digest,
 		maxTagsLen, tagsStr,
 		ver.CreatedAt)
 }

@@ -361,7 +361,7 @@ go test ./...  # Integration tests will be skipped
 ```
 
 **CI Policy:**
-In GitHub Actions CI, **all tests must run** - if any tests are skipped, the build will fail. This ensures that integration tests always run in CI where `GITHUB_TOKEN` is available. Locally, skipped tests are acceptable for development without credentials.
+In GitHub Actions CI, **all tests must run** - if any tests are skipped, the build will fail. This ensures that integration tests always run in CI where `GITHUB_TOKEN` is available. 
 
 #### Limitations
 

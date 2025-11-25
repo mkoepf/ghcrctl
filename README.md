@@ -49,6 +49,34 @@ View current configuration:
 ghcrctl config show
 ```
 
+#### Environment Variables (Recommended for Parallel Sessions)
+
+You can override the config file by setting environment variables. This is particularly useful for working with multiple owners in parallel terminal sessions:
+
+```bash
+# Work with an organization
+export GHCRCTL_OWNER=mycompany
+export GHCRCTL_OWNER_TYPE=org
+ghcrctl images
+
+# In another terminal, work with your personal account
+export GHCRCTL_OWNER=myusername
+export GHCRCTL_OWNER_TYPE=user
+ghcrctl images
+```
+
+**Priority order:**
+1. Environment variables (`GHCRCTL_OWNER`, `GHCRCTL_OWNER_TYPE`) - highest priority
+2. Config file (`~/.ghcrctl/config.yaml`) - fallback
+
+**Default behavior:** If only `GHCRCTL_OWNER` is set, `GHCRCTL_OWNER_TYPE` defaults to `user`.
+
+**Quick one-off commands:**
+```bash
+# Run a single command with different owner without changing config
+GHCRCTL_OWNER=otherorg GHCRCTL_OWNER_TYPE=org ghcrctl images
+```
+
 ### Authentication
 
 Set your GitHub Personal Access Token (PAT) as an environment variable:

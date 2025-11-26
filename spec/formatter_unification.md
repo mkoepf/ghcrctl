@@ -184,7 +184,7 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 - ~400 lines of duplicated code removed
 - Single source of truth for graph building
 
-### 🟡 Phase 2: Extract Display Formatting
+### ✅ Phase 2: Extract Display Formatting
 **Goal:** Create `internal/display` package for consistent formatting
 
 #### Step 2.0: Extract common utility functions (COMPLETED)
@@ -196,6 +196,15 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 - [x] All tests passing
 
 **Status:** ✅ Complete (commit: 0ec40a6)
+
+#### Step 2.1: Extract JSON formatting (COMPLETED)
+- [x] Create OutputJSON helper function
+- [x] Add comprehensive tests (100% coverage)
+- [x] Replace duplicate JSON output functions in all commands
+- [x] Remove 35 lines of duplicated code
+- [x] All tests passing
+
+**Status:** ✅ Complete (commit: 967954f)
 
 #### Step 2.1: Define display structures
 - [ ] Create `internal/display/formatter.go`
@@ -361,7 +370,23 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
   - Commit: 0ec40a6
   - Lines changed: +137, -44
 
-**Status:** Phase 2 started. Utility functions extracted.
+### 2025-11-26 (Evening - Phase 2 Completion)
+- ✅ Phase 2.1 Complete: Extract JSON formatting
+  - Added OutputJSON helper function to display package
+  - Created comprehensive tests for OutputJSON (100% coverage)
+  - Replaced outputVersionsJSON in cmd/versions.go
+  - Replaced outputJSON in cmd/images.go
+  - Replaced outputLabelsJSON in cmd/labels.go
+  - Replaced outputSBOMJSON in cmd/sbom.go
+  - Replaced outputProvenanceJSON in cmd/provenance.go
+  - Removed 35 lines of duplicated JSON formatting code
+  - All tests passing (60.3s total)
+  - Code quality checks passing
+  - Code coverage increased to 61.2%
+  - Commit: 967954f
+  - Lines changed: +93, -56
+
+**Status:** Phase 2 complete. Display package created with common formatting helpers.
 
 ---
 

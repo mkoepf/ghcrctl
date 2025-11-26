@@ -7,8 +7,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
 	"github.com/mhk/ghcrctl/internal/oras"
@@ -22,6 +24,15 @@ var (
 	deleteVersionDig string
 	deleteGraphDig   string
 	deleteGraphVer   int64
+
+	// Filter flags for bulk deletion
+	deleteTagPattern    string
+	deleteOnlyTagged    bool
+	deleteOnlyUntagged  bool
+	deleteOlderThan     string
+	deleteNewerThan     string
+	deleteOlderThanDays int
+	deleteNewerThanDays int
 )
 
 var deleteCmd = &cobra.Command{
@@ -37,11 +48,11 @@ Available Commands:
 }
 
 var deleteVersionCmd = &cobra.Command{
-	Use:   "version <image> <version-id>",
-	Short: "Delete a single package version",
-	Long: `Delete a single package version from GitHub Container Registry.
+	Use:   "version <image> [version-id]",
+	Short: "Delete package version(s)",
+	Long: `Delete package version(s) from GitHub Container Registry.
 
-This command deletes a single package version by its version ID or digest.
+This command can delete a single version by ID/digest, or multiple versions using filters.
 By default, it will prompt for confirmation before deleting.
 
 IMPORTANT: Deletion is permanent and cannot be undone (except within 30 days
@@ -54,12 +65,26 @@ Examples:
   # Delete by digest
   ghcrctl delete version myimage --digest sha256:abc123...
 
-  # Skip confirmation
-  ghcrctl delete version myimage 12345678 --force
+  # Delete all untagged versions (bulk deletion)
+  ghcrctl delete version myimage --untagged
 
-  # Dry run
-  ghcrctl delete version myimage 12345678 --dry-run`,
+  # Delete untagged versions older than 30 days
+  ghcrctl delete version myimage --untagged --older-than-days 30
+
+  # Delete versions matching tag pattern older than a date
+  ghcrctl delete version myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
+
+  # Preview what would be deleted (dry-run)
+  ghcrctl delete version myimage --untagged --dry-run
+
+  # Skip confirmation for bulk deletion
+  ghcrctl delete version myimage --untagged --older-than-days 30 --force`,
 	Args: func(cmd *cobra.Command, args []string) error {
+		// Check if any filter flags are set (indicates bulk deletion)
+		filterFlagsSet := deleteOnlyTagged || deleteOnlyUntagged || deleteTagPattern != "" ||
+			deleteOlderThan != "" || deleteNewerThan != "" ||
+			deleteOlderThanDays > 0 || deleteNewerThanDays > 0
+
 		// If --digest is provided, we need exactly 1 arg (image name)
 		if deleteVersionDig != "" {
 			if len(args) != 1 {
@@ -67,12 +92,20 @@ Examples:
 			}
 			return nil
 		}
+
+		// If filter flags are set (bulk deletion), we need exactly 1 arg (image name)
+		if filterFlagsSet {
+			if len(args) != 1 {
+				return fmt.Errorf("accepts 1 arg (image name) when using filters, received %d", len(args))
+			}
+			return nil
+		}
+
 		// Otherwise, we need exactly 2 args (image name and version-id)
 		return cobra.ExactArgs(2)(cmd, args)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
-		var versionID int64
 
 		// Load configuration
 		cfg := config.New()
@@ -103,77 +136,18 @@ Examples:
 
 		ctx := cmd.Context()
 
-		// Determine version ID from either positional arg or --digest flag
-		if deleteVersionDig != "" {
-			// Normalize digest format
-			digest := deleteVersionDig
-			if !strings.HasPrefix(digest, "sha256:") {
-				digest = "sha256:" + digest
-			}
+		// Check if this is bulk deletion mode
+		filterFlagsSet := deleteOnlyTagged || deleteOnlyUntagged || deleteTagPattern != "" ||
+			deleteOlderThan != "" || deleteNewerThan != "" ||
+			deleteOlderThanDays > 0 || deleteNewerThanDays > 0
 
-			// Look up version ID by digest
-			versionID, err = client.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to find version by digest: %w", err)
-			}
-		} else {
-			// Parse version ID from positional argument
-			versionIDStr := args[1]
-			versionID, err = strconv.ParseInt(versionIDStr, 10, 64)
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("invalid version-id: must be a number, got %q", versionIDStr)
-			}
+		if filterFlagsSet {
+			// Bulk deletion mode
+			return runBulkDelete(ctx, cmd, client, owner, ownerType, imageName)
 		}
 
-		// Get version tags to show what we're deleting
-		tags, err := client.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to get version details: %w", err)
-		}
-
-		// Show what will be deleted
-		fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "  Image:      %s\n", imageName)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
-		fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", versionID)
-		if len(tags) > 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %v\n", tags)
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       (untagged)\n")
-		}
-		fmt.Fprintln(cmd.OutOrStdout())
-
-		// Handle dry-run
-		if deleteDryRun {
-			fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
-			return nil
-		}
-
-		// Confirm deletion unless --force is used
-		if !deleteForce {
-			confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), "Are you sure you want to delete this version?")
-			if err != nil {
-				return fmt.Errorf("failed to read confirmation: %w", err)
-			}
-
-			if !confirmed {
-				fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
-				return nil
-			}
-		}
-
-		// Perform deletion
-		err = client.DeletePackageVersion(ctx, owner, ownerType, imageName, versionID)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to delete package version: %w", err)
-		}
-
-		fmt.Fprintf(cmd.OutOrStdout(), "Successfully deleted version %d of %s\n", versionID, imageName)
-		return nil
+		// Single deletion mode
+		return runSingleDelete(ctx, cmd, args, client, owner, ownerType, imageName)
 	},
 }
 
@@ -357,6 +331,174 @@ Examples:
 	},
 }
 
+// runSingleDelete handles deletion of a single version
+func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, client *gh.Client, owner, ownerType, imageName string) error {
+	var versionID int64
+	var err error
+
+	// Determine version ID from either positional arg or --digest flag
+	if deleteVersionDig != "" {
+		// Normalize digest format
+		digest := deleteVersionDig
+		if !strings.HasPrefix(digest, "sha256:") {
+			digest = "sha256:" + digest
+		}
+
+		// Look up version ID by digest
+		versionID, err = client.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
+		if err != nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("failed to find version by digest: %w", err)
+		}
+	} else {
+		// Parse version ID from positional argument
+		versionIDStr := args[1]
+		versionID, err = strconv.ParseInt(versionIDStr, 10, 64)
+		if err != nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("invalid version-id: must be a number, got %q", versionIDStr)
+		}
+	}
+
+	// Get version tags to show what we're deleting
+	tags, err := client.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("failed to get version details: %w", err)
+	}
+
+	// Show what will be deleted
+	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  Image:      %s\n", imageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", versionID)
+	if len(tags) > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %v\n", tags)
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       (untagged)\n")
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Handle dry-run
+	if deleteDryRun {
+		fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
+		return nil
+	}
+
+	// Confirm deletion unless --force is used
+	if !deleteForce {
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), "Are you sure you want to delete this version?")
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+
+		if !confirmed {
+			fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+			return nil
+		}
+	}
+
+	// Perform deletion
+	err = client.DeletePackageVersion(ctx, owner, ownerType, imageName, versionID)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("failed to delete package version: %w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "Successfully deleted version %d of %s\n", versionID, imageName)
+	return nil
+}
+
+// runBulkDelete handles deletion of multiple versions using filters
+func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, imageName string) error {
+	// Build filter from flags
+	filter, err := buildDeleteFilter()
+	if err != nil {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("invalid filter options: %w", err)
+	}
+
+	// List all package versions
+	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("failed to list package versions: %w", err)
+	}
+
+	// Apply filters
+	matchingVersions := filter.Apply(allVersions)
+
+	// Check if any versions match
+	if len(matchingVersions) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No versions match the specified filters")
+		return nil
+	}
+
+	// Display summary of what will be deleted
+	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete %d package version(s):\n", len(matchingVersions))
+	fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s\n", imageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Owner: %s (%s)\n\n", owner, ownerType)
+
+	// Show details of matching versions (limit to first 10 for readability)
+	displayLimit := 10
+	for i, ver := range matchingVersions {
+		if i >= displayLimit {
+			fmt.Fprintf(cmd.OutOrStdout(), "  ... and %d more\n", len(matchingVersions)-displayLimit)
+			break
+		}
+
+		tagsStr := "(untagged)"
+		if len(ver.Tags) > 0 {
+			tagsStr = strings.Join(ver.Tags, ", ")
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Handle dry-run
+	if deleteDryRun {
+		fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
+		return nil
+	}
+
+	// Confirm deletion unless --force is used
+	if !deleteForce {
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), fmt.Sprintf("Are you sure you want to delete %d version(s)?", len(matchingVersions)))
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+
+		if !confirmed {
+			fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+			return nil
+		}
+	}
+
+	// Perform bulk deletion
+	successCount := 0
+	failCount := 0
+	for i, ver := range matchingVersions {
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleting version %d/%d (ID: %d)...\n", i+1, len(matchingVersions), ver.ID)
+		err := client.DeletePackageVersion(ctx, owner, ownerType, imageName, ver.ID)
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Failed: %v\n", err)
+			failCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// Summary
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %d succeeded, %d failed\n", successCount, failCount)
+
+	if failCount > 0 {
+		return fmt.Errorf("failed to delete %d version(s)", failCount)
+	}
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(deleteCmd)
 
@@ -369,11 +511,84 @@ func init() {
 	deleteVersionCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Show what would be deleted without deleting")
 	deleteVersionCmd.Flags().StringVar(&deleteVersionDig, "digest", "", "Delete version by digest")
 
+	// Filter flags for bulk deletion
+	deleteVersionCmd.Flags().StringVar(&deleteTagPattern, "tag-pattern", "", "Delete versions matching regex pattern")
+	deleteVersionCmd.Flags().BoolVar(&deleteOnlyTagged, "tagged", false, "Delete only tagged versions")
+	deleteVersionCmd.Flags().BoolVar(&deleteOnlyUntagged, "untagged", false, "Delete only untagged versions")
+	deleteVersionCmd.Flags().StringVar(&deleteOlderThan, "older-than", "", "Delete versions older than date (YYYY-MM-DD or RFC3339)")
+	deleteVersionCmd.Flags().StringVar(&deleteNewerThan, "newer-than", "", "Delete versions newer than date (YYYY-MM-DD or RFC3339)")
+	deleteVersionCmd.Flags().IntVar(&deleteOlderThanDays, "older-than-days", 0, "Delete versions older than N days")
+	deleteVersionCmd.Flags().IntVar(&deleteNewerThanDays, "newer-than-days", 0, "Delete versions newer than N days")
+
 	// Flags for delete graph
 	deleteGraphCmd.Flags().BoolVar(&deleteForce, "force", false, "Skip confirmation prompt")
 	deleteGraphCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Show what would be deleted without deleting")
 	deleteGraphCmd.Flags().StringVar(&deleteGraphDig, "digest", "", "Find graph by digest")
 	deleteGraphCmd.Flags().Int64Var(&deleteGraphVer, "version", 0, "Find graph containing this version ID")
+}
+
+// Helper functions for delete version bulk operations
+
+// parseDeleteDate attempts to parse a date string in multiple user-friendly formats
+func parseDeleteDate(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, nil
+	}
+
+	// Try multiple formats in order of likelihood
+	formats := []string{
+		"2006-01-02",          // Date only (most convenient)
+		time.RFC3339,          // Full datetime with timezone
+		"2006-01-02T15:04:05", // Datetime without timezone
+		time.RFC3339Nano,      // With fractional seconds
+	}
+
+	var lastErr error
+	for _, format := range formats {
+		t, err := time.Parse(format, dateStr)
+		if err == nil {
+			return t, nil
+		}
+		lastErr = err
+	}
+
+	return time.Time{}, lastErr
+}
+
+// buildDeleteFilter constructs a VersionFilter from delete command flags
+func buildDeleteFilter() (*filter.VersionFilter, error) {
+	// Check for conflicting flags
+	if deleteOnlyTagged && deleteOnlyUntagged {
+		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
+	}
+
+	vf := &filter.VersionFilter{
+		OnlyTagged:    deleteOnlyTagged,
+		OnlyUntagged:  deleteOnlyUntagged,
+		TagPattern:    deleteTagPattern,
+		OlderThanDays: deleteOlderThanDays,
+		NewerThanDays: deleteNewerThanDays,
+	}
+
+	// Parse older-than date
+	if deleteOlderThan != "" {
+		t, err := parseDeleteDate(deleteOlderThan)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --older-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
+		}
+		vf.OlderThan = t
+	}
+
+	// Parse newer-than date
+	if deleteNewerThan != "" {
+		t, err := parseDeleteDate(deleteNewerThan)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --newer-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
+		}
+		vf.NewerThan = t
+	}
+
+	return vf, nil
 }
 
 // Helper functions for delete graph

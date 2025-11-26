@@ -31,8 +31,8 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete version command: %v", err)
 	}
 
-	if deleteVersionCmd.Use != "version <image> <version-id>" {
-		t.Errorf("Expected Use 'version <image> <version-id>', got '%s'", deleteVersionCmd.Use)
+	if deleteVersionCmd.Use != "version <image> [version-id]" {
+		t.Errorf("Expected Use 'version <image> [version-id]', got '%s'", deleteVersionCmd.Use)
 	}
 
 	if deleteVersionCmd.Short == "" {
@@ -88,22 +88,24 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 		t.Fatalf("Failed to find delete version command: %v", err)
 	}
 
-	// Check for --force flag
-	forceFlag := deleteVersionCmd.Flags().Lookup("force")
-	if forceFlag == nil {
-		t.Error("Expected --force flag to exist")
+	requiredFlags := []string{
+		"force",
+		"dry-run",
+		"digest",
+		"tag-pattern",
+		"tagged",
+		"untagged",
+		"older-than",
+		"newer-than",
+		"older-than-days",
+		"newer-than-days",
 	}
 
-	// Check for --dry-run flag
-	dryRunFlag := deleteVersionCmd.Flags().Lookup("dry-run")
-	if dryRunFlag == nil {
-		t.Error("Expected --dry-run flag to exist")
-	}
-
-	// Check for --digest flag
-	digestFlag := deleteVersionCmd.Flags().Lookup("digest")
-	if digestFlag == nil {
-		t.Error("Expected --digest flag to exist")
+	for _, flagName := range requiredFlags {
+		flag := deleteVersionCmd.Flags().Lookup(flagName)
+		if flag == nil {
+			t.Errorf("delete version command should have --%s flag", flagName)
+		}
 	}
 }
 
@@ -232,6 +234,177 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 
 			// Reset args
 			rootCmd.SetArgs([]string{})
+		})
+	}
+}
+
+// TestBuildDeleteFilter verifies that the filter is built correctly from flags
+func TestBuildDeleteFilter(t *testing.T) {
+	tests := []struct {
+		name        string
+		setup       func()
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "no filters",
+			setup: func() {
+				deleteTagPattern = ""
+				deleteOnlyTagged = false
+				deleteOnlyUntagged = false
+				deleteOlderThan = ""
+				deleteNewerThan = ""
+				deleteOlderThanDays = 0
+				deleteNewerThanDays = 0
+			},
+			wantErr: false,
+		},
+		{
+			name: "conflicting tagged/untagged flags",
+			setup: func() {
+				deleteOnlyTagged = true
+				deleteOnlyUntagged = true
+			},
+			wantErr:     true,
+			errContains: "cannot use --tagged and --untagged together",
+		},
+		{
+			name: "invalid older-than date",
+			setup: func() {
+				deleteOnlyTagged = false
+				deleteOnlyUntagged = false
+				deleteOlderThan = "invalid-date"
+			},
+			wantErr:     true,
+			errContains: "invalid --older-than date format",
+		},
+		{
+			name: "valid older-than date RFC3339",
+			setup: func() {
+				deleteOlderThan = "2025-01-01T00:00:00Z"
+				deleteNewerThan = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid older-than date (date only)",
+			setup: func() {
+				deleteOlderThan = "2025-01-01"
+				deleteNewerThan = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid newer-than date (date only)",
+			setup: func() {
+				deleteOlderThan = ""
+				deleteNewerThan = "2025-11-01"
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			filter, err := buildDeleteFilter()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tt.errContains != "" && !containsStr(err.Error(), tt.errContains) {
+					t.Errorf("Expected error to contain %q, got %q", tt.errContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if filter == nil {
+					t.Error("Expected non-nil filter")
+				}
+			}
+		})
+	}
+}
+
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstr(s, substr)))
+}
+
+func findSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDeleteVersionBulkModeArgsValidation tests that bulk mode accepts only image name
+func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		setupFlag func()
+		expectErr bool
+	}{
+		{
+			name: "bulk mode with untagged flag - correct args",
+			args: []string{"delete", "version", "myimage"},
+			setupFlag: func() {
+				deleteOnlyUntagged = true
+			},
+			expectErr: false,
+		},
+		{
+			name: "bulk mode with untagged flag - too many args",
+			args: []string{"delete", "version", "myimage", "12345"},
+			setupFlag: func() {
+				deleteOnlyUntagged = true
+			},
+			expectErr: true,
+		},
+		{
+			name: "bulk mode with tag pattern - correct args",
+			args: []string{"delete", "version", "myimage"},
+			setupFlag: func() {
+				deleteOnlyUntagged = false
+				deleteTagPattern = ".*-rc.*"
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset flags
+			deleteOnlyUntagged = false
+			deleteTagPattern = ""
+
+			// Setup specific flag
+			if tt.setupFlag != nil {
+				tt.setupFlag()
+			}
+
+			// Test args validation
+			rootCmd.SetArgs(tt.args)
+			err := rootCmd.Execute()
+
+			// We expect configuration errors since we're not providing real tokens/config
+			// But we should not get args validation errors if expectErr is false
+			if !tt.expectErr && err != nil {
+				// Check if error is about args validation (not config/auth errors)
+				errStr := err.Error()
+				if containsStr(errStr, "accepts") || containsStr(errStr, "arg") {
+					t.Errorf("Unexpected args validation error: %v", err)
+				}
+			}
+
+			// Reset
+			rootCmd.SetArgs([]string{})
+			deleteOnlyUntagged = false
+			deleteTagPattern = ""
 		})
 	}
 }

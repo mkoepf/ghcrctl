@@ -9,6 +9,7 @@ import (
 
 	"github.com/mhk/ghcrctl/internal/config"
 	"github.com/mhk/ghcrctl/internal/discovery"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
 	"github.com/mhk/ghcrctl/internal/oras"
@@ -434,21 +435,6 @@ func outputGraphJSON(w io.Writer, g *graph.Graph) error {
 	return nil
 }
 
-func formatTags(tags []string) string {
-	if len(tags) == 0 {
-		return "[]"
-	}
-	result := "["
-	for i, tag := range tags {
-		if i > 0 {
-			result += ", "
-		}
-		result += tag
-	}
-	result += "]"
-	return result
-}
-
 func outputGraphTree(w io.Writer, g *graph.Graph, imageName string) error {
 	fmt.Fprintf(w, "OCI Artifact Graph for %s\n\n", imageName)
 
@@ -463,7 +449,7 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string) error {
 
 	fmt.Fprintf(w, "%s: %s\n", rootType, g.Root.Digest)
 	if len(g.Root.Tags) > 0 {
-		fmt.Fprintf(w, "  Tags: %s\n", formatTags(g.Root.Tags))
+		fmt.Fprintf(w, "  Tags: %s\n", display.FormatTags(g.Root.Tags))
 	}
 	if g.Root.VersionID != 0 {
 		fmt.Fprintf(w, "  Version ID: %d\n", g.Root.VersionID)

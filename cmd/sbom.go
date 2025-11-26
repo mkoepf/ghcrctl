@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
@@ -167,7 +167,7 @@ func fetchAndDisplayAllSBOMs(w io.Writer, ctx context.Context, image string, sbo
 				"content": content,
 			})
 		} else {
-			fmt.Fprintf(w, "\n=== SBOM: %s ===\n", shortDigest(sbom.Digest))
+			fmt.Fprintf(w, "\n=== SBOM: %s ===\n", display.ShortDigest(sbom.Digest))
 			if err := outputSBOMReadable(w, content, sbom.Digest); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to display SBOM %s: %v\n", sbom.Digest, err)
 			}
@@ -197,7 +197,7 @@ func listSBOMs(w io.Writer, sboms []oras.ReferrerInfo, imageName string) error {
 		}
 	}
 
-	fmt.Fprintf(w, "\nExample: ghcrctl sbom %s --digest %s\n", imageName, shortDigest(sboms[0].Digest))
+	fmt.Fprintf(w, "\nExample: ghcrctl sbom %s --digest %s\n", imageName, display.ShortDigest(sboms[0].Digest))
 
 	return nil
 }
@@ -214,7 +214,7 @@ func outputSBOMJSON(w io.Writer, content []map[string]interface{}) error {
 
 // outputSBOMReadable outputs SBOM content in human-readable format
 func outputSBOMReadable(w io.Writer, content []map[string]interface{}, digest string) error {
-	fmt.Fprintf(w, "SBOM: %s\n\n", shortDigest(digest))
+	fmt.Fprintf(w, "SBOM: %s\n\n", display.ShortDigest(digest))
 
 	// Try to extract key information from the SBOM
 	// SBOM format varies (SPDX, CycloneDX, etc.), so we'll do our best
@@ -228,16 +228,6 @@ func outputSBOMReadable(w io.Writer, content []map[string]interface{}, digest st
 	}
 
 	return nil
-}
-
-// shortDigest returns a shortened version of a digest for display
-func shortDigest(digest string) string {
-	// Remove sha256: prefix and take first 12 characters
-	digest = strings.TrimPrefix(digest, "sha256:")
-	if len(digest) > 12 {
-		return digest[:12]
-	}
-	return digest
 }
 
 func init() {

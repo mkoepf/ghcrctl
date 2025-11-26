@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/oras"
@@ -368,11 +369,11 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		if typeLen := len(determineVersionType(ver, g.Type)); typeLen > maxTypeLen {
 			maxTypeLen = typeLen
 		}
-		digest := shortDigest(ver.Name)
+		digest := display.ShortDigest(ver.Name)
 		if len(digest) > maxDigestLen {
 			maxDigestLen = len(digest)
 		}
-		if tagsStr := formatTags(ver.Tags); len(tagsStr) > maxTagsLen {
+		if tagsStr := display.FormatTags(ver.Tags); len(tagsStr) > maxTagsLen {
 			maxTagsLen = len(tagsStr)
 		}
 		if len(ver.CreatedAt) > maxCreatedLen {
@@ -393,11 +394,11 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 			if typeLen := len(childType); typeLen > maxTypeLen {
 				maxTypeLen = typeLen
 			}
-			digest := shortDigest(ver.Name)
+			digest := display.ShortDigest(ver.Name)
 			if len(digest) > maxDigestLen {
 				maxDigestLen = len(digest)
 			}
-			if tagsStr := formatTags(ver.Tags); len(tagsStr) > maxTagsLen {
+			if tagsStr := display.FormatTags(ver.Tags); len(tagsStr) > maxTagsLen {
 				maxTagsLen = len(tagsStr)
 			}
 			if len(ver.CreatedAt) > maxCreatedLen {
@@ -467,8 +468,8 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDig
 }
 
 func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
-	tagsStr := formatTags(ver.Tags)
-	digest := shortDigest(ver.Name)
+	tagsStr := display.FormatTags(ver.Tags)
+	digest := display.ShortDigest(ver.Name)
 	fmt.Fprintf(w, "%s %-*d  %-*s  %-*s  %-*s  %s\n",
 		indicator,
 		maxIDLen, ver.ID,

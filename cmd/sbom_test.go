@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/mhk/ghcrctl/internal/display"
 )
 
 func TestSBOMCommandStructure(t *testing.T) {
@@ -96,9 +98,9 @@ func TestShortDigest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := shortDigest(tt.digest)
+			result := display.ShortDigest(tt.digest)
 			if result != tt.expected {
-				t.Errorf("shortDigest(%s) = %s, want %s", tt.digest, result, tt.expected)
+				t.Errorf("display.ShortDigest(%s) = %s, want %s", tt.digest, result, tt.expected)
 			}
 		})
 	}

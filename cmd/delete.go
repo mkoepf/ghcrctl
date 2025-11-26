@@ -373,7 +373,7 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image:      %s\n", imageName)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", versionID)
-	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", formatTagsForDisplay(tags))
+	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", FormatTagsForDisplay(tags))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Handle dry-run
@@ -444,7 +444,7 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 			break
 		}
 
-		tagsStr := formatTagsForDisplay(ver.Tags)
+		tagsStr := FormatTagsForDisplay(ver.Tags)
 		fmt.Fprintf(cmd.OutOrStdout(), "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -523,9 +523,9 @@ func init() {
 
 // Helper functions for delete version bulk operations
 
-// formatTagsForDisplay formats a tag slice for display
+// FormatTagsForDisplay formats a tag slice for display
 // Returns "[]" for empty/nil slices, or comma-separated tags otherwise
-func formatTagsForDisplay(tags []string) string {
+func FormatTagsForDisplay(tags []string) string {
 	if len(tags) == 0 {
 		return "[]"
 	}

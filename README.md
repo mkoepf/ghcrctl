@@ -214,22 +214,42 @@ Versions for myimage:
 Total: 8 version(s) in 2 graph(s)
 ```
 
-**Filter by tag:**
+**Filter options:**
 ```bash
-# Show only versions with a specific tag
+# Show only versions with a specific tag (optimized - only graphs this version)
 ghcrctl versions myimage --tag v1.0.0
 
-# This is optimized - only builds graph for the filtered version
-# Reduces API calls by 92% compared to listing all versions
+# Show only tagged versions
+ghcrctl versions myimage --tagged
+
+# Show only untagged versions
+ghcrctl versions myimage --untagged
+
+# Show versions matching a tag pattern (regex)
+ghcrctl versions myimage --tag-pattern "^v1\\..*"
+
+# Show versions older than a specific date
+ghcrctl versions myimage --older-than 2025-01-01
+
+# Show versions newer than a specific date
+ghcrctl versions myimage --newer-than 2025-11-01
+
+# Show versions older than 30 days
+ghcrctl versions myimage --older-than-days 30
+
+# Combine filters: untagged versions older than 7 days
+ghcrctl versions myimage --untagged --older-than-days 7
 ```
 
 **JSON output:**
 ```bash
 ghcrctl versions myimage --json
+# or
+ghcrctl versions myimage -o json
 ```
 
 **Performance optimization:**
-When using `--tag` to filter, the command only discovers graph relationships for matching versions, significantly reducing API calls and execution time. Without the filter, all tagged versions are processed.
+When using `--tag` to filter, the command only discovers graph relationships for matching versions, significantly reducing API calls and execution time. Without the filter, all tagged versions are processed. Other filters (--tagged, --tag-pattern, date filters) are applied after listing all versions.
 
 **Understanding version types:**
 - `index` - Multi-arch image manifest list (references platform manifests)
@@ -379,6 +399,71 @@ ghcrctl delete version myimage 12345678 --dry-run
 - Remove specific untagged versions (e.g., orphaned attestations)
 - Clean up individual failed builds
 - Delete a single platform manifest
+
+#### Bulk Delete Multiple Versions
+
+Delete multiple versions at once using filters:
+
+```bash
+# Delete all untagged versions
+ghcrctl delete version myimage --untagged
+
+# Delete untagged versions older than 30 days
+ghcrctl delete version myimage --untagged --older-than-days 30
+
+# Delete versions matching a tag pattern older than a specific date
+ghcrctl delete version myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
+
+# Delete versions older than a specific date
+ghcrctl delete version myimage --older-than "2025-01-01"
+
+# Preview what would be deleted (dry-run)
+ghcrctl delete version myimage --untagged --dry-run
+
+# Skip confirmation for automated cleanup
+ghcrctl delete version myimage --untagged --older-than-days 30 --force
+```
+
+**Available filters:**
+- `--untagged` - Delete only untagged versions
+- `--tagged` - Delete only tagged versions
+- `--tag-pattern <regex>` - Delete versions with tags matching pattern
+- `--older-than <date>` - Delete versions older than date (YYYY-MM-DD or RFC3339)
+- `--newer-than <date>` - Delete versions newer than date
+- `--older-than-days <N>` - Delete versions older than N days
+- `--newer-than-days <N>` - Delete versions newer than N days
+
+Filters can be combined using AND logic (all must match).
+
+**Example output:**
+```bash
+$ ghcrctl delete version myimage --untagged --older-than-days 30
+
+Preparing to delete 5 package version(s):
+  Image: myimage
+  Owner: myorg (org)
+
+  - ID: 12345678, Tags: [], Created: 2024-11-15 10:30:45
+  - ID: 12345679, Tags: [], Created: 2024-11-16 14:22:10
+  - ID: 12345680, Tags: [], Created: 2024-11-17 09:15:33
+  - ID: 12345681, Tags: [], Created: 2024-11-18 16:45:22
+  - ID: 12345682, Tags: [], Created: 2024-11-20 11:30:15
+
+Are you sure you want to delete 5 version(s)? [y/N]:
+```
+
+**Use cases:**
+- Clean up old untagged versions to reduce storage costs
+- Remove release candidates after final release
+- Delete old development builds
+- Automate cleanup in CI/CD pipelines
+
+**Safety features:**
+- Preview of what will be deleted (shows up to 10 versions, then "...and N more")
+- Confirmation prompt (unless `--force`)
+- Dry-run mode (`--dry-run`) to preview without deleting
+- Reports success/failure counts after deletion
+- Gracefully handles no matching versions
 
 **Requirements:**
 - GITHUB_TOKEN with `write:packages` and `delete:packages` scope

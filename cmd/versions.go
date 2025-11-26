@@ -25,7 +25,7 @@ var (
 	versionsNewerThan     string
 	versionsOlderThanDays int
 	versionsNewerThanDays int
-	versionsOutputFormat string
+	versionsOutputFormat  string
 )
 
 var versionsCmd = &cobra.Command{

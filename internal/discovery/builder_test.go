@@ -95,26 +95,26 @@ func TestGetVersionCache(t *testing.T) {
 			}
 
 			// Verify cache has correct number of entries
-			if len(cache.byDigest) != len(tt.versions) {
-				t.Errorf("byDigest cache size = %d, want %d", len(cache.byDigest), len(tt.versions))
+			if len(cache.ByDigest) != len(tt.versions) {
+				t.Errorf("ByDigest cache size = %d, want %d", len(cache.ByDigest), len(tt.versions))
 			}
 
-			if len(cache.byID) != len(tt.versions) {
-				t.Errorf("byID cache size = %d, want %d", len(cache.byID), len(tt.versions))
+			if len(cache.ByID) != len(tt.versions) {
+				t.Errorf("ByID cache size = %d, want %d", len(cache.ByID), len(tt.versions))
 			}
 
 			// Verify each version is in both caches
 			for _, ver := range tt.versions {
-				if v, ok := cache.byDigest[ver.Name]; !ok {
-					t.Errorf("Version %s not found in byDigest cache", ver.Name)
+				if v, ok := cache.ByDigest[ver.Name]; !ok {
+					t.Errorf("Version %s not found in ByDigest cache", ver.Name)
 				} else if v.ID != ver.ID {
-					t.Errorf("byDigest cache: got ID %d, want %d", v.ID, ver.ID)
+					t.Errorf("ByDigest cache: got ID %d, want %d", v.ID, ver.ID)
 				}
 
-				if v, ok := cache.byID[ver.ID]; !ok {
-					t.Errorf("Version ID %d not found in byID cache", ver.ID)
+				if v, ok := cache.ByID[ver.ID]; !ok {
+					t.Errorf("Version ID %d not found in ByID cache", ver.ID)
 				} else if v.Name != ver.Name {
-					t.Errorf("byID cache: got Name %s, want %s", v.Name, ver.Name)
+					t.Errorf("ByID cache: got Name %s, want %s", v.Name, ver.Name)
 				}
 			}
 		})
@@ -150,28 +150,28 @@ func TestVersionCacheLookups(t *testing.T) {
 	}
 
 	// Test lookup by digest
-	v, ok := cache.byDigest["sha256:abc"]
+	v, ok := cache.ByDigest["sha256:abc"]
 	if !ok {
-		t.Error("Expected to find sha256:abc in byDigest cache")
+		t.Error("Expected to find sha256:abc in ByDigest cache")
 	} else if v.ID != 100 {
-		t.Errorf("byDigest lookup: got ID %d, want 100", v.ID)
+		t.Errorf("ByDigest lookup: got ID %d, want 100", v.ID)
 	}
 
 	// Test lookup by ID
-	v, ok = cache.byID[200]
+	v, ok = cache.ByID[200]
 	if !ok {
-		t.Error("Expected to find ID 200 in byID cache")
+		t.Error("Expected to find ID 200 in ByID cache")
 	} else if v.Name != "sha256:def" {
-		t.Errorf("byID lookup: got Name %s, want sha256:def", v.Name)
+		t.Errorf("ByID lookup: got Name %s, want sha256:def", v.Name)
 	}
 
 	// Test missing entries
-	_, ok = cache.byDigest["sha256:missing"]
+	_, ok = cache.ByDigest["sha256:missing"]
 	if ok {
 		t.Error("Should not find missing digest in cache")
 	}
 
-	_, ok = cache.byID[999]
+	_, ok = cache.ByID[999]
 	if ok {
 		t.Error("Should not find missing ID in cache")
 	}

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/discovery"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
 	"github.com/mhk/ghcrctl/internal/oras"
@@ -168,19 +168,23 @@ Examples:
 			return fmt.Errorf("failed to create GitHub client: %w", err)
 		}
 
-		// Fetch all versions once and cache them for lookups
+		// Create GraphBuilder for version cache and parent finding
+		builder := discovery.NewGraphBuilder(ctx, ghClient, fullImage, owner, ownerType, imageName)
+
+		// Fetch all versions once and cache them for efficient lookups
 		// This avoids redundant API calls (5× → 1×)
-		allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+		cache, err := builder.GetVersionCache()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: could not list package versions: %v\n", err)
-			allVersions = []gh.PackageVersionInfo{} // Empty list, lookups will fail gracefully
+			// Create empty cache for graceful degradation
+			cache = &discovery.VersionCache{
+				ByDigest: make(map[string]gh.PackageVersionInfo),
+				ByID:     make(map[int64]gh.PackageVersionInfo),
+			}
 		}
 
-		// Create digest→version map for O(1) lookups
-		versionCache := make(map[string]gh.PackageVersionInfo)
-		for _, ver := range allVersions {
-			versionCache[ver.Name] = ver
-		}
+		// Use the cache for digest lookups (replacing manual map)
+		versionCache := cache.ByDigest
 
 		// Map digest to version ID using cache
 		// Note: The cache already includes tags from ListPackageVersions,
@@ -224,8 +228,8 @@ Examples:
 		// Check if this digest has no children (no platforms, no referrers)
 		// If so, it might be a child artifact itself, so search for its parent
 		if len(platformInfos) == 0 && len(initialReferrers) == 0 {
-			// Try to find the parent graph that contains this digest
-			parentDigest, err := findParentDigest(ctx, allVersions, fullImage, digest)
+			// Try to find the parent graph that contains this digest using GraphBuilder
+			parentDigest, err := builder.FindParentDigest(digest, cache)
 			if err == nil && parentDigest != "" && parentDigest != digest {
 				// Found a parent! Use the parent digest instead
 				digest = parentDigest
@@ -607,87 +611,7 @@ func outputGraphTree(w io.Writer, g *graph.Graph, imageName string) error {
 	return nil
 }
 
-// sortByIDProximity sorts versions by their ID proximity to a target ID
-// Versions with IDs closest to targetID come first
-func sortByIDProximity(versions []gh.PackageVersionInfo, targetID int64) []gh.PackageVersionInfo {
-	// Create a copy to avoid modifying the original slice
-	sorted := make([]gh.PackageVersionInfo, len(versions))
-	copy(sorted, versions)
-
-	// Sort by absolute distance from targetID
-	for i := 0; i < len(sorted)-1; i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			distI := sorted[i].ID - targetID
-			if distI < 0 {
-				distI = -distI
-			}
-			distJ := sorted[j].ID - targetID
-			if distJ < 0 {
-				distJ = -distJ
-			}
-			if distJ < distI {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
-
-	return sorted
-}
-
-// findParentDigest searches for a parent digest that references the given child digest
-// Returns the parent digest if found, or empty string if not found
-// Uses pre-fetched versions list to avoid redundant API calls
-func findParentDigest(ctx context.Context, versions []gh.PackageVersionInfo, fullImage, childDigest string) (string, error) {
-	// Find the child version's ID to optimize search order
-	var childID int64
-	for _, ver := range versions {
-		if ver.Name == childDigest {
-			childID = ver.ID
-			break
-		}
-	}
-
-	// Sort versions by proximity to child ID - related artifacts are typically created together
-	// and have IDs within a small range (typically ±4-20)
-	if childID != 0 {
-		versions = sortByIDProximity(versions, childID)
-	}
-
-	// For each version, check if it references the child digest
-	for _, ver := range versions {
-		candidateDigest := ver.Name
-
-		// Skip if this is the same as the child digest
-		if candidateDigest == childDigest {
-			continue
-		}
-
-		// Check if this candidate has the child digest as a platform manifest
-		platforms, err := oras.GetPlatformManifests(ctx, fullImage, candidateDigest)
-		if err == nil {
-			for _, p := range platforms {
-				if p.Digest == childDigest {
-					// Found a parent! This candidate has the child as a platform manifest
-					return candidateDigest, nil
-				}
-			}
-		}
-
-		// Check if this candidate has the child digest as a referrer (attestation)
-		referrers, err := oras.DiscoverReferrers(ctx, fullImage, candidateDigest)
-		if err == nil {
-			for _, r := range referrers {
-				if r.Digest == childDigest {
-					// Found a parent! This candidate has the child as a referrer
-					return candidateDigest, nil
-				}
-			}
-		}
-	}
-
-	// No parent found
-	return "", nil
-}
+// Removed: sortByIDProximity and findParentDigest are now in internal/discovery package
 
 func init() {
 	rootCmd.AddCommand(graphCmd)

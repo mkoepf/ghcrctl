@@ -27,8 +27,8 @@ type GraphBuilder struct {
 
 // VersionCache provides efficient lookups of version information by digest or ID.
 type VersionCache struct {
-	byDigest map[string]gh.PackageVersionInfo
-	byID     map[int64]gh.PackageVersionInfo
+	ByDigest map[string]gh.PackageVersionInfo
+	ByID     map[int64]gh.PackageVersionInfo
 }
 
 // NewGraphBuilder creates a new GraphBuilder instance.
@@ -60,14 +60,14 @@ func (b *GraphBuilder) GetVersionCache() (*VersionCache, error) {
 
 	// Create cache with both digest and ID lookups
 	cache := &VersionCache{
-		byDigest: make(map[string]gh.PackageVersionInfo),
-		byID:     make(map[int64]gh.PackageVersionInfo),
+		ByDigest: make(map[string]gh.PackageVersionInfo),
+		ByID:     make(map[int64]gh.PackageVersionInfo),
 	}
 
 	// Populate both maps
 	for _, ver := range allVersions {
-		cache.byDigest[ver.Name] = ver
-		cache.byID[ver.ID] = ver
+		cache.ByDigest[ver.Name] = ver
+		cache.ByID[ver.ID] = ver
 	}
 
 	return cache, nil
@@ -78,13 +78,13 @@ func (b *GraphBuilder) GetVersionCache() (*VersionCache, error) {
 func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (string, error) {
 	// Find the child version's ID to optimize search order
 	var childID int64
-	if ver, found := cache.byDigest[digest]; found {
+	if ver, found := cache.ByDigest[digest]; found {
 		childID = ver.ID
 	}
 
 	// Get all versions as a slice for sorting
-	versions := make([]gh.PackageVersionInfo, 0, len(cache.byDigest))
-	for _, ver := range cache.byDigest {
+	versions := make([]gh.PackageVersionInfo, 0, len(cache.ByDigest))
+	for _, ver := range cache.ByDigest {
 		versions = append(versions, ver)
 	}
 

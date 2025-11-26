@@ -19,6 +19,17 @@ func createTestVersion(id int64, tags []string, createdAt string) gh.PackageVers
 	}
 }
 
+// Helper to create test version with GitHub's actual date format
+func createTestVersionGitHubFormat(id int64, tags []string, createdAt string) gh.PackageVersionInfo {
+	return gh.PackageVersionInfo{
+		ID:        id,
+		Name:      "sha256:abc123",
+		Tags:      tags,
+		CreatedAt: createdAt, // GitHub format: "2006-01-02 15:04:05"
+		UpdatedAt: createdAt,
+	}
+}
+
 func TestVersionFilter_Apply_NoFilters(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
 		createTestVersion(1, []string{"v1.0.0"}, "2025-01-01T00:00:00Z"),
@@ -259,4 +270,36 @@ func TestVersionFilter_Apply_TagsFilter_Multiple(t *testing.T) {
 	assert.Equal(t, 2, len(result))
 	assert.Equal(t, int64(3), result[0].ID)
 	assert.Equal(t, int64(4), result[1].ID)
+}
+
+func TestVersionFilter_Apply_GitHubDateFormat_NoFilters(t *testing.T) {
+	// This test reproduces the real-world bug: GitHub returns dates as "2006-01-02 15:04:05"
+	// When no date filters are active, versions with this format should still pass through
+	versions := []gh.PackageVersionInfo{
+		createTestVersionGitHubFormat(1, []string{"v1.0.0"}, "2025-01-01 10:30:45"),
+		createTestVersionGitHubFormat(2, []string{}, "2025-01-02 14:20:10"),
+	}
+
+	filter := &VersionFilter{} // No filters at all
+	result := filter.Apply(versions)
+
+	// Should return both versions even though date format doesn't match RFC3339
+	assert.Equal(t, 2, len(result), "All versions should pass when no filters are active")
+}
+
+func TestVersionFilter_Apply_GitHubDateFormat_TaggedOnly(t *testing.T) {
+	// When using non-date filters with GitHub date format
+	versions := []gh.PackageVersionInfo{
+		createTestVersionGitHubFormat(1, []string{"v1.0.0"}, "2025-01-01 10:30:45"),
+		createTestVersionGitHubFormat(2, []string{}, "2025-01-02 14:20:10"),
+		createTestVersionGitHubFormat(3, []string{"v2.0.0"}, "2025-01-03 09:15:22"),
+	}
+
+	filter := &VersionFilter{OnlyTagged: true}
+	result := filter.Apply(versions)
+
+	// Should return tagged versions even with GitHub date format
+	assert.Equal(t, 2, len(result))
+	assert.Equal(t, int64(1), result[0].ID)
+	assert.Equal(t, int64(3), result[1].ID)
 }

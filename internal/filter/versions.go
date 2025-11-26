@@ -93,30 +93,60 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 		}
 	}
 
-	// Parse creation time
-	createdAt, err := time.Parse(time.RFC3339, ver.CreatedAt)
-	if err != nil {
-		// Skip versions with invalid dates
-		return false
-	}
+	// Only parse dates if we actually need to check date filters
+	needsDateCheck := !f.OlderThan.IsZero() || !f.NewerThan.IsZero() ||
+		!olderThanTime.IsZero() || !newerThanTime.IsZero()
 
-	// Check absolute date filters
-	if !f.OlderThan.IsZero() && !createdAt.Before(f.OlderThan) {
-		return false
-	}
-	if !f.NewerThan.IsZero() && !createdAt.After(f.NewerThan) {
-		return false
-	}
+	if needsDateCheck {
+		// Parse creation time - try multiple formats
+		createdAt, err := parseDate(ver.CreatedAt)
+		if err != nil {
+			// Skip versions with invalid dates only when date filtering is active
+			return false
+		}
 
-	// Check age-based filters
-	if !olderThanTime.IsZero() && !createdAt.Before(olderThanTime) {
-		return false
-	}
-	if !newerThanTime.IsZero() && !createdAt.After(newerThanTime) {
-		return false
+		// Check absolute date filters
+		if !f.OlderThan.IsZero() && !createdAt.Before(f.OlderThan) {
+			return false
+		}
+		if !f.NewerThan.IsZero() && !createdAt.After(f.NewerThan) {
+			return false
+		}
+
+		// Check age-based filters
+		if !olderThanTime.IsZero() && !createdAt.Before(olderThanTime) {
+			return false
+		}
+		if !newerThanTime.IsZero() && !createdAt.After(newerThanTime) {
+			return false
+		}
 	}
 
 	return true
+}
+
+// parseDate attempts to parse a date string in multiple formats
+// GitHub API returns dates in format "2006-01-02 15:04:05"
+func parseDate(dateStr string) (time.Time, error) {
+	// Try GitHub format first (most common)
+	t, err := time.Parse("2006-01-02 15:04:05", dateStr)
+	if err == nil {
+		return t, nil
+	}
+
+	// Try RFC3339 format (for tests and potential API changes)
+	t, err = time.Parse(time.RFC3339, dateStr)
+	if err == nil {
+		return t, nil
+	}
+
+	// Try RFC3339 with fractional seconds
+	t, err = time.Parse(time.RFC3339Nano, dateStr)
+	if err == nil {
+		return t, nil
+	}
+
+	return time.Time{}, err
 }
 
 // hasMatchingTag checks if any version tag matches any filter tag (exact match)

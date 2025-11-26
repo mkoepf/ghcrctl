@@ -10,7 +10,7 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 
 ghcrctl provides functionality for:
 
-- **Exploring images** and their OCI artifact graph (multi-arch platforms, SBOM, provenance)
+- **Exploring images** and their versions (multi-arch platforms, SBOM, provenance)
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Managing GHCR version metadata** (labels, tags)
@@ -96,7 +96,7 @@ export GITHUB_TOKEN=ghp_your_token_here
 
 **Required token type:** Classic Personal Access Token (PAT) or Fine-grained PAT
 **Required scopes:**
-- `read:packages` - for read operations (list, graph, sbom, provenance)
+- `read:packages` - for read operations (list, versions, sbom, provenance)
 - `write:packages` - for write operations (tag command)
 
 **Note:** GitHub App installation tokens (`ghs_*` prefix) are not supported for write operations to GHCR via the OCI registry API.
@@ -113,70 +113,6 @@ Get output in JSON format:
 
 ```bash
 ghcrctl images --json
-```
-
-### Display OCI Artifact Graph
-
-Display the complete OCI artifact graph for an image, showing all related package versions:
-
-```bash
-ghcrctl graph myimage
-```
-
-This command reveals the complete structure of your container image, explaining all those "untagged" package versions you see in GHCR:
-
-**Performance note:** When querying untagged child artifacts (like platform manifests or attestations) by version ID or digest, the tool must search through all package versions to find the parent graph. This is currently the only reliable method, as neither the OCI `subject` field (not populated by Docker Buildx) nor the GitHub Package API provide parent-child relationship metadata. The search stops as soon as the parent is found, but for packages with many versions, this operation can be slow.
-
-**What it shows:**
-- **Image Index** (manifest list) or **Manifest** (single-arch)
-- **Platform Manifests** (references) - Each architecture creates an untagged version (linux/amd64, linux/arm64, etc.)
-- **Attestations** (referrers) - SBOM and provenance attestations
-- **Version breakdown** - Shows which versions are tagged vs. untagged
-
-**Example: Multi-arch image with attestations**
-```
-OCI Artifact Graph for myimage
-
-Image Index: sha256:01af50cc8b0d33e...
-  Tags: [latest]
-  Version ID: 585861918
-  │
-  ├─ Platform Manifests (references):
-  │    ├─ linux/amd64
-  │    │  Digest: sha256:62f946a8267d...
-  │    │  Size: 669 bytes
-  │    └─ linux/arm64
-  │       Digest: sha256:89c3b5f1a432...
-  │       Size: 672 bytes
-  │
-  └─ Attestations (referrers):
-         ├─ sbom
-         │  Digest: sha256:9a1636d22702...
-         └─ provenance
-            Digest: sha256:9a1636d22702...
-
-Summary:
-  Platforms: 2
-  SBOM: true
-  Provenance: true
-  Total versions: 5 (1 tagged, 4 untagged)
-```
-
-**Understanding the output:**
-- **References** (inside image index): Platform-specific manifests that the multi-arch image consists of
-- **Referrers** (external): Attestations that reference the image (SBOM, provenance, signatures)
-- **Total versions**: Complete count explaining all package versions in GHCR for this image
-
-Specify a tag (default is `latest`):
-
-```bash
-ghcrctl graph myimage --tag v1.0.0
-```
-
-Get output in JSON format:
-
-```bash
-ghcrctl graph myimage --json
 ```
 
 ### List Package Versions
@@ -247,6 +183,47 @@ ghcrctl versions myimage --json
 # or
 ghcrctl versions myimage -o json
 ```
+
+**Verbose output:**
+
+For detailed information including full digests and sizes, use the `--verbose` or `-v` flag:
+
+```bash
+ghcrctl versions myimage --tag latest --verbose
+# or
+ghcrctl versions myimage --tag latest -v
+```
+
+Example verbose output:
+```
+Versions for myimage:
+
+┌─ 585861918  index
+│  Digest:  sha256:01af50cc8b0d33e7bb9137d6aa60274975475ee048e6610da62670a30466a824543
+│  Tags:    [v1.0.0, latest]
+│  Created: 2025-01-15 10:30:45
+│
+├─ 585861919  platform: linux/amd64
+│  Digest:  sha256:62f946a8267d2795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
+│  Size:    669 bytes
+│  Created: 2025-01-15 10:30:44
+│
+├─ 585861920  platform: linux/arm64
+│  Digest:  sha256:89c3b5f1a4322795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
+│  Size:    672 bytes
+│  Created: 2025-01-15 10:30:44
+│
+└─ 585861921  attestation: sbom, provenance
+   Digest:  sha256:9a1636d227022795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
+   Size:    12.4 KB
+   Created: 2025-01-15 10:30:46
+```
+
+The verbose view shows:
+- Full SHA256 digests (not truncated)
+- Artifact sizes in human-readable format
+- Clear type labels (`platform:`, `attestation:`)
+- Combined attestation types when same digest (e.g., `sbom, provenance`)
 
 **Performance optimization:**
 When using `--tag` to filter, the command only discovers graph relationships for matching versions, significantly reducing API calls and execution time. Without the filter, all tagged versions are processed. Other filters (--tagged, --tag-pattern, date filters) are applied after listing all versions.
@@ -546,7 +523,6 @@ Are you sure you want to delete this graph? [y/N]:
 ghcrctl --help
 ghcrctl config --help
 ghcrctl images --help
-ghcrctl graph --help
 ghcrctl versions --help
 ghcrctl sbom --help
 ghcrctl provenance --help
@@ -582,9 +558,9 @@ This flag logs all HTTP requests to stderr as JSON, including:
 - Auditing: Track which operations make API calls
 - Optimization: Find opportunities to reduce API calls
 
-**Example: Analyzing graph command performance:**
+**Example: Analyzing versions command performance:**
 ```bash
-./ghcrctl graph myimage --log-api-calls 2>api-calls.log
+./ghcrctl versions myimage --verbose --log-api-calls 2>api-calls.log
 # Analyze the log to see which API calls take longest
 jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' api-calls.log
 ```
@@ -698,7 +674,7 @@ The scoped token used in the integration tests allows to test
 - SBOM and provenance discovery
 - Multi-layer attestation detection (Docker buildx pattern)
 - Platform manifest extraction (multi-arch images)
-- Graph command with tree-style output
+- Versions command with verbose output
 - SBOM command end-to-end functionality
 - Provenance command end-to-end functionality
 - JSON and table/tree output formats

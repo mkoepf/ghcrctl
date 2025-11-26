@@ -108,10 +108,26 @@ func TestBuildVersionFilter(t *testing.T) {
 			errContains: "invalid --older-than date format",
 		},
 		{
-			name: "valid older-than date",
+			name: "valid older-than date RFC3339",
 			setup: func() {
 				versionsOlderThan = "2025-01-01T00:00:00Z"
 				versionsNewerThan = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid older-than date (date only)",
+			setup: func() {
+				versionsOlderThan = "2025-01-01"
+				versionsNewerThan = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid newer-than date (date only)",
+			setup: func() {
+				versionsOlderThan = ""
+				versionsNewerThan = "2025-11-01"
 			},
 			wantErr: false,
 		},

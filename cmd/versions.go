@@ -55,7 +55,10 @@ Examples:
   ghcrctl versions myimage --tag-pattern "^v1\\..*"
 
   # List versions older than a specific date
-  ghcrctl versions myimage --older-than 2025-01-01T00:00:00Z
+  ghcrctl versions myimage --older-than 2025-01-01
+
+  # List versions newer than a specific date
+  ghcrctl versions myimage --newer-than 2025-11-01
 
   # List versions older than 30 days
   ghcrctl versions myimage --older-than-days 30
@@ -471,6 +474,30 @@ func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
 	return "untagged"
 }
 
+// parseUserDate parses a date string in multiple user-friendly formats
+// Supports: "2025-11-01", "2025-11-01T10:30:00Z", etc.
+func parseUserDate(dateStr string) (time.Time, error) {
+	// Try common formats in order of likelihood
+	formats := []string{
+		"2006-01-02",          // Date only (most convenient)
+		time.RFC3339,          // 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano,      // With fractional seconds
+		"2006-01-02 15:04:05", // Space-separated (similar to GitHub format)
+		"2006-01-02T15:04:05", // Without timezone
+		time.DateTime,         // 2006-01-02 15:04:05 (Go 1.20+)
+		time.DateOnly,         // 2006-01-02 (Go 1.20+)
+	}
+
+	for _, format := range formats {
+		t, err := time.Parse(format, dateStr)
+		if err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse date %q (supported formats: YYYY-MM-DD, RFC3339)", dateStr)
+}
+
 // buildVersionFilter creates a VersionFilter from command-line flags
 func buildVersionFilter() (*filter.VersionFilter, error) {
 	vf := &filter.VersionFilter{
@@ -488,17 +515,17 @@ func buildVersionFilter() (*filter.VersionFilter, error) {
 
 	// Parse absolute date filters
 	if versionsOlderThan != "" {
-		t, err := time.Parse(time.RFC3339, versionsOlderThan)
+		t, err := parseUserDate(versionsOlderThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --older-than date format (expected RFC3339): %w", err)
+			return nil, fmt.Errorf("invalid --older-than date format: %w", err)
 		}
 		vf.OlderThan = t
 	}
 
 	if versionsNewerThan != "" {
-		t, err := time.Parse(time.RFC3339, versionsNewerThan)
+		t, err := parseUserDate(versionsNewerThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --newer-than date format (expected RFC3339): %w", err)
+			return nil, fmt.Errorf("invalid --newer-than date format: %w", err)
 		}
 		vf.NewerThan = t
 	}
@@ -518,8 +545,8 @@ func init() {
 	versionsCmd.Flags().StringVar(&versionsTagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")
 	versionsCmd.Flags().BoolVar(&versionsOnlyTagged, "tagged", false, "Show only tagged versions")
 	versionsCmd.Flags().BoolVar(&versionsOnlyUntagged, "untagged", false, "Show only untagged versions")
-	versionsCmd.Flags().StringVar(&versionsOlderThan, "older-than", "", "Show versions older than date (RFC3339 format)")
-	versionsCmd.Flags().StringVar(&versionsNewerThan, "newer-than", "", "Show versions newer than date (RFC3339 format)")
+	versionsCmd.Flags().StringVar(&versionsOlderThan, "older-than", "", "Show versions older than date (YYYY-MM-DD or RFC3339)")
+	versionsCmd.Flags().StringVar(&versionsNewerThan, "newer-than", "", "Show versions newer than date (YYYY-MM-DD or RFC3339)")
 	versionsCmd.Flags().IntVar(&versionsOlderThanDays, "older-than-days", 0, "Show versions older than N days")
 	versionsCmd.Flags().IntVar(&versionsNewerThanDays, "newer-than-days", 0, "Show versions newer than N days")
 }

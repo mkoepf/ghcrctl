@@ -50,15 +50,31 @@ fi
 echo ""
 
 ###########################################
-# 3. Tests with Race Detection
+# 3. Tests with Race Detection and SKIP detection
 ###########################################
-echo -e "${BLUE}[3/5] Running tests with race detection...${NC}"
-if go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1; then
-    echo -e "${GREEN}✓ All tests passed${NC}"
-else
-    echo -e "${RED}✗ Tests failed${NC}"
+echo -e "${BLUE}[3/5] Running tests with race and skip detection...${NC}"
+# Run go test and capture combined stdout+stderr
+output=$(go test -json -v -race \
+    -coverprofile=coverage.out \
+    -covermode=atomic \
+    ./... 2>&1)
+
+test_exit_code=$?   # exit code of go test
+
+# Fail if any tests failed
+if [ "$test_exit_code" -ne 0 ]; then
+    echo -e "${RED}✗ One or more tests failed${NC}"
     exit 1
 fi
+
+# Fail if any tests were skipped
+if echo "$output" | grep -q '"Action":"skip"'; then
+    echo -e "${RED}✗ One or more tests were SKIPPED${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ All tests passed${NC}"
+
 echo ""
 
 ###########################################

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
@@ -145,7 +146,7 @@ func fetchAndDisplayProvenance(w io.Writer, ctx context.Context, image, digest s
 
 	// Display the content
 	if jsonOutput {
-		return outputProvenanceJSON(w, content)
+		return display.OutputJSON(w, content)
 	}
 	return outputProvenanceReadable(w, content, digest)
 }
@@ -199,16 +200,6 @@ func listProvenances(w io.Writer, provenances []oras.ReferrerInfo, imageName str
 
 	fmt.Fprintf(w, "\nExample: ghcrctl provenance %s --digest %s\n", imageName, shortProvenanceDigest(provenances[0].Digest))
 
-	return nil
-}
-
-// outputProvenanceJSON outputs provenance content as JSON
-func outputProvenanceJSON(w io.Writer, content []map[string]interface{}) error {
-	data, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Fprintln(w, string(data))
 	return nil
 }
 

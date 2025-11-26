@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -149,7 +148,7 @@ Examples:
 
 		// Output results
 		if versionsJSON {
-			return outputVersionsJSON(cmd.OutOrStdout(), allVersions)
+			return display.OutputJSON(cmd.OutOrStdout(), allVersions)
 		}
 		return outputVersionsTableWithGraphs(cmd.OutOrStdout(), versionGraphs, imageName)
 	},
@@ -328,15 +327,6 @@ func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, roo
 	}
 
 	return artifacts, graphType
-}
-
-func outputVersionsJSON(w io.Writer, versions []gh.PackageVersionInfo) error {
-	data, err := json.MarshalIndent(versions, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Fprintln(w, string(data))
-	return nil
 }
 
 func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName string) error {

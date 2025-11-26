@@ -145,7 +145,7 @@ func fetchAndDisplaySBOM(w io.Writer, ctx context.Context, image, digest string,
 
 	// Display the content
 	if jsonOutput {
-		return outputSBOMJSON(w, content)
+		return display.OutputJSON(w, content)
 	}
 	return outputSBOMReadable(w, content, digest)
 }
@@ -199,16 +199,6 @@ func listSBOMs(w io.Writer, sboms []oras.ReferrerInfo, imageName string) error {
 
 	fmt.Fprintf(w, "\nExample: ghcrctl sbom %s --digest %s\n", imageName, display.ShortDigest(sboms[0].Digest))
 
-	return nil
-}
-
-// outputSBOMJSON outputs SBOM content as JSON
-func outputSBOMJSON(w io.Writer, content []map[string]interface{}) error {
-	data, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Fprintln(w, string(data))
 	return nil
 }
 

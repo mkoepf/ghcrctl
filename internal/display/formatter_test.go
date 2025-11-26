@@ -1,6 +1,8 @@
 package display
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -77,5 +79,71 @@ func TestShortDigest(t *testing.T) {
 				t.Errorf("ShortDigest(%q) = %q, expected %q", tt.digest, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestOutputJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     interface{}
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "simple string slice",
+			data:     []string{"a", "b", "c"},
+			expected: "[\n  \"a\",\n  \"b\",\n  \"c\"\n]\n",
+			wantErr:  false,
+		},
+		{
+			name:     "map",
+			data:     map[string]string{"key": "value"},
+			expected: "{\n  \"key\": \"value\"\n}\n",
+			wantErr:  false,
+		},
+		{
+			name: "struct",
+			data: struct {
+				Name string `json:"name"`
+				Age  int    `json:"age"`
+			}{Name: "test", Age: 25},
+			expected: "{\n  \"name\": \"test\",\n  \"age\": 25\n}\n",
+			wantErr:  false,
+		},
+		{
+			name:     "nil",
+			data:     nil,
+			expected: "null\n",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := OutputJSON(&buf, tt.data)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OutputJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			got := buf.String()
+			if got != tt.expected {
+				t.Errorf("OutputJSON() output = %q, expected %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestOutputJSONWithInvalidData(t *testing.T) {
+	var buf bytes.Buffer
+	// Functions cannot be marshaled to JSON
+	err := OutputJSON(&buf, func() {})
+	if err == nil {
+		t.Error("OutputJSON() should return error for unmarshalable data")
+	}
+	if !strings.Contains(err.Error(), "failed to marshal JSON") {
+		t.Errorf("OutputJSON() error should mention JSON marshaling, got: %v", err)
 	}
 }

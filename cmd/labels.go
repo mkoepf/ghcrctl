@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
@@ -95,7 +95,7 @@ Examples:
 
 		// Output results
 		if labelsJSON {
-			return outputLabelsJSON(cmd.OutOrStdout(), labels)
+			return display.OutputJSON(cmd.OutOrStdout(), labels)
 		}
 		return outputLabelsTable(cmd.OutOrStdout(), labels, imageName, labelsTag)
 	},
@@ -115,15 +115,6 @@ func getImageLabels(ctx context.Context, image, tag string) (map[string]string, 
 	}
 
 	return config.Config.Labels, nil
-}
-
-func outputLabelsJSON(w io.Writer, labels map[string]string) error {
-	data, err := json.MarshalIndent(labels, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Fprintln(w, string(data))
-	return nil
 }
 
 func outputLabelsTable(w io.Writer, labels map[string]string, image, tag string) error {

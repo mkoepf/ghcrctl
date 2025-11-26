@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/mhk/ghcrctl/internal/display"
 )
 
 func TestImagesCommandStructure(t *testing.T) {
@@ -142,7 +144,7 @@ func TestOutputJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output in buffer
 			buf := &bytes.Buffer{}
-			err := outputJSON(buf, tt.packages)
+			err := display.OutputJSON(buf, tt.packages)
 
 			if tt.wantErr {
 				if err == nil {

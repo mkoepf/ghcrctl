@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/spf13/cobra"
 )
@@ -78,19 +78,10 @@ Examples:
 
 		// Output results
 		if jsonOutput {
-			return outputJSON(cmd.OutOrStdout(), packages)
+			return display.OutputJSON(cmd.OutOrStdout(), packages)
 		}
 		return outputTable(cmd.OutOrStdout(), packages, owner)
 	},
-}
-
-func outputJSON(w io.Writer, packages []string) error {
-	data, err := json.MarshalIndent(packages, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	fmt.Fprintln(w, string(data))
-	return nil
 }
 
 func outputTable(w io.Writer, packages []string, owner string) error {

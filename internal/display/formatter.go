@@ -1,6 +1,9 @@
 package display
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"strings"
 )
 
@@ -30,4 +33,15 @@ func ShortDigest(digest string) string {
 		return digest[:12]
 	}
 	return digest
+}
+
+// OutputJSON marshals data to indented JSON and writes it to the provided writer.
+// This is a common helper used across multiple commands for consistent JSON output.
+func OutputJSON(w io.Writer, data interface{}) error {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	fmt.Fprintln(w, string(jsonData))
+	return nil
 }

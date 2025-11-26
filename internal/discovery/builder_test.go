@@ -27,9 +27,9 @@ func TestGetVersionCache(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "empty versions list",
+			name:     "empty versions list",
 			versions: []gh.PackageVersionInfo{},
-			wantErr: false,
+			wantErr:  false,
 		},
 		{
 			name: "single version",

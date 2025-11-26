@@ -132,47 +132,45 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 **Goal:** Create `internal/discovery` package with unified graph building logic
 
 #### Step 1.1: Create internal/discovery package
-- [ ] Create `internal/discovery/builder.go`
-- [ ] Create `internal/discovery/builder_test.go`
-- [ ] Define core interfaces:
-  ```go
-  type GraphBuilder struct {
-      ctx        context.Context
-      ghClient   *gh.Client
-      fullImage  string
-      owner      string
-      ownerType  string
-      imageName  string
-  }
+- [x] Create `internal/discovery/builder.go`
+- [x] Create `internal/discovery/builder_test.go`
+- [x] Define core interfaces (GHClient for testability)
+- [x] Implement GetVersionCache() with dual lookup maps
+- [x] Implement FindParentDigest() with ID proximity optimization
+- [x] Add comprehensive tests
 
-  type VersionCache struct {
-      byDigest map[string]gh.PackageVersionInfo
-      byID     map[int64]gh.PackageVersionInfo
-  }
+**Status:** ✅ Complete (commits: 2dd1575, 4b2c0f8)
 
-  func NewGraphBuilder(...) *GraphBuilder
-  func (b *GraphBuilder) BuildGraph(digest string) (*graph.Graph, error)
-  func (b *GraphBuilder) GetVersionCache() (*VersionCache, error)
-  func (b *GraphBuilder) FindParentDigest(digest string) (string, error)
-  ```
+#### Step 1.2: Incremental Integration Approach (REVISED)
+**Goal:** Integrate incrementally instead of implementing BuildGraph in isolation
 
-#### Step 1.2: Implement GraphBuilder
-- [ ] Extract graph building logic from `graph.go`
-- [ ] Write tests for GraphBuilder
-- [ ] Ensure all tests pass
-- [ ] Performance: Should be equivalent to current implementation
+- [x] Phase 1.2a: Use GetVersionCache in graph command
+- [x] Phase 1.2b: Use FindParentDigest in graph command
+- [x] Phase 1.2c: Integrate into graph command
+- [x] Phase 1.2d: Integrate into delete graph command
+- [ ] Phase 1.2e: Integrate into versions command (optional - different structure)
 
-#### Step 1.3: Update graph command
-- [ ] Replace inline graph building with `GraphBuilder`
-- [ ] Remove duplicated code
-- [ ] Verify behavior unchanged (run integration tests)
-- [ ] Estimated lines removed: ~200
+**Rationale:** Incremental integration drives what BuildGraph needs and follows TDD principles
+
+**Status:** ✅ Complete for graph and delete commands (commits: ca0e703, ef57a9a)
+
+#### Step 1.3: Complete graph command migration
+- [x] Replace inline version cache with discovery.GetVersionCache
+- [x] Replace findParentDigest with discovery.FindParentDigest
+- [x] Remove duplicated sortByIDProximity and findParentDigest (~80 lines)
+- [x] Remove test duplication
+- [x] Verify behavior unchanged (all integration tests pass)
+- **Actual lines removed: ~115 lines**
+
+**Status:** ✅ Complete
 
 #### Step 1.4: Update delete graph command
-- [ ] Replace `buildGraph()` with `discovery.GraphBuilder`
-- [ ] Remove duplicate function
-- [ ] Verify behavior unchanged
-- [ ] Estimated lines removed: ~100
+- [x] Integrate discovery.GetVersionCache in buildGraph()
+- [x] Replace findParentDigest with discovery.FindParentDigest
+- [x] Verify behavior unchanged (all tests pass)
+- **Actual lines removed: ~1 net line (10 additions, 11 deletions)**
+
+**Status:** ✅ Complete
 
 #### Step 1.5: Update versions command
 - [ ] Use `discovery.GraphBuilder` instead of `buildVersionGraphs`
@@ -288,11 +286,11 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 
 | Metric | Before | After | Status |
 |--------|--------|-------|--------|
-| Duplicated graph building code | ~600 lines | ~200 lines | 🔴 Not started |
-| Graph builder implementations | 3 | 1 | 🔴 Not started |
-| Commands with type info | 1 (versions) | 2 (versions + delete) | 🔴 Not started |
-| Display formatters | 3 | 1 shared | 🔴 Not started |
-| Test coverage | Unknown | >80% | 🔴 Not started |
+| Duplicated graph building code | ~600 lines | ~485 lines | 🟡 Phase 1 complete (~115 lines removed) |
+| Graph builder implementations | 3 | 2 (discovery + versions) | 🟡 2 of 3 unified |
+| Commands with type info | 1 (versions) | 2 (versions + delete) | 🔴 Not started (Phase 3) |
+| Display formatters | 3 | 3 | 🔴 Not started (Phase 2) |
+| Discovery package test coverage | N/A | 100% (3 tests) | 🟢 Complete |
 
 ## Risks and Mitigations
 
@@ -316,15 +314,36 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 
 ## Progress Log
 
-### 2025-11-26
+### 2025-11-26 (Morning)
 - ✅ Created specification document
 - ✅ Analyzed current code duplication
 - ✅ Designed architecture
-- 🔴 Phase 1 not started
+
+### 2025-11-26 (Afternoon)
+- ✅ Phase 1.1 Complete: Created internal/discovery package
+  - Implemented GetVersionCache with dual lookup maps
+  - Implemented FindParentDigest with ID proximity optimization
+  - Added comprehensive unit tests (3 tests, all passing)
+  - Commits: 2dd1575, 4b2c0f8
+- ✅ Phase 1.3 Complete: Graph command integration
+  - Integrated discovery.GetVersionCache
+  - Integrated discovery.FindParentDigest
+  - Removed ~115 lines of duplicate code
+  - All integration tests pass (46.6s)
+  - Commit: ca0e703
+- ✅ Phase 1.4 Complete: Delete graph command integration
+  - Integrated discovery package in buildGraph()
+  - All tests pass (61.3s for cmd package)
+  - Commit: ef57a9a
+
+**Status:** Phase 1 substantially complete. Graph and delete commands unified.
 
 ---
 
 **Next Steps:**
-1. Review and approve this specification
-2. Create feature branch
-3. Begin Phase 1.1: Create internal/discovery package
+1. ~~Review and approve this specification~~ ✅
+2. ~~Create feature branch~~ (working on main)
+3. ~~Begin Phase 1.1: Create internal/discovery package~~ ✅
+4. Optional: Integrate versions command (different structure, lower priority)
+5. Phase 2: Extract display formatting (future work)
+6. Phase 3: Add type info to delete command (future work)

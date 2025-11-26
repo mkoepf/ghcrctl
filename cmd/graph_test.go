@@ -3,8 +3,6 @@ package cmd
 import (
 	"strings"
 	"testing"
-
-	"github.com/mhk/ghcrctl/internal/gh"
 )
 
 func TestGraphCommandStructure(t *testing.T) {

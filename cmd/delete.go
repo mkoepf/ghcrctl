@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/discovery"
 	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
@@ -602,17 +603,17 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 		return nil, err
 	}
 
+	// Create GraphBuilder for version cache and parent finding
+	builder := discovery.NewGraphBuilder(ctx, ghClient, fullImage, owner, ownerType, imageName)
+
 	// Fetch all versions once for efficient lookups
-	allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+	cache, err := builder.GetVersionCache()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list package versions: %w", err)
+		return nil, fmt.Errorf("failed to get version cache: %w", err)
 	}
 
-	// Create digest→version map
-	versionCache := make(map[string]gh.PackageVersionInfo)
-	for _, ver := range allVersions {
-		versionCache[ver.Name] = ver
-	}
+	// Use the cache for digest lookups
+	versionCache := cache.ByDigest
 
 	// Set root version info
 	if rootInfo, found := versionCache[rootDigest]; found {
@@ -630,8 +631,8 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 	// Check if we need to find parent graph
 	initialReferrers, _ := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
 	if len(platformInfos) == 0 && len(initialReferrers) == 0 {
-		// This might be a child artifact, try to find parent
-		parentDigest, err := findParentDigest(ctx, allVersions, fullImage, rootDigest)
+		// This might be a child artifact, try to find parent using GraphBuilder
+		parentDigest, err := builder.FindParentDigest(rootDigest, cache)
 		if err == nil && parentDigest != "" && parentDigest != rootDigest {
 			// Found parent, rebuild graph with parent
 			return buildGraph(ctx, ghClient, fullImage, owner, ownerType, imageName, parentDigest, tag)

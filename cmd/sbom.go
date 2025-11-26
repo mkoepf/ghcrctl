@@ -24,8 +24,24 @@ var (
 var sbomCmd = &cobra.Command{
 	Use:   "sbom <image>",
 	Short: "Display SBOM (Software Bill of Materials)",
-	Long:  `Display the SBOM for a container image. If multiple SBOMs exist, use --digest to select one or --all to show all.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Display the SBOM for a container image. If multiple SBOMs exist, use --digest to select one or --all to show all.
+
+Examples:
+  # Show SBOM for latest tag
+  ghcrctl sbom myimage
+
+  # Show SBOM for specific tag
+  ghcrctl sbom myimage --tag v1.0.0
+
+  # Show specific SBOM by digest
+  ghcrctl sbom myimage --digest abc123def456
+
+  # Show all SBOMs
+  ghcrctl sbom myimage --all
+
+  # Output in JSON format
+  ghcrctl sbom myimage --json`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
 

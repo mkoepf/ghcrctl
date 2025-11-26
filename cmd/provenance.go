@@ -24,8 +24,24 @@ var (
 var provenanceCmd = &cobra.Command{
 	Use:   "provenance <image>",
 	Short: "Display provenance attestation",
-	Long:  `Display the provenance attestation for a container image. If multiple provenance documents exist, use --digest to select one or --all to show all.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Display the provenance attestation for a container image. If multiple provenance documents exist, use --digest to select one or --all to show all.
+
+Examples:
+  # Show provenance for latest tag
+  ghcrctl provenance myimage
+
+  # Show provenance for specific tag
+  ghcrctl provenance myimage --tag v1.0.0
+
+  # Show specific provenance by digest
+  ghcrctl provenance myimage --digest abc123def456
+
+  # Show all provenance documents
+  ghcrctl provenance myimage --all
+
+  # Output in JSON format
+  ghcrctl provenance myimage --json`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
 

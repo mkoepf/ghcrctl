@@ -25,8 +25,24 @@ var (
 var graphCmd = &cobra.Command{
 	Use:   "graph <image>",
 	Short: "Display OCI artifact graph",
-	Long:  `Display the OCI artifact graph for a container image, including SBOM and provenance.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Display the OCI artifact graph for a container image, including SBOM and provenance.
+
+Examples:
+  # Show graph for latest tag
+  ghcrctl graph myimage
+
+  # Show graph for specific tag
+  ghcrctl graph myimage --tag v1.0.0
+
+  # Show graph by digest
+  ghcrctl graph myimage --digest sha256:abc123...
+
+  # Show graph by version ID
+  ghcrctl graph myimage --version 12345678
+
+  # Output in JSON format
+  ghcrctl graph myimage --json`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
 

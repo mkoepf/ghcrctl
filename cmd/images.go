@@ -15,8 +15,15 @@ var jsonOutput bool
 var imagesCmd = &cobra.Command{
 	Use:   "images",
 	Short: "List container images",
-	Long:  `List all container images for the configured owner from GitHub Container Registry.`,
-	Args:  cobra.NoArgs,
+	Long: `List all container images for the configured owner from GitHub Container Registry.
+
+Examples:
+  # List all images for configured owner
+  ghcrctl images
+
+  # List images in JSON format
+  ghcrctl images --json`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Load configuration
 		cfg := config.New()

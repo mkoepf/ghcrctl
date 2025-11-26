@@ -16,8 +16,15 @@ var tagCmd = &cobra.Command{
 This command uses the OCI registry API to copy a tag, creating a new tag
 reference that points to the same image digest as the existing tag.
 
-Example:
-  ghcrctl tag myimage v1.0.0 latest`,
+Examples:
+  # Promote version to latest
+  ghcrctl tag myimage v1.0.0 latest
+
+  # Add semantic version alias
+  ghcrctl tag myimage v1.2.3 v1.2
+
+  # Tag for environment deployment
+  ghcrctl tag myimage v2.1.0 production`,
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]

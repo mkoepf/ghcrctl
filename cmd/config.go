@@ -16,7 +16,11 @@ var configCmd = &cobra.Command{
 var configShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Display current configuration",
-	Long:  `Display the current ghcrctl configuration from ~/.ghcrctl/config.yaml`,
+	Long: `Display the current ghcrctl configuration from ~/.ghcrctl/config.yaml
+
+Examples:
+  # Show current configuration
+  ghcrctl config show`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.New()
 		name, ownerType, err := cfg.GetOwner()
@@ -40,8 +44,15 @@ var configShowCmd = &cobra.Command{
 var configOrgCmd = &cobra.Command{
 	Use:   "org <org-name>",
 	Short: "Set the GHCR owner as an organization",
-	Long:  `Set the GitHub Container Registry owner as an organization in the configuration.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Set the GitHub Container Registry owner as an organization in the configuration.
+
+Examples:
+  # Configure for organization
+  ghcrctl config org mycompany
+
+  # Configure for different organization
+  ghcrctl config org acme-corp`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -64,8 +75,15 @@ var configOrgCmd = &cobra.Command{
 var configUserCmd = &cobra.Command{
 	Use:   "user <user-name>",
 	Short: "Set the GHCR owner as a user",
-	Long:  `Set the GitHub Container Registry owner as a user in the configuration.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Set the GitHub Container Registry owner as a user in the configuration.
+
+Examples:
+  # Configure for personal account
+  ghcrctl config user myusername
+
+  # Configure for different user
+  ghcrctl config user johndoe`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 

@@ -479,13 +479,15 @@ func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtyp
 }
 
 func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
-	if len(ver.Tags) > 0 {
-		if graphType == "index" {
-			return "index"
-		}
-		return "manifest"
+	// Check graphType first - it tells us what the version actually is
+	// regardless of whether it has tags
+	if graphType == "index" {
+		return "index"
 	}
-	return "untagged"
+
+	// For all other cases (manifest, standalone), return "manifest"
+	// This is more accurate than "untagged" which describes tag status, not type
+	return "manifest"
 }
 
 // parseUserDate parses a date string in multiple user-friendly formats

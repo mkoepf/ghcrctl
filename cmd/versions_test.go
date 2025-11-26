@@ -243,3 +243,54 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 		}
 	}
 }
+
+// TestDetermineVersionType verifies that version types are determined correctly
+// regardless of whether the version is tagged or untagged
+func TestDetermineVersionType(t *testing.T) {
+	tests := []struct {
+		name      string
+		ver       gh.PackageVersionInfo
+		graphType string
+		want      string
+	}{
+		{
+			name:      "tagged index",
+			ver:       gh.PackageVersionInfo{Tags: []string{"v1.0"}},
+			graphType: "index",
+			want:      "index",
+		},
+		{
+			name:      "tagged manifest",
+			ver:       gh.PackageVersionInfo{Tags: []string{"v1.0"}},
+			graphType: "manifest",
+			want:      "manifest",
+		},
+		{
+			name:      "untagged index should show as index not untagged",
+			ver:       gh.PackageVersionInfo{Tags: []string{}},
+			graphType: "index",
+			want:      "index",
+		},
+		{
+			name:      "untagged manifest should show as manifest not untagged",
+			ver:       gh.PackageVersionInfo{Tags: []string{}},
+			graphType: "manifest",
+			want:      "manifest",
+		},
+		{
+			name:      "untagged standalone should show as manifest not untagged",
+			ver:       gh.PackageVersionInfo{Tags: []string{}},
+			graphType: "standalone",
+			want:      "manifest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := determineVersionType(tt.ver, tt.graphType)
+			if got != tt.want {
+				t.Errorf("determineVersionType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

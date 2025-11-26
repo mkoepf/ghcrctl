@@ -18,6 +18,7 @@ import (
 
 var (
 	versionsJSON          bool
+	versionsVerbose       bool
 	versionsTag           string
 	versionsTagPattern    string
 	versionsOnlyTagged    bool
@@ -151,6 +152,9 @@ Examples:
 		if versionsJSON {
 			return display.OutputJSON(cmd.OutOrStdout(), allVersions)
 		}
+		if versionsVerbose {
+			return outputVersionsVerbose(cmd.OutOrStdout(), versionGraphs, imageName)
+		}
 		return outputVersionsTableWithGraphs(cmd.OutOrStdout(), versionGraphs, imageName)
 	},
 }
@@ -167,6 +171,7 @@ type VersionChild struct {
 	Version      gh.PackageVersionInfo
 	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
 	Platform     string // e.g., "linux/amd64" for platform manifests
+	Size         int64  // Size in bytes (for verbose output)
 }
 
 func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph []gh.PackageVersionInfo, allVersions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
@@ -206,6 +211,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 							Version:      childVer,
 							ArtifactType: artifact.ArtifactType,
 							Platform:     artifact.Platform,
+							Size:         artifact.Size,
 						}
 					}
 				}
@@ -247,6 +253,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 								Version:      childVer,
 								ArtifactType: artifact.ArtifactType,
 								Platform:     artifact.Platform,
+								Size:         artifact.Size,
 							}
 						}
 					}
@@ -282,6 +289,7 @@ type DiscoveredArtifact struct {
 	Digest       string
 	ArtifactType string // "platform", "sbom", "provenance", "attestation"
 	Platform     string // e.g., "linux/amd64" for platform manifests
+	Size         int64  // Size in bytes
 }
 
 // discoverRelatedVersionsByDigest discovers children using a digest directly
@@ -299,6 +307,7 @@ func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, roo
 					Digest:       platform.Digest,
 					ArtifactType: "platform",
 					Platform:     platform.Platform,
+					Size:         platform.Size,
 				})
 			}
 		}
@@ -319,6 +328,7 @@ func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, roo
 					Digest:       ref.Digest,
 					ArtifactType: artType,
 					Platform:     "",
+					Size:         ref.Size,
 				})
 			}
 		}
@@ -467,6 +477,106 @@ func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtyp
 		ver.CreatedAt)
 }
 
+// outputVersionsVerbose outputs detailed version information
+func outputVersionsVerbose(w io.Writer, graphs []VersionGraph, imageName string) error {
+	if len(graphs) == 0 {
+		fmt.Fprintf(w, "No versions found for %s\n", imageName)
+		return nil
+	}
+
+	fmt.Fprintf(w, "Versions for %s:\n\n", imageName)
+
+	for i, g := range graphs {
+		printVerboseGraph(w, g, i == len(graphs)-1)
+	}
+
+	return nil
+}
+
+func printVerboseGraph(w io.Writer, g VersionGraph, isLast bool) {
+	hasChildren := len(g.Children) > 0
+
+	// Print root version
+	if hasChildren {
+		fmt.Fprintf(w, "┌─ %d  %s\n", g.RootVersion.ID, g.Type)
+	} else {
+		fmt.Fprintf(w, "─  %d  %s\n", g.RootVersion.ID, g.Type)
+	}
+	printVerboseDetails(w, g.RootVersion.Name, g.RootVersion.Tags, g.RootVersion.CreatedAt, 0, hasChildren)
+
+	// Print children
+	for i, child := range g.Children {
+		isLastChild := i == len(g.Children)-1
+		indicator := "├─"
+		if isLastChild {
+			indicator = "└─"
+		}
+
+		// Determine type label
+		typeLabel := formatVerboseType(child)
+
+		fmt.Fprintf(w, "%s %d  %s\n", indicator, child.Version.ID, typeLabel)
+		printVerboseChildDetails(w, child, isLastChild)
+	}
+
+	if !isLast {
+		fmt.Fprintln(w)
+	}
+}
+
+func formatVerboseType(child VersionChild) string {
+	if child.Platform != "" {
+		return "platform: " + child.Platform
+	}
+	return "attestation: " + child.ArtifactType
+}
+
+func printVerboseDetails(w io.Writer, digest string, tags []string, created string, size int64, hasChildren bool) {
+	prefix := "│  "
+	if !hasChildren {
+		prefix = "   "
+	}
+
+	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, digest)
+	if len(tags) > 0 {
+		fmt.Fprintf(w, "%sTags:    %s\n", prefix, display.FormatTags(tags))
+	}
+	if size > 0 {
+		fmt.Fprintf(w, "%sSize:    %s\n", prefix, formatSize(size))
+	}
+	fmt.Fprintf(w, "%sCreated: %s\n", prefix, created)
+	fmt.Fprintf(w, "%s\n", prefix)
+}
+
+func printVerboseChildDetails(w io.Writer, child VersionChild, isLast bool) {
+	prefix := "│  "
+	if isLast {
+		prefix = "   "
+	}
+
+	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, child.Version.Name)
+	if child.Size > 0 {
+		fmt.Fprintf(w, "%sSize:    %s\n", prefix, formatSize(child.Size))
+	}
+	fmt.Fprintf(w, "%sCreated: %s\n", prefix, child.Version.CreatedAt)
+	fmt.Fprintf(w, "%s\n", prefix)
+}
+
+func formatSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+	)
+	switch {
+	case bytes >= MB:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/MB)
+	case bytes >= KB:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/KB)
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+}
+
 func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
 	// Check graphType first - it tells us what the version actually is
 	// regardless of whether it has tags
@@ -545,6 +655,7 @@ func buildVersionFilter() (*filter.VersionFilter, error) {
 
 func init() {
 	rootCmd.AddCommand(versionsCmd)
+	versionsCmd.Flags().BoolVarP(&versionsVerbose, "verbose", "v", false, "Show detailed version information")
 	versionsCmd.Flags().BoolVar(&versionsJSON, "json", false, "Output in JSON format")
 	versionsCmd.Flags().StringVar(&versionsTag, "tag", "", "Filter versions by exact tag match")
 	versionsCmd.Flags().StringVar(&versionsTagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")

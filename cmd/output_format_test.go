@@ -9,7 +9,6 @@ import (
 func TestOutputFormatFlag(t *testing.T) {
 	commandsWithJSON := []string{
 		"images",
-		"graph",
 		"labels",
 		"sbom",
 		"provenance",
@@ -54,8 +53,6 @@ func TestOutputFormatValues(t *testing.T) {
 		{"images", "table", false},
 		{"images", "yaml", true}, // not supported
 		{"images", "csv", true},  // not supported
-		{"graph", "json", false},
-		{"graph", "table", false},
 		{"labels", "json", false},
 		{"labels", "table", false},
 		{"sbom", "json", false},
@@ -88,7 +85,6 @@ func TestOutputFormatValues(t *testing.T) {
 func TestBackwardCompatibility(t *testing.T) {
 	commandsWithJSON := []string{
 		"images",
-		"graph",
 		"labels",
 		"sbom",
 		"provenance",
@@ -115,7 +111,6 @@ func TestBackwardCompatibility(t *testing.T) {
 func TestOutputFlagDescription(t *testing.T) {
 	commandsWithJSON := []string{
 		"images",
-		"graph",
 		"labels",
 		"sbom",
 		"provenance",

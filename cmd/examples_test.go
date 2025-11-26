@@ -16,7 +16,6 @@ func TestCommandExamples(t *testing.T) {
 	}{
 		// Commands that should have examples
 		{"images command", "images", true},
-		{"graph command", "graph", true},
 		{"sbom command", "sbom", true},
 		{"provenance command", "provenance", true},
 		{"labels command", "labels", true},
@@ -51,7 +50,6 @@ func TestExampleFormat(t *testing.T) {
 		commandName string
 	}{
 		{"images command", "images"},
-		{"graph command", "graph"},
 		{"sbom command", "sbom"},
 		{"provenance command", "provenance"},
 		{"labels command", "labels"},

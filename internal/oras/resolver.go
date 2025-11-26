@@ -157,6 +157,7 @@ type ReferrerInfo struct {
 	Digest       string // Digest of the referrer artifact
 	ArtifactType string // Type of the referrer (sbom, provenance, etc.)
 	MediaType    string // Original OCI media type
+	Size         int64  // Size of the artifact in bytes
 }
 
 // PlatformInfo contains information about a platform-specific manifest
@@ -291,6 +292,7 @@ func discoverAttestationsInIndex(ctx context.Context, repo *remote.Repository, i
 					Digest:       manifest.Digest.String(),
 					ArtifactType: artifactType,
 					MediaType:    manifest.MediaType,
+					Size:         manifest.Size,
 				})
 			}
 		}

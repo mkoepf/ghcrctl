@@ -176,3 +176,34 @@ func TestVersionCacheLookups(t *testing.T) {
 		t.Error("Should not find missing ID in cache")
 	}
 }
+
+func TestSortByIDProximity(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		{ID: 100, Name: "v100"},
+		{ID: 110, Name: "v110"},
+		{ID: 90, Name: "v90"},
+		{ID: 200, Name: "v200"},
+		{ID: 105, Name: "v105"},
+	}
+
+	// Sort by proximity to ID 100
+	sorted := sortByIDProximity(versions, 100)
+
+	// Expected order: 100 (distance 0), 105 (distance 5), 110 (distance 10), 90 (distance 10), 200 (distance 100)
+	// Note: 110 and 90 both have distance 10, so order between them is not guaranteed
+	if sorted[0].ID != 100 {
+		t.Errorf("First element should be ID 100, got %d", sorted[0].ID)
+	}
+	if sorted[1].ID != 105 {
+		t.Errorf("Second element should be ID 105, got %d", sorted[1].ID)
+	}
+	// Last should be furthest
+	if sorted[len(sorted)-1].ID != 200 {
+		t.Errorf("Last element should be ID 200, got %d", sorted[len(sorted)-1].ID)
+	}
+
+	// Original slice should not be modified
+	if versions[0].ID != 100 {
+		t.Error("Original slice should not be modified")
+	}
+}

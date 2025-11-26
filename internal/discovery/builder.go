@@ -5,6 +5,7 @@ import (
 
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
+	"github.com/mhk/ghcrctl/internal/oras"
 )
 
 // GHClient defines the interface for GitHub API operations needed by GraphBuilder.
@@ -75,6 +76,85 @@ func (b *GraphBuilder) GetVersionCache() (*VersionCache, error) {
 // FindParentDigest attempts to find a parent digest that contains the given digest
 // as a child (platform manifest or attestation). Returns empty string if no parent found.
 func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (string, error) {
-	// TODO: Implementation will be added incrementally
+	// Find the child version's ID to optimize search order
+	var childID int64
+	if ver, found := cache.byDigest[digest]; found {
+		childID = ver.ID
+	}
+
+	// Get all versions as a slice for sorting
+	versions := make([]gh.PackageVersionInfo, 0, len(cache.byDigest))
+	for _, ver := range cache.byDigest {
+		versions = append(versions, ver)
+	}
+
+	// Sort versions by proximity to child ID - related artifacts are typically created together
+	// and have IDs within a small range (typically ±4-20)
+	if childID != 0 {
+		versions = sortByIDProximity(versions, childID)
+	}
+
+	// For each version, check if it references the child digest
+	for _, ver := range versions {
+		candidateDigest := ver.Name
+
+		// Skip if this is the same as the child digest
+		if candidateDigest == digest {
+			continue
+		}
+
+		// Check if this candidate has the child digest as a platform manifest
+		// Note: Using ORAS package functions directly for now
+		// TODO: Consider making ORAS operations injectable for testing
+		platforms, err := oras.GetPlatformManifests(b.ctx, b.fullImage, candidateDigest)
+		if err == nil {
+			for _, p := range platforms {
+				if p.Digest == digest {
+					// Found a parent! This candidate has the child as a platform manifest
+					return candidateDigest, nil
+				}
+			}
+		}
+
+		// Check if this candidate has the child digest as a referrer (attestation)
+		referrers, err := oras.DiscoverReferrers(b.ctx, b.fullImage, candidateDigest)
+		if err == nil {
+			for _, r := range referrers {
+				if r.Digest == digest {
+					// Found a parent! This candidate has the child as a referrer
+					return candidateDigest, nil
+				}
+			}
+		}
+	}
+
+	// No parent found
 	return "", nil
+}
+
+// sortByIDProximity sorts versions by their distance from a target ID.
+// Versions closer to the target ID are placed first.
+func sortByIDProximity(versions []gh.PackageVersionInfo, targetID int64) []gh.PackageVersionInfo {
+	// Create a copy to avoid modifying the original slice
+	sorted := make([]gh.PackageVersionInfo, len(versions))
+	copy(sorted, versions)
+
+	// Sort by absolute distance from targetID
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			distI := sorted[i].ID - targetID
+			if distI < 0 {
+				distI = -distI
+			}
+			distJ := sorted[j].ID - targetID
+			if distJ < 0 {
+				distJ = -distJ
+			}
+			if distJ < distI {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	return sorted
 }

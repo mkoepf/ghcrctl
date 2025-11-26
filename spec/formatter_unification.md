@@ -184,10 +184,20 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
 - ~400 lines of duplicated code removed
 - Single source of truth for graph building
 
-### 🔴 Phase 2: Extract Display Formatting
+### 🟡 Phase 2: Extract Display Formatting
 **Goal:** Create `internal/display` package for consistent formatting
 
-#### Step 2.1: Create internal/display package
+#### Step 2.0: Extract common utility functions (COMPLETED)
+- [x] Create `internal/display/formatter.go` with FormatTags and ShortDigest
+- [x] Create `internal/display/formatter_test.go` with 100% coverage
+- [x] Remove duplicate formatTags from cmd/graph.go
+- [x] Remove duplicate shortDigest from cmd/sbom.go
+- [x] Update all commands to use display package functions
+- [x] All tests passing
+
+**Status:** ✅ Complete (commit: 0ec40a6)
+
+#### Step 2.1: Define display structures
 - [ ] Create `internal/display/formatter.go`
 - [ ] Create `internal/display/formatter_test.go`
 - [ ] Define core structures:
@@ -337,6 +347,21 @@ if len(platformInfos) == 0 && len(initialReferrers) == 0 {
   - Commit: ef57a9a
 
 **Status:** Phase 1 substantially complete. Graph and delete commands unified.
+
+### 2025-11-26 (Afternoon - Phase 2 Start)
+- ✅ Phase 2.0 Complete: Extract common utility functions
+  - Created internal/display package
+  - Implemented FormatTags and ShortDigest utility functions
+  - Created comprehensive unit tests (100% coverage)
+  - Removed duplicate formatTags from graph.go
+  - Removed duplicate shortDigest from sbom.go
+  - Updated all commands (graph, versions, delete, sbom) to use display package
+  - All tests passing (72.8s total)
+  - Code quality checks passing
+  - Commit: 0ec40a6
+  - Lines changed: +137, -44
+
+**Status:** Phase 2 started. Utility functions extracted.
 
 ---
 

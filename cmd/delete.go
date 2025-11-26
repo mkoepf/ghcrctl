@@ -372,11 +372,7 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image:      %s\n", imageName)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", versionID)
-	if len(tags) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %v\n", tags)
-	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       (untagged)\n")
-	}
+	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", formatTagsForDisplay(tags))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Handle dry-run
@@ -447,10 +443,7 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 			break
 		}
 
-		tagsStr := "(untagged)"
-		if len(ver.Tags) > 0 {
-			tagsStr = strings.Join(ver.Tags, ", ")
-		}
+		tagsStr := formatTagsForDisplay(ver.Tags)
 		fmt.Fprintf(cmd.OutOrStdout(), "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -528,6 +521,15 @@ func init() {
 }
 
 // Helper functions for delete version bulk operations
+
+// formatTagsForDisplay formats a tag slice for display
+// Returns "[]" for empty/nil slices, or comma-separated tags otherwise
+func formatTagsForDisplay(tags []string) string {
+	if len(tags) == 0 {
+		return "[]"
+	}
+	return strings.Join(tags, ", ")
+}
 
 // parseDeleteDate attempts to parse a date string in multiple user-friendly formats
 func parseDeleteDate(dateStr string) (time.Time, error) {

@@ -408,3 +408,42 @@ func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestFormatTagsForDisplay tests the tags formatting function
+func TestFormatTagsForDisplay(t *testing.T) {
+	tests := []struct {
+		name string
+		tags []string
+		want string
+	}{
+		{
+			name: "no tags should show []",
+			tags: []string{},
+			want: "[]",
+		},
+		{
+			name: "nil tags should show []",
+			tags: nil,
+			want: "[]",
+		},
+		{
+			name: "single tag",
+			tags: []string{"v1.0"},
+			want: "v1.0",
+		},
+		{
+			name: "multiple tags",
+			tags: []string{"v1.0", "latest"},
+			want: "v1.0, latest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatTagsForDisplay(tt.tags)
+			if got != tt.want {
+				t.Errorf("formatTagsForDisplay() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -25,6 +25,7 @@ var (
 	versionsNewerThan     string
 	versionsOlderThanDays int
 	versionsNewerThanDays int
+	versionsOutputFormat string
 )
 
 var versionsCmd = &cobra.Command{
@@ -71,6 +72,19 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Handle output format flag (-o)
+		if versionsOutputFormat != "" {
+			switch versionsOutputFormat {
+			case "json":
+				versionsJSON = true
+			case "table":
+				versionsJSON = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", versionsOutputFormat)
+			}
+		}
 
 		// Load configuration
 		cfg := config.New()
@@ -549,4 +563,5 @@ func init() {
 	versionsCmd.Flags().StringVar(&versionsNewerThan, "newer-than", "", "Show versions newer than date (YYYY-MM-DD or RFC3339)")
 	versionsCmd.Flags().IntVar(&versionsOlderThanDays, "older-than-days", 0, "Show versions older than N days")
 	versionsCmd.Flags().IntVar(&versionsNewerThanDays, "newer-than-days", 0, "Show versions newer than N days")
+	versionsCmd.Flags().StringVarP(&versionsOutputFormat, "output", "o", "", "Output format (json, table)")
 }

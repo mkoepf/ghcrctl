@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	labelsTag  string
-	labelsKey  string
-	labelsJSON bool
+	labelsTag          string
+	labelsKey          string
+	labelsJSON         bool
+	labelsOutputFormat string
 )
 
 var labelsCmd = &cobra.Command{
@@ -45,6 +46,19 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Handle output format flag (-o)
+		if labelsOutputFormat != "" {
+			switch labelsOutputFormat {
+			case "json":
+				labelsJSON = true
+			case "table":
+				labelsJSON = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", labelsOutputFormat)
+			}
+		}
 
 		// Load configuration
 		cfg := config.New()
@@ -149,4 +163,5 @@ func init() {
 	labelsCmd.Flags().StringVar(&labelsTag, "tag", "latest", "Tag to resolve (default: latest)")
 	labelsCmd.Flags().StringVar(&labelsKey, "key", "", "Show only specific label key")
 	labelsCmd.Flags().BoolVar(&labelsJSON, "json", false, "Output in JSON format")
+	labelsCmd.Flags().StringVarP(&labelsOutputFormat, "output", "o", "", "Output format (json, table)")
 }

@@ -10,7 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var jsonOutput bool
+var (
+	jsonOutput         bool
+	imagesOutputFormat string
+)
 
 var imagesCmd = &cobra.Command{
 	Use:   "images",
@@ -25,6 +28,19 @@ Examples:
   ghcrctl images --json`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Handle output format flag (-o)
+		if imagesOutputFormat != "" {
+			switch imagesOutputFormat {
+			case "json":
+				jsonOutput = true
+			case "table":
+				jsonOutput = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", imagesOutputFormat)
+			}
+		}
+
 		// Load configuration
 		cfg := config.New()
 		owner, ownerType, err := cfg.GetOwner()
@@ -95,4 +111,5 @@ func outputTable(w io.Writer, packages []string, owner string) error {
 func init() {
 	rootCmd.AddCommand(imagesCmd)
 	imagesCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	imagesCmd.Flags().StringVarP(&imagesOutputFormat, "output", "o", "", "Output format (json, table)")
 }

@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	graphTag        string
-	graphVersion    int64
-	graphDigest     string
-	graphJSONOutput bool
+	graphTag          string
+	graphVersion      int64
+	graphDigest       string
+	graphJSONOutput   bool
+	graphOutputFormat string
 )
 
 var graphCmd = &cobra.Command{
@@ -45,6 +46,19 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Handle output format flag (-o)
+		if graphOutputFormat != "" {
+			switch graphOutputFormat {
+			case "json":
+				graphJSONOutput = true
+			case "table":
+				graphJSONOutput = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", graphOutputFormat)
+			}
+		}
 
 		// Validate flag exclusivity - count how many flags were explicitly set
 		flagsSet := 0
@@ -681,4 +695,5 @@ func init() {
 	graphCmd.Flags().Int64Var(&graphVersion, "version", 0, "Version ID to find graph for")
 	graphCmd.Flags().StringVar(&graphDigest, "digest", "", "Digest to find graph for (accepts sha256:... or just the hash)")
 	graphCmd.Flags().BoolVar(&graphJSONOutput, "json", false, "Output in JSON format")
+	graphCmd.Flags().StringVarP(&graphOutputFormat, "output", "o", "", "Output format (json, table)")
 }

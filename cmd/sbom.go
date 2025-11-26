@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	sbomTag    string
-	sbomDigest string
-	sbomAll    bool
-	sbomJSON   bool
+	sbomTag          string
+	sbomDigest       string
+	sbomAll          bool
+	sbomJSON         bool
+	sbomOutputFormat string
 )
 
 var sbomCmd = &cobra.Command{
@@ -44,6 +45,19 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Handle output format flag (-o)
+		if sbomOutputFormat != "" {
+			switch sbomOutputFormat {
+			case "json":
+				sbomJSON = true
+			case "table":
+				sbomJSON = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", sbomOutputFormat)
+			}
+		}
 
 		// Load configuration
 		cfg := config.New()
@@ -232,4 +246,5 @@ func init() {
 	sbomCmd.Flags().StringVar(&sbomDigest, "digest", "", "Specific SBOM digest to fetch")
 	sbomCmd.Flags().BoolVar(&sbomAll, "all", false, "Show all SBOMs")
 	sbomCmd.Flags().BoolVar(&sbomJSON, "json", false, "Output in JSON format")
+	sbomCmd.Flags().StringVarP(&sbomOutputFormat, "output", "o", "", "Output format (json, table)")
 }

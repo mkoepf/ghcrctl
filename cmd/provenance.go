@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	provenanceTag    string
-	provenanceDigest string
-	provenanceAll    bool
-	provenanceJSON   bool
+	provenanceTag          string
+	provenanceDigest       string
+	provenanceAll          bool
+	provenanceJSON         bool
+	provenanceOutputFormat string
 )
 
 var provenanceCmd = &cobra.Command{
@@ -44,6 +45,19 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imageName := args[0]
+
+		// Handle output format flag (-o)
+		if provenanceOutputFormat != "" {
+			switch provenanceOutputFormat {
+			case "json":
+				provenanceJSON = true
+			case "table":
+				provenanceJSON = false
+			default:
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid output format %q. Supported formats: json, table", provenanceOutputFormat)
+			}
+		}
 
 		// Load configuration
 		cfg := config.New()
@@ -232,4 +246,5 @@ func init() {
 	provenanceCmd.Flags().StringVar(&provenanceDigest, "digest", "", "Specific provenance digest to fetch")
 	provenanceCmd.Flags().BoolVar(&provenanceAll, "all", false, "Show all provenance documents")
 	provenanceCmd.Flags().BoolVar(&provenanceJSON, "json", false, "Output in JSON format")
+	provenanceCmd.Flags().StringVarP(&provenanceOutputFormat, "output", "o", "", "Output format (json, table)")
 }

@@ -177,6 +177,82 @@ func TestVersionCacheLookups(t *testing.T) {
 	}
 }
 
+func TestNewVersionCacheFromSlice(t *testing.T) {
+	tests := []struct {
+		name     string
+		versions []gh.PackageVersionInfo
+	}{
+		{
+			name:     "empty versions list",
+			versions: []gh.PackageVersionInfo{},
+		},
+		{
+			name: "single version",
+			versions: []gh.PackageVersionInfo{
+				{
+					ID:   123,
+					Name: "sha256:abc123",
+					Tags: []string{"v1.0"},
+				},
+			},
+		},
+		{
+			name: "multiple versions",
+			versions: []gh.PackageVersionInfo{
+				{
+					ID:   123,
+					Name: "sha256:abc123",
+					Tags: []string{"v1.0"},
+				},
+				{
+					ID:   456,
+					Name: "sha256:def456",
+					Tags: []string{"v2.0", "latest"},
+				},
+				{
+					ID:   789,
+					Name: "sha256:ghi789",
+					Tags: []string{},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewVersionCacheFromSlice(tt.versions)
+
+			if cache == nil {
+				t.Fatal("NewVersionCacheFromSlice() returned nil cache")
+			}
+
+			// Verify cache has correct number of entries
+			if len(cache.ByDigest) != len(tt.versions) {
+				t.Errorf("ByDigest cache size = %d, want %d", len(cache.ByDigest), len(tt.versions))
+			}
+
+			if len(cache.ByID) != len(tt.versions) {
+				t.Errorf("ByID cache size = %d, want %d", len(cache.ByID), len(tt.versions))
+			}
+
+			// Verify each version is in both caches
+			for _, ver := range tt.versions {
+				if v, ok := cache.ByDigest[ver.Name]; !ok {
+					t.Errorf("Version %s not found in ByDigest cache", ver.Name)
+				} else if v.ID != ver.ID {
+					t.Errorf("ByDigest cache: got ID %d, want %d", v.ID, ver.ID)
+				}
+
+				if v, ok := cache.ByID[ver.ID]; !ok {
+					t.Errorf("Version ID %d not found in ByID cache", ver.ID)
+				} else if v.Name != ver.Name {
+					t.Errorf("ByID cache: got Name %s, want %s", v.Name, ver.Name)
+				}
+			}
+		})
+	}
+}
+
 func TestSortByIDProximity(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
 		{ID: 100, Name: "v100"},

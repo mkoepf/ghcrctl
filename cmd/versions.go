@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/discovery"
 	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
@@ -169,11 +170,8 @@ type VersionChild struct {
 }
 
 func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph []gh.PackageVersionInfo, allVersions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
-	// Map digest to version info for quick lookup (use ALL versions for child discovery)
-	digestToVersion := make(map[string]gh.PackageVersionInfo)
-	for _, ver := range allVersions {
-		digestToVersion[ver.Name] = ver
-	}
+	// Create version cache for efficient lookups (use ALL versions for child discovery)
+	cache := discovery.NewVersionCacheFromSlice(allVersions)
 
 	// Track which versions have been assigned to a graph
 	assigned := make(map[int64]bool)
@@ -199,7 +197,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 			// Find child versions by digest and consolidate artifact types
 			childMap := make(map[int64]*VersionChild) // Map version ID to child
 			for _, artifact := range relatedArtifacts {
-				if childVer, found := digestToVersion[artifact.Digest]; found && !assigned[childVer.ID] {
+				if childVer, found := cache.ByDigest[artifact.Digest]; found && !assigned[childVer.ID] {
 					if existing, exists := childMap[childVer.ID]; exists {
 						// Consolidate artifact types for the same version
 						existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
@@ -241,7 +239,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 				// Find child versions by digest
 				childMap := make(map[int64]*VersionChild)
 				for _, artifact := range relatedArtifacts {
-					if childVer, found := digestToVersion[artifact.Digest]; found && !assigned[childVer.ID] {
+					if childVer, found := cache.ByDigest[artifact.Digest]; found && !assigned[childVer.ID] {
 						if existing, exists := childMap[childVer.ID]; exists {
 							existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
 						} else {

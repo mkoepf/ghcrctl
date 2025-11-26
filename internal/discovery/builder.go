@@ -31,6 +31,22 @@ type VersionCache struct {
 	ByID     map[int64]gh.PackageVersionInfo
 }
 
+// NewVersionCacheFromSlice creates a VersionCache from an existing slice of versions.
+// This is useful when versions have already been fetched and don't need to be re-fetched.
+func NewVersionCacheFromSlice(versions []gh.PackageVersionInfo) *VersionCache {
+	cache := &VersionCache{
+		ByDigest: make(map[string]gh.PackageVersionInfo),
+		ByID:     make(map[int64]gh.PackageVersionInfo),
+	}
+
+	for _, ver := range versions {
+		cache.ByDigest[ver.Name] = ver
+		cache.ByID[ver.ID] = ver
+	}
+
+	return cache
+}
+
 // NewGraphBuilder creates a new GraphBuilder instance.
 func NewGraphBuilder(ctx context.Context, ghClient GHClient, fullImage, owner, ownerType, imageName string) *GraphBuilder {
 	return &GraphBuilder{

@@ -6,16 +6,25 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
 
 var (
-	versionsJSON bool
-	versionsTag  string
+	versionsJSON          bool
+	versionsTag           string
+	versionsTagPattern    string
+	versionsOnlyTagged    bool
+	versionsOnlyUntagged  bool
+	versionsOlderThan     string
+	versionsNewerThan     string
+	versionsOlderThanDays int
+	versionsNewerThanDays int
 )
 
 var versionsCmd = &cobra.Command{
@@ -35,6 +44,24 @@ Examples:
 
   # List versions for a specific tag
   ghcrctl versions myimage --tag v1.0
+
+  # List only tagged versions
+  ghcrctl versions myimage --tagged
+
+  # List only untagged versions
+  ghcrctl versions myimage --untagged
+
+  # List versions matching a tag pattern (regex)
+  ghcrctl versions myimage --tag-pattern "^v1\\..*"
+
+  # List versions older than a specific date
+  ghcrctl versions myimage --older-than 2025-01-01T00:00:00Z
+
+  # List versions older than 30 days
+  ghcrctl versions myimage --older-than-days 30
+
+  # Combine filters: untagged versions older than 7 days
+  ghcrctl versions myimage --untagged --older-than-days 7
 
   # List versions in JSON format
   ghcrctl versions myimage --json`,
@@ -78,15 +105,19 @@ Examples:
 			return fmt.Errorf("failed to list versions: %w", err)
 		}
 
-		// Optimization: Filter versions by tag to determine which graphs to build
-		// Build graphs only for tagged roots, but provide all versions for child lookup
-		versionsToGraph := allVersions
-		if versionsTag != "" {
-			versionsToGraph = filterVersionsByTag(allVersions, versionsTag)
-			if len(versionsToGraph) == 0 {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("no versions found with tag %q", versionsTag)
-			}
+		// Build filter from command-line flags
+		versionFilter, err := buildVersionFilter()
+		if err != nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("invalid filter options: %w", err)
+		}
+
+		// Apply filters to determine which versions to graph
+		// Build graphs only for filtered roots, but provide all versions for child lookup
+		versionsToGraph := versionFilter.Apply(allVersions)
+		if len(versionsToGraph) == 0 {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("no versions found matching filter criteria")
 		}
 
 		// Build graph relationships
@@ -118,25 +149,6 @@ type VersionChild struct {
 	Version      gh.PackageVersionInfo
 	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
 	Platform     string // e.g., "linux/amd64" for platform manifests
-}
-
-// filterVersionsByTag filters versions to only those with the specified tag
-// Returns all versions if tagFilter is empty
-func filterVersionsByTag(versions []gh.PackageVersionInfo, tagFilter string) []gh.PackageVersionInfo {
-	if tagFilter == "" {
-		return versions
-	}
-
-	filtered := []gh.PackageVersionInfo{}
-	for _, ver := range versions {
-		for _, tag := range ver.Tags {
-			if tag == tagFilter {
-				filtered = append(filtered, ver)
-				break
-			}
-		}
-	}
-	return filtered
 }
 
 func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph []gh.PackageVersionInfo, allVersions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
@@ -459,8 +471,55 @@ func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
 	return "untagged"
 }
 
+// buildVersionFilter creates a VersionFilter from command-line flags
+func buildVersionFilter() (*filter.VersionFilter, error) {
+	vf := &filter.VersionFilter{
+		OnlyTagged:    versionsOnlyTagged,
+		OnlyUntagged:  versionsOnlyUntagged,
+		TagPattern:    versionsTagPattern,
+		OlderThanDays: versionsOlderThanDays,
+		NewerThanDays: versionsNewerThanDays,
+	}
+
+	// Handle exact tag match (backward compatibility with --tag flag)
+	if versionsTag != "" {
+		vf.Tags = []string{versionsTag}
+	}
+
+	// Parse absolute date filters
+	if versionsOlderThan != "" {
+		t, err := time.Parse(time.RFC3339, versionsOlderThan)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --older-than date format (expected RFC3339): %w", err)
+		}
+		vf.OlderThan = t
+	}
+
+	if versionsNewerThan != "" {
+		t, err := time.Parse(time.RFC3339, versionsNewerThan)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --newer-than date format (expected RFC3339): %w", err)
+		}
+		vf.NewerThan = t
+	}
+
+	// Validate conflicting flags
+	if versionsOnlyTagged && versionsOnlyUntagged {
+		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
+	}
+
+	return vf, nil
+}
+
 func init() {
 	rootCmd.AddCommand(versionsCmd)
 	versionsCmd.Flags().BoolVar(&versionsJSON, "json", false, "Output in JSON format")
-	versionsCmd.Flags().StringVar(&versionsTag, "tag", "", "Filter versions by tag")
+	versionsCmd.Flags().StringVar(&versionsTag, "tag", "", "Filter versions by exact tag match")
+	versionsCmd.Flags().StringVar(&versionsTagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")
+	versionsCmd.Flags().BoolVar(&versionsOnlyTagged, "tagged", false, "Show only tagged versions")
+	versionsCmd.Flags().BoolVar(&versionsOnlyUntagged, "untagged", false, "Show only untagged versions")
+	versionsCmd.Flags().StringVar(&versionsOlderThan, "older-than", "", "Show versions older than date (RFC3339 format)")
+	versionsCmd.Flags().StringVar(&versionsNewerThan, "newer-than", "", "Show versions newer than date (RFC3339 format)")
+	versionsCmd.Flags().IntVar(&versionsOlderThanDays, "older-than-days", 0, "Show versions older than N days")
+	versionsCmd.Flags().IntVar(&versionsNewerThanDays, "newer-than-days", 0, "Show versions newer than N days")
 }

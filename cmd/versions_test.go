@@ -66,86 +66,92 @@ func TestBuildVersionGraphsUsesDigestDirectly(t *testing.T) {
 	}
 }
 
-// TestFilterVersionsByTag verifies that versions can be filtered by tag before graph building
-func TestFilterVersionsByTag(t *testing.T) {
-	versions := []gh.PackageVersionInfo{
-		{
-			ID:   1,
-			Name: "sha256:aaa",
-			Tags: []string{"v1.0", "latest"},
-		},
-		{
-			ID:   2,
-			Name: "sha256:bbb",
-			Tags: []string{"v2.0"},
-		},
-		{
-			ID:   3,
-			Name: "sha256:ccc",
-			Tags: []string{"v1.0", "stable"},
-		},
-		{
-			ID:   4,
-			Name: "sha256:ddd",
-			Tags: []string{},
-		},
-	}
-
+// TestBuildVersionFilter verifies that the filter is built correctly from flags
+func TestBuildVersionFilter(t *testing.T) {
 	tests := []struct {
-		name          string
-		filterTag     string
-		expectedCount int
-		expectedIDs   []int64
+		name        string
+		setup       func()
+		wantErr     bool
+		errContains string
 	}{
 		{
-			name:          "filter by v1.0",
-			filterTag:     "v1.0",
-			expectedCount: 2,
-			expectedIDs:   []int64{1, 3},
+			name: "no filters",
+			setup: func() {
+				versionsTag = ""
+				versionsTagPattern = ""
+				versionsOnlyTagged = false
+				versionsOnlyUntagged = false
+				versionsOlderThan = ""
+				versionsNewerThan = ""
+				versionsOlderThanDays = 0
+				versionsNewerThanDays = 0
+			},
+			wantErr: false,
 		},
 		{
-			name:          "filter by v2.0",
-			filterTag:     "v2.0",
-			expectedCount: 1,
-			expectedIDs:   []int64{2},
+			name: "conflicting tagged/untagged flags",
+			setup: func() {
+				versionsOnlyTagged = true
+				versionsOnlyUntagged = true
+			},
+			wantErr:     true,
+			errContains: "cannot use --tagged and --untagged together",
 		},
 		{
-			name:          "filter by non-existent tag",
-			filterTag:     "nonexistent",
-			expectedCount: 0,
-			expectedIDs:   []int64{},
+			name: "invalid older-than date",
+			setup: func() {
+				versionsOnlyTagged = false
+				versionsOnlyUntagged = false
+				versionsOlderThan = "invalid-date"
+			},
+			wantErr:     true,
+			errContains: "invalid --older-than date format",
 		},
 		{
-			name:          "no filter",
-			filterTag:     "",
-			expectedCount: 4,
-			expectedIDs:   []int64{1, 2, 3, 4},
+			name: "valid older-than date",
+			setup: func() {
+				versionsOlderThan = "2025-01-01T00:00:00Z"
+				versionsNewerThan = ""
+			},
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filtered := filterVersionsByTag(versions, tt.filterTag)
+			tt.setup()
+			filter, err := buildVersionFilter()
 
-			if len(filtered) != tt.expectedCount {
-				t.Errorf("Expected %d versions, got %d", tt.expectedCount, len(filtered))
-			}
-
-			// Check that the correct versions were included
-			for _, expectedID := range tt.expectedIDs {
-				found := false
-				for _, ver := range filtered {
-					if ver.ID == expectedID {
-						found = true
-						break
-					}
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+					t.Errorf("Expected error to contain %q, got %q", tt.errContains, err.Error())
 				}
-				if !found {
-					t.Errorf("Expected version ID %d to be in filtered results", expectedID)
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if filter == nil {
+					t.Error("Expected non-nil filter")
 				}
 			}
 		})
 	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // TestVersionsCommandStructure verifies the versions command is properly set up
@@ -202,15 +208,22 @@ func TestVersionsCommandArguments(t *testing.T) {
 
 // TestVersionsCommandHasFlags verifies required flags exist
 func TestVersionsCommandHasFlags(t *testing.T) {
-	// Check for --json flag
-	jsonFlag := versionsCmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Error("versions command should have --json flag")
+	requiredFlags := []string{
+		"json",
+		"tag",
+		"tag-pattern",
+		"tagged",
+		"untagged",
+		"older-than",
+		"newer-than",
+		"older-than-days",
+		"newer-than-days",
 	}
 
-	// Check for --tag flag
-	tagFlag := versionsCmd.Flags().Lookup("tag")
-	if tagFlag == nil {
-		t.Error("versions command should have --tag flag")
+	for _, flagName := range requiredFlags {
+		flag := versionsCmd.Flags().Lookup(flagName)
+		if flag == nil {
+			t.Errorf("versions command should have --%s flag", flagName)
+		}
 	}
 }

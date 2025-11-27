@@ -44,57 +44,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Create test Dockerfiles
-      - name: Create test Dockerfiles
-        run: |
-          # Test image 1: No SBOM, no provenance, single platform
-          cat > Dockerfile.test1 << 'EOF'
-          FROM alpine:3.19
-          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image without SBOM or provenance"
-          LABEL test.image.type="no-sbom-no-provenance-single"
-          RUN echo "Test image 1 - no SBOM, no provenance" > /test.txt
-          CMD ["cat", "/test.txt"]
-          EOF
-
-          # Test image 2: With SBOM and provenance, multiarch (amd64 + arm64)
-          cat > Dockerfile.test2 << 'EOF'
-          FROM alpine:3.19
-          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image with SBOM and provenance (multiarch)"
-          LABEL test.image.type="with-sbom-with-provenance-multiarch"
-          RUN echo "Test image 2 - with SBOM and provenance" > /test.txt
-          CMD ["cat", "/test.txt"]
-          EOF
-
-          # Test image 3: With SBOM but no provenance, single platform
-          cat > Dockerfile.test3 << 'EOF'
-          FROM alpine:3.19
-          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image with SBOM but no provenance"
-          LABEL test.image.type="with-sbom-no-provenance"
-          RUN echo "Test image 3 - with SBOM, no provenance" > /test.txt
-          CMD ["cat", "/test.txt"]
-          EOF
-
-          # Test image 4: No SBOM, no provenance, multiarch (amd64 + arm64)
-          cat > Dockerfile.test4 << 'EOF'
-          FROM alpine:3.19
-          LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-          LABEL org.opencontainers.image.description="Test image without SBOM or provenance (multiarch)"
-          LABEL test.image.type="no-sbom-no-provenance-multiarch"
-          RUN echo "Test image 4 - no SBOM, no provenance, multiarch" > /test.txt
-          CMD ["cat", "/test.txt"]
-          EOF
-
       # Build and push image 1: No SBOM, no provenance, single platform
       - name: Build and push test image 1 (no SBOM, no provenance, single platform)
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.test1
+          file: ./integrationtests/Dockerfile.no-sbom
           push: true
           platforms: linux/amd64
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom:v1.0
@@ -109,11 +68,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.test2
+          file: ./integrationtests/Dockerfile.with-sbom
           push: true
           platforms: linux/amd64,linux/arm64
           sbom: true
           provenance: mode=max
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom:v1.0
@@ -130,11 +91,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.test3
+          file: ./integrationtests/Dockerfile.with-sbom-no-provenance
           push: true
           platforms: linux/amd64
           sbom: true
           provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom-no-provenance:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-with-sbom-no-provenance:v1.0
@@ -148,11 +111,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.test4
+          file: ./integrationtests/Dockerfile.no-sbom-no-provenance
           push: true
           platforms: linux/amd64,linux/arm64
           sbom: false
           provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom-no-provenance:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-no-sbom-no-provenance:v1.0

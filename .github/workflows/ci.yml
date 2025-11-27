@@ -1,5 +1,13 @@
 name: CI
 
+env:
+  GO_VERSION: '1.25.3'
+  checkout_action: &checkout_action actions/checkout@v6
+  setup_go_action: &setup_go_action actions/setup-go@v6
+  codecov_action: &codecov_action codecov/codecov-action@v4
+  trivy_action: &trivy_action aquasecurity/trivy-action@0.33.1
+  upload_artifact_action: &upload_artifact_action actions/upload-artifact@v5
+
 on:
   push:
     branches: [ main ]
@@ -12,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: *checkout_action
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: *setup_go_action
         with:
-          go-version: '1.25.3'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Run gofmt
         run: |
@@ -38,15 +46,15 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.25.3']
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: *checkout_action
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: *setup_go_action
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Run tests (Unix)
@@ -72,7 +80,7 @@ jobs:
           }
 
       - name: Report test coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25.3'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${coverage}%"
@@ -83,8 +91,8 @@ jobs:
           go tool cover -func=coverage.out
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25.3'
-        uses: codecov/codecov-action@v4
+        if: matrix.os == 'ubuntu-latest'
+        uses: *codecov_action
         with:
           file: ./coverage.out
           flags: unittests
@@ -96,12 +104,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: *checkout_action
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: *setup_go_action
         with:
-          go-version: '1.25.3'
+          go-version: ${{ env.GO_VERSION }}
 
       # 1. govulncheck (Go official vulnerability scanner)
       - name: Run govulncheck
@@ -117,7 +125,7 @@ jobs:
 
       # 3. Trivy (scans for vulnerable deps, secrets, misconfig)
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: *trivy_action
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
@@ -130,15 +138,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.25.3']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: *checkout_action
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: *setup_go_action
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Build (Linux/macOS)
@@ -162,12 +169,11 @@ jobs:
           .\ghcrctl.exe config --help
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: *upload_artifact_action
         with:
-          name: ghcrctl-${{ runner.os }}-go${{ matrix.go-version }}
+          name: ghcrctl-${{ runner.os }}
           path: |
             ghcrctl
             ghcrctl.exe
           if-no-files-found: ignore
           retention-days: 7
-

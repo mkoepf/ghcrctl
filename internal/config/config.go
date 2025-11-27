@@ -60,7 +60,7 @@ func (c *Config) Load() error {
 func (c *Config) Save() error {
 	// Ensure the config directory exists
 	configDir := filepath.Dir(c.path)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 

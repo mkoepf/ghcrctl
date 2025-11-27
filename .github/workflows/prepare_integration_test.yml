@@ -44,8 +44,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build and push image 1: No SBOM, no provenance, single platform
-      - name: Build and push test image 1 (no SBOM, no provenance, single platform)
+      # Build, scan and push image 1: No SBOM, no provenance, single platform
+      - name: Build test image 1 (no SBOM, no provenance, single platform)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/Dockerfile.no-sbom
+          push: false
+          load: true
+          platforms: linux/amd64
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: image-local:${{ inputs.image_prefix }}-no-sbom-local
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      - name: Scan test image 1 (no SBOM, no provenance, single platform)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: image-local:${{ inputs.image_prefix }}-no-sbom-local
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Push test image 1 (no SBOM, no provenance, single platform)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,8 +84,32 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-      # Build and push image 2: With SBOM and provenance, multiarch
-      - name: Build and push test image 2 (with SBOM, with provenance, multiarch)
+      # Build, scan and push image 2: With SBOM and provenance, multiarch
+      - name: Build test image 2 (with SBOM, with provenance, multiarch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/Dockerfile.with-sbom
+          push: false
+          load: true
+          platforms: linux/amd64,linux/arm64
+          sbom: true
+          provenance: mode=max
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: image-local:${{ inputs.image_prefix }}-with-sbom-local
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      - name: Scan test image 2 (with SBOM, with provenance, multiarch)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: image-local:${{ inputs.image_prefix }}-with-sbom-local
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Push test image 2 (with SBOM, with provenance, multiarch)
         id: push-with-sbom
         uses: docker/build-push-action@v6
         with:
@@ -86,8 +132,32 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-      # Build and push image 3: With SBOM but no provenance, single platform
-      - name: Build and push test image 3 (with SBOM, no provenance, single platform)
+      # Build, scan and push image 3: With SBOM but no provenance, single platform
+      - name: Build test image 3 (with SBOM, no provenance, single platform)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/Dockerfile.with-sbom-no-provenance
+          push: false
+          load: true
+          platforms: linux/amd64
+          sbom: true
+          provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: image-local:${{ inputs.image_prefix }}-with-sbom-no-provenance-local
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      - name: Scan test image 3 (with SBOM, no provenance, single platform)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: image-local:${{ inputs.image_prefix }}-with-sbom-no-provenance-local
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Push test image 3 (with SBOM, no provenance, single platform)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -106,8 +176,32 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-      # Build and push image 4: No SBOM, no provenance, multiarch
-      - name: Build and push test image 4 (no SBOM, no provenance, multiarch)
+      # Build, scan and push image 4: No SBOM, no provenance, multiarch
+      - name: Build test image 4 (no SBOM, no provenance, multiarch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/Dockerfile.no-sbom-no-provenance
+          push: false
+          load: true
+          platforms: linux/amd64,linux/arm64
+          sbom: false
+          provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: image-local:${{ inputs.image_prefix }}-no-sbom-no-provenance-local
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      - name: Scan test image 4 (no SBOM, no provenance, multiarch)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: image-local:${{ inputs.image_prefix }}-no-sbom-no-provenance-local
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Push test image 4 (no SBOM, no provenance, multiarch)
         uses: docker/build-push-action@v6
         with:
           context: .

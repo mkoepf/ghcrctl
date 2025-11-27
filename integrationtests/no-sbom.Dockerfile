@@ -1,4 +1,4 @@
-FROM alpine:3.19
+FROM alpine:3.22
 ARG GITHUB_REPOSITORY
 LABEL org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"
 LABEL org.opencontainers.image.description="Test image without SBOM or provenance"

@@ -164,6 +164,13 @@ ghcrctl versions myimage --untagged
 # Show versions matching a tag pattern (regex)
 ghcrctl versions myimage --tag-pattern "^v1\\..*"
 
+# Filter by specific version ID
+ghcrctl versions myimage --version 585861918
+
+# Filter by digest (full or short format)
+ghcrctl versions myimage --digest sha256:01af50cc8b0d
+ghcrctl versions myimage --digest 01af50cc8b0d  # short form from DIGEST column
+
 # Show versions older than a specific date
 ghcrctl versions myimage --older-than 2025-01-01
 

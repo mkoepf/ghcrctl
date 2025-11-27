@@ -1,0 +1,2 @@
+# Ignore missing HEALTHCHECK only for integration test images
+AVD-DS-0026

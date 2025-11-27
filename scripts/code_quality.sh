@@ -25,7 +25,7 @@ echo ""
 ###########################################
 # 1. Code Formatting Check (gofmt)
 ###########################################
-echo -e "${BLUE}[1/5] Checking code formatting with gofmt...${NC}"
+echo -e "${BLUE}[1/6] Checking code formatting with gofmt...${NC}"
 UNFORMATTED=$(gofmt -s -l . 2>&1)
 if [ -n "$UNFORMATTED" ]; then
     echo -e "${RED}✗ The following files are not formatted:${NC}"
@@ -41,7 +41,7 @@ echo ""
 ###########################################
 # 2. Build Check
 ###########################################
-echo -e "${BLUE}[2/5] Building binary...${NC}"
+echo -e "${BLUE}[2/6] Building binary...${NC}"
 if go build -v -o ghcrctl . 2>&1 > /dev/null; then
     echo -e "${GREEN}✓ Build successful${NC}"
 
@@ -65,7 +65,7 @@ echo ""
 ###########################################
 # 3. Static Analysis (go vet)
 ###########################################
-echo -e "${BLUE}[3/5] Running static analysis with go vet...${NC}"
+echo -e "${BLUE}[3/6] Running static analysis with go vet...${NC}"
 if go vet ./... 2>&1; then
     echo -e "${GREEN}✓ go vet passed${NC}"
 else
@@ -78,7 +78,7 @@ echo ""
 ###########################################
 # 4. Tests with Race Detection and SKIP detection
 ###########################################
-echo -e "${BLUE}[4/5] Running tests with race and skip detection...${NC}"
+echo -e "${BLUE}[4/6] Running tests with race and skip detection...${NC}"
 # Run go test and capture combined stdout+stderr
 output=$(go test -json -v -race \
     -coverprofile=coverage.out \
@@ -103,11 +103,18 @@ echo -e "${GREEN}✓ All tests passed${NC}"
 
 echo ""
 
+###########################################
+# 5. Security scans
+###########################################
+echo -e "${BLUE}[5/6] Running security scans... ${NC}"
+govulncheck ./...
+gosec ./...
+trivy fs . --skip-dirs .claude --scanners=vuln,misconfig,secret
 
 ###########################################
-# 5. Coverage Report (informational only)
+# 6. Coverage Report (informational only)
 ###########################################
-echo -e "${BLUE}[5/5] Reporting test coverage (informational)...${NC}"
+echo -e "${BLUE}[6/6] Reporting test coverage (informational)...${NC}"
 if [ -f coverage.out ]; then
     COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
     echo -e "Total coverage: ${YELLOW}${COVERAGE}%${NC}"

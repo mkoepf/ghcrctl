@@ -2,11 +2,6 @@ name: CI
 
 env:
   GO_VERSION: '1.25.3'
-  checkout_action: &checkout_action actions/checkout@v6
-  setup_go_action: &setup_go_action actions/setup-go@v6
-  codecov_action: &codecov_action codecov/codecov-action@v4
-  trivy_action: &trivy_action aquasecurity/trivy-action@0.33.1
-  upload_artifact_action: &upload_artifact_action actions/upload-artifact@v5
 
 on:
   push:
@@ -20,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: *checkout_action
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: *setup_go_action
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -49,10 +44,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: *checkout_action
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: *setup_go_action
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -92,7 +87,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
-        uses: *codecov_action
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage.out
           flags: unittests
@@ -104,10 +99,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: *checkout_action
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: *setup_go_action
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -125,7 +120,7 @@ jobs:
 
       # 3. Trivy (scans for vulnerable deps, secrets, misconfig)
       - name: Run Trivy filesystem scan
-        uses: *trivy_action
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
@@ -140,10 +135,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout code
-        uses: *checkout_action
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: *setup_go_action
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -169,7 +164,7 @@ jobs:
           .\ghcrctl.exe config --help
 
       - name: Upload build artifact
-        uses: *upload_artifact_action
+        uses: actions/upload-artifact@v5
         with:
           name: ghcrctl-${{ runner.os }}
           path: |

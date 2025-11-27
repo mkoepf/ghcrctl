@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Keep GitHub Actions (e.g. actions/checkout, actions/setup-go, ...) up to
+  # date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Dependabot will open PRs to bump:
+    # - actions/checkout@v6
+    # - actions/setup-go@v6
+    # - aquasecurity/trivy-action@0.33.1
+    # - codecov/codecov-action@v4
+    # - actions/upload-artifact@v5
+
+  # Keep Go module dependencies up to date
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Optional: ignore major version updates
+    # ignore:
+    #   - dependency-name: "*"
+    #     update-types: ["version-update:semver-major"]
+
+  # (Optional) Track Dockerfile base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

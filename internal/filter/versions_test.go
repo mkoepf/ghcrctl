@@ -385,3 +385,98 @@ func TestVersionFilter_Apply_Digest_WithoutPrefix(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 	assert.Equal(t, int64(1), result[0].ID)
 }
+
+func TestVersionFilter_Apply_OnlyUntagged_WithTaggedGraphMembers(t *testing.T) {
+	// Scenario: Multi-arch image "latest" (ID=1) with children:
+	// - Platform manifest linux/amd64 (ID=2, untagged)
+	// - Platform manifest linux/arm64 (ID=3, untagged)
+	// - SBOM attestation (ID=4, untagged)
+	// Plus an orphan untagged version (ID=5)
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:amd64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 3, Name: "sha256:arm64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 4, Name: "sha256:sbom", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 5, Name: "sha256:orphan", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+	}
+
+	// TaggedGraphMembers contains the tagged version and all its children
+	taggedGraphMembers := map[int64]bool{
+		1: true, // tagged index
+		2: true, // child: linux/amd64
+		3: true, // child: linux/arm64
+		4: true, // child: sbom
+	}
+
+	filter := &VersionFilter{
+		OnlyUntagged:       true,
+		TaggedGraphMembers: taggedGraphMembers,
+	}
+	result := filter.Apply(versions)
+
+	// Should only return the orphan (ID=5), not the children of the tagged graph
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(5), result[0].ID)
+}
+
+func TestVersionFilter_Apply_OnlyUntagged_WithEmptyTaggedGraphMembers(t *testing.T) {
+	// When TaggedGraphMembers is empty, all untagged versions should be returned
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Name: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
+	}
+
+	filter := &VersionFilter{
+		OnlyUntagged:       true,
+		TaggedGraphMembers: map[int64]bool{}, // empty map
+	}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 2, len(result))
+	assert.Equal(t, int64(2), result[0].ID)
+	assert.Equal(t, int64(3), result[1].ID)
+}
+
+func TestVersionFilter_Apply_OnlyUntagged_WithNilTaggedGraphMembers(t *testing.T) {
+	// When TaggedGraphMembers is nil, behavior should be same as legacy (all untagged)
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Name: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
+	}
+
+	filter := &VersionFilter{
+		OnlyUntagged:       true,
+		TaggedGraphMembers: nil, // nil map
+	}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 2, len(result))
+	assert.Equal(t, int64(2), result[0].ID)
+	assert.Equal(t, int64(3), result[1].ID)
+}
+
+func TestVersionFilter_Apply_OnlyUntagged_AllInTaggedGraph(t *testing.T) {
+	// Edge case: All untagged versions are children of tagged versions
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:child1", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 3, Name: "sha256:child2", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+	}
+
+	taggedGraphMembers := map[int64]bool{
+		1: true,
+		2: true,
+		3: true,
+	}
+
+	filter := &VersionFilter{
+		OnlyUntagged:       true,
+		TaggedGraphMembers: taggedGraphMembers,
+	}
+	result := filter.Apply(versions)
+
+	// No orphans exist, so result should be empty
+	assert.Equal(t, 0, len(result))
+}

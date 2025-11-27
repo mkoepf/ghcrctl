@@ -18,6 +18,11 @@ type VersionFilter struct {
 	OnlyTagged   bool
 	OnlyUntagged bool
 
+	// Graph-aware filtering for OnlyUntagged
+	// When OnlyUntagged is true, versions in this set are excluded
+	// (they belong to tagged graphs and shouldn't be shown as "untagged")
+	TaggedGraphMembers map[int64]bool
+
 	// Date filtering
 	OlderThan time.Time // Include versions created before this time
 	NewerThan time.Time // Include versions created after this time
@@ -91,8 +96,15 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 	if f.OnlyTagged && !hasTag {
 		return false
 	}
-	if f.OnlyUntagged && hasTag {
-		return false
+	if f.OnlyUntagged {
+		// Exclude versions that have tags
+		if hasTag {
+			return false
+		}
+		// Exclude versions that belong to tagged graphs (children of tagged versions)
+		if f.TaggedGraphMembers != nil && f.TaggedGraphMembers[ver.ID] {
+			return false
+		}
 	}
 
 	// Check exact tag match (OR logic for multiple tags)

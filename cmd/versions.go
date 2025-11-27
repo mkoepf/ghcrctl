@@ -139,6 +139,15 @@ Examples:
 			return fmt.Errorf("invalid filter options: %w", err)
 		}
 
+		// Build full image reference
+		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+
+		// For --untagged filter, discover tagged graph members first
+		// This allows the filter to exclude children of tagged versions
+		if versionFilter.OnlyUntagged {
+			versionFilter.TaggedGraphMembers = identifyTaggedGraphMembers(ctx, fullImage, allVersions)
+		}
+
 		// Apply filters to determine which versions to graph
 		// Build graphs only for filtered roots, but provide all versions for child lookup
 		versionsToGraph := versionFilter.Apply(allVersions)
@@ -149,7 +158,6 @@ Examples:
 
 		// Build graph relationships
 		// Pass versionsToGraph (filtered roots) and allVersions (for child lookup)
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 		versionGraphs, err := buildVersionGraphs(ctx, fullImage, versionsToGraph, allVersions, client, owner, ownerType, imageName)
 		if err != nil {
 			cmd.SilenceUsage = true
@@ -343,6 +351,33 @@ func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, roo
 	}
 
 	return artifacts, graphType
+}
+
+// identifyTaggedGraphMembers discovers all versions that belong to tagged graphs.
+// This includes tagged versions themselves and all their children (platform manifests,
+// attestations, etc.). Used by --untagged filter to exclude children of tagged versions.
+func identifyTaggedGraphMembers(ctx context.Context, fullImage string, allVersions []gh.PackageVersionInfo) map[int64]bool {
+	members := make(map[int64]bool)
+	cache := discovery.NewVersionCacheFromSlice(allVersions)
+
+	for _, ver := range allVersions {
+		if len(ver.Tags) > 0 {
+			// This is a tagged version - add it and discover its children
+			members[ver.ID] = true
+
+			// Discover children using ORAS
+			relatedArtifacts, _ := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
+
+			// Add all children to the members set
+			for _, artifact := range relatedArtifacts {
+				if childVer, found := cache.ByDigest[artifact.Digest]; found {
+					members[childVer.ID] = true
+				}
+			}
+		}
+	}
+
+	return members
 }
 
 func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName string) error {

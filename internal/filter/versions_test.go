@@ -370,3 +370,18 @@ func TestVersionFilter_Apply_Digest_ShortForm(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 	assert.Equal(t, int64(1), result[0].ID)
 }
+
+func TestVersionFilter_Apply_Digest_WithoutPrefix(t *testing.T) {
+	// This tests matching the format shown in the DIGEST column (no sha256: prefix)
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+	}
+
+	// User copies "abc123def456" from DIGEST column (first 12 chars without prefix)
+	filter := &VersionFilter{Digest: "abc123def456"}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(1), result[0].ID)
+}

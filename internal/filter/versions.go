@@ -81,7 +81,8 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 	}
 
 	// Check digest filter (prefix matching for short digests)
-	if f.Digest != "" && !strings.HasPrefix(ver.Name, f.Digest) {
+	// Supports both "sha256:abc123" and "abc123" (as shown in DIGEST column)
+	if f.Digest != "" && !matchesDigest(ver.Name, f.Digest) {
 		return false
 	}
 
@@ -183,5 +184,23 @@ func hasMatchingTagPattern(versionTags []string, pattern *regexp.Regexp) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// matchesDigest checks if a version digest matches the filter digest.
+// Supports both full format "sha256:abc123..." and short format "abc123..."
+// (as displayed in the DIGEST column without the sha256: prefix).
+func matchesDigest(versionDigest, filterDigest string) bool {
+	// Try direct prefix match first (handles "sha256:abc123" format)
+	if strings.HasPrefix(versionDigest, filterDigest) {
+		return true
+	}
+
+	// If filter doesn't have sha256: prefix, try matching against the hash part
+	if !strings.HasPrefix(filterDigest, "sha256:") {
+		hashPart := strings.TrimPrefix(versionDigest, "sha256:")
+		return strings.HasPrefix(hashPart, filterDigest)
+	}
+
 	return false
 }

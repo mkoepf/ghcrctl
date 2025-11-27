@@ -130,6 +130,12 @@ jobs:
         run: |
           echo "## Integration Test Images Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Base Image: Trivial Base (Multiarch)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-trivial-base\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Used as base for all other test images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Image 1: No SBOM, No Provenance (Single Platform)" >> $GITHUB_STEP_SUMMARY
           echo "- Platform: linux/amd64" >> $GITHUB_STEP_SUMMARY
           echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`" >> $GITHUB_STEP_SUMMARY

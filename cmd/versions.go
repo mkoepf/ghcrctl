@@ -28,6 +28,8 @@ var (
 	versionsOlderThanDays int
 	versionsNewerThanDays int
 	versionsOutputFormat  string
+	versionsVersionID     int64
+	versionsDigest        string
 )
 
 var versionsCmd = &cobra.Command{
@@ -68,6 +70,12 @@ Examples:
 
   # Combine filters: untagged versions older than 7 days
   ghcrctl versions myimage --untagged --older-than-days 7
+
+  # Filter by specific version ID
+  ghcrctl versions myimage --version 12345678
+
+  # Filter by digest (supports prefix matching)
+  ghcrctl versions myimage --digest sha256:abc123
 
   # List versions in JSON format
   ghcrctl versions myimage --json`,
@@ -621,6 +629,8 @@ func buildVersionFilter() (*filter.VersionFilter, error) {
 		TagPattern:    versionsTagPattern,
 		OlderThanDays: versionsOlderThanDays,
 		NewerThanDays: versionsNewerThanDays,
+		VersionID:     versionsVersionID,
+		Digest:        versionsDigest,
 	}
 
 	// Handle exact tag match (backward compatibility with --tag flag)
@@ -666,4 +676,6 @@ func init() {
 	versionsCmd.Flags().IntVar(&versionsOlderThanDays, "older-than-days", 0, "Show versions older than N days")
 	versionsCmd.Flags().IntVar(&versionsNewerThanDays, "newer-than-days", 0, "Show versions newer than N days")
 	versionsCmd.Flags().StringVarP(&versionsOutputFormat, "output", "o", "", "Output format (json, table)")
+	versionsCmd.Flags().Int64Var(&versionsVersionID, "version", 0, "Filter by exact version ID")
+	versionsCmd.Flags().StringVar(&versionsDigest, "digest", "", "Filter by digest (supports prefix matching)")
 }

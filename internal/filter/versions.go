@@ -2,6 +2,7 @@ package filter
 
 import (
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/mhk/ghcrctl/internal/gh"
@@ -24,6 +25,10 @@ type VersionFilter struct {
 	// Age-based filtering (relative to current time)
 	OlderThanDays int // Include versions older than N days
 	NewerThanDays int // Include versions newer than N days
+
+	// Direct version filtering
+	VersionID int64  // Filter by exact version ID (0 means no filter)
+	Digest    string // Filter by digest (supports prefix matching)
 }
 
 // Apply applies all configured filters to the provided versions
@@ -70,6 +75,16 @@ func (f *VersionFilter) Apply(versions []gh.PackageVersionInfo) []gh.PackageVers
 
 // matchesVersion checks if a single version matches all filter criteria
 func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *regexp.Regexp, olderThanTime, newerThanTime time.Time) bool {
+	// Check version ID filter (exact match)
+	if f.VersionID != 0 && ver.ID != f.VersionID {
+		return false
+	}
+
+	// Check digest filter (prefix matching for short digests)
+	if f.Digest != "" && !strings.HasPrefix(ver.Name, f.Digest) {
+		return false
+	}
+
 	// Check tagged/untagged filter
 	hasTag := len(ver.Tags) > 0
 	if f.OnlyTagged && !hasTag {

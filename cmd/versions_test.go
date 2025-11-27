@@ -85,6 +85,8 @@ func TestBuildVersionFilter(t *testing.T) {
 				versionsNewerThan = ""
 				versionsOlderThanDays = 0
 				versionsNewerThanDays = 0
+				versionsVersionID = 0
+				versionsDigest = ""
 			},
 			wantErr: false,
 		},
@@ -128,6 +130,23 @@ func TestBuildVersionFilter(t *testing.T) {
 			setup: func() {
 				versionsOlderThan = ""
 				versionsNewerThan = "2025-11-01"
+			},
+			wantErr: false,
+		},
+		{
+			name: "version ID filter",
+			setup: func() {
+				versionsNewerThan = ""
+				versionsVersionID = 12345
+				versionsDigest = ""
+			},
+			wantErr: false,
+		},
+		{
+			name: "digest filter",
+			setup: func() {
+				versionsVersionID = 0
+				versionsDigest = "sha256:abc123"
 			},
 			wantErr: false,
 		},
@@ -234,6 +253,8 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 		"newer-than",
 		"older-than-days",
 		"newer-than-days",
+		"version",
+		"digest",
 	}
 
 	for _, flagName := range requiredFlags {

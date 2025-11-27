@@ -303,3 +303,70 @@ func TestVersionFilter_Apply_GitHubDateFormat_TaggedOnly(t *testing.T) {
 	assert.Equal(t, int64(1), result[0].ID)
 	assert.Equal(t, int64(3), result[1].ID)
 }
+
+func TestVersionFilter_Apply_VersionID(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		createTestVersion(12345, []string{"v1.0.0"}, "2025-01-01T00:00:00Z"),
+		createTestVersion(12346, []string{"v2.0.0"}, "2025-01-02T00:00:00Z"),
+		createTestVersion(12347, []string{"latest"}, "2025-01-03T00:00:00Z"),
+	}
+
+	filter := &VersionFilter{VersionID: 12346}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(12346), result[0].ID)
+}
+
+func TestVersionFilter_Apply_VersionID_NotFound(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		createTestVersion(12345, []string{"v1.0.0"}, "2025-01-01T00:00:00Z"),
+		createTestVersion(12346, []string{"v2.0.0"}, "2025-01-02T00:00:00Z"),
+	}
+
+	filter := &VersionFilter{VersionID: 99999}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 0, len(result))
+}
+
+func TestVersionFilter_Apply_Digest(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Name: "sha256:ghi789", Tags: []string{"latest"}, CreatedAt: "2025-01-03T00:00:00Z"},
+	}
+
+	filter := &VersionFilter{Digest: "sha256:def456"}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(2), result[0].ID)
+	assert.Equal(t, "sha256:def456", result[0].Name)
+}
+
+func TestVersionFilter_Apply_Digest_NotFound(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+	}
+
+	filter := &VersionFilter{Digest: "sha256:notexist"}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 0, len(result))
+}
+
+func TestVersionFilter_Apply_Digest_ShortForm(t *testing.T) {
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Name: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+	}
+
+	// Short form should match the beginning of the digest
+	filter := &VersionFilter{Digest: "sha256:abc123"}
+	result := filter.Apply(versions)
+
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(1), result[0].ID)
+}

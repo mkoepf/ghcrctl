@@ -448,19 +448,19 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		}
 	}
 
-	// Print header
-	fmt.Fprintf(w, "  %-*s  %-*s  %-*s  %-*s  %s\n",
-		maxIDLen, "VERSION ID",
-		maxTypeLen, "TYPE",
-		maxDigestLen, "DIGEST",
-		maxTagsLen, "TAGS",
-		"CREATED")
+	// Print header with colors
 	fmt.Fprintf(w, "  %s  %s  %s  %s  %s\n",
-		strings.Repeat("-", maxIDLen),
-		strings.Repeat("-", maxTypeLen),
-		strings.Repeat("-", maxDigestLen),
-		strings.Repeat("-", maxTagsLen),
-		strings.Repeat("-", maxCreatedLen))
+		display.ColorHeader(fmt.Sprintf("%-*s", maxIDLen, "VERSION ID")),
+		display.ColorHeader(fmt.Sprintf("%-*s", maxTypeLen, "TYPE")),
+		display.ColorHeader(fmt.Sprintf("%-*s", maxDigestLen, "DIGEST")),
+		display.ColorHeader(fmt.Sprintf("%-*s", maxTagsLen, "TAGS")),
+		display.ColorHeader("CREATED"))
+	fmt.Fprintf(w, "  %s  %s  %s  %s  %s\n",
+		display.ColorSeparator(strings.Repeat("-", maxIDLen)),
+		display.ColorSeparator(strings.Repeat("-", maxTypeLen)),
+		display.ColorSeparator(strings.Repeat("-", maxDigestLen)),
+		display.ColorSeparator(strings.Repeat("-", maxTagsLen)),
+		display.ColorSeparator(strings.Repeat("-", maxCreatedLen)))
 
 	// Print graphs
 	for i, g := range graphs {
@@ -472,17 +472,18 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		}
 	}
 
-	fmt.Fprintf(w, "\nTotal: %d version(s) in %d graph(s)\n", totalVersions, len(graphs))
+	fmt.Fprintf(w, "\nTotal: %s version(s) in %s graph(s)\n",
+		display.ColorCount(totalVersions), display.ColorCount(len(graphs)))
 	return nil
 }
 
 func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
-	// Determine tree indicators
+	// Determine tree indicators (apply color)
 	var rootIndicator, midIndicator, lastIndicator string
 	if len(g.Children) > 0 {
-		rootIndicator = "┌"
-		midIndicator = "├"
-		lastIndicator = "└"
+		rootIndicator = display.ColorTreeIndicator("┌")
+		midIndicator = display.ColorTreeIndicator("├")
+		lastIndicator = display.ColorTreeIndicator("└")
 	} else {
 		rootIndicator = " "
 	}
@@ -509,14 +510,28 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDig
 }
 
 func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
+	// Format raw values for width calculation
 	tagsStr := display.FormatTags(ver.Tags)
 	digest := display.ShortDigest(ver.Name)
-	fmt.Fprintf(w, "%s %-*d  %-*s  %-*s  %-*s  %s\n",
+
+	// Apply colors (pad first, then color to preserve alignment)
+	coloredType := display.ColorVersionType(fmt.Sprintf("%-*s", maxTypeLen, vtype))
+	coloredDigest := display.ColorDigest(fmt.Sprintf("%-*s", maxDigestLen, digest))
+	// Pad tags after coloring won't work for alignment, so we pad the raw string
+	// and accept that colored output may shift slightly (acceptable tradeoff)
+	var paddedTags string
+	if len(ver.Tags) > 0 {
+		paddedTags = display.ColorTags(ver.Tags) + strings.Repeat(" ", maxTagsLen-len(tagsStr))
+	} else {
+		paddedTags = display.ColorTags(ver.Tags) + strings.Repeat(" ", maxTagsLen-2) // "[]" is 2 chars
+	}
+
+	fmt.Fprintf(w, "%s %-*d  %s  %s  %s  %s\n",
 		indicator,
 		maxIDLen, ver.ID,
-		maxTypeLen, vtype,
-		maxDigestLen, digest,
-		maxTagsLen, tagsStr,
+		coloredType,
+		coloredDigest,
+		paddedTags,
 		ver.CreatedAt)
 }
 
@@ -539,26 +554,32 @@ func outputVersionsVerbose(w io.Writer, graphs []VersionGraph, imageName string)
 func printVerboseGraph(w io.Writer, g VersionGraph, isLast bool) {
 	hasChildren := len(g.Children) > 0
 
-	// Print root version
+	// Print root version with colored tree indicators and type
 	if hasChildren {
-		fmt.Fprintf(w, "┌─ %d  %s\n", g.RootVersion.ID, g.Type)
+		fmt.Fprintf(w, "%s %d  %s\n",
+			display.ColorTreeIndicator("┌─"),
+			g.RootVersion.ID,
+			display.ColorVersionType(g.Type))
 	} else {
-		fmt.Fprintf(w, "─  %d  %s\n", g.RootVersion.ID, g.Type)
+		fmt.Fprintf(w, "%s %d  %s\n",
+			display.ColorTreeIndicator("─"),
+			g.RootVersion.ID,
+			display.ColorVersionType(g.Type))
 	}
 	printVerboseDetails(w, g.RootVersion.Name, g.RootVersion.Tags, g.RootVersion.CreatedAt, 0, hasChildren)
 
 	// Print children
 	for i, child := range g.Children {
 		isLastChild := i == len(g.Children)-1
-		indicator := "├─"
+		indicator := display.ColorTreeIndicator("├─")
 		if isLastChild {
-			indicator = "└─"
+			indicator = display.ColorTreeIndicator("└─")
 		}
 
 		// Determine type label
 		typeLabel := formatVerboseType(child)
 
-		fmt.Fprintf(w, "%s %d  %s\n", indicator, child.Version.ID, typeLabel)
+		fmt.Fprintf(w, "%s %d  %s\n", indicator, child.Version.ID, display.ColorVersionType(typeLabel))
 		printVerboseChildDetails(w, child, isLastChild)
 	}
 
@@ -575,14 +596,14 @@ func formatVerboseType(child VersionChild) string {
 }
 
 func printVerboseDetails(w io.Writer, digest string, tags []string, created string, size int64, hasChildren bool) {
-	prefix := "│  "
+	prefix := display.ColorTreeIndicator("│  ")
 	if !hasChildren {
 		prefix = "   "
 	}
 
-	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, digest)
+	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, display.ColorDigest(digest))
 	if len(tags) > 0 {
-		fmt.Fprintf(w, "%sTags:    %s\n", prefix, display.FormatTags(tags))
+		fmt.Fprintf(w, "%sTags:    %s\n", prefix, display.ColorTags(tags))
 	}
 	if size > 0 {
 		fmt.Fprintf(w, "%sSize:    %s\n", prefix, formatSize(size))
@@ -592,12 +613,12 @@ func printVerboseDetails(w io.Writer, digest string, tags []string, created stri
 }
 
 func printVerboseChildDetails(w io.Writer, child VersionChild, isLast bool) {
-	prefix := "│  "
+	prefix := display.ColorTreeIndicator("│  ")
 	if isLast {
 		prefix = "   "
 	}
 
-	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, child.Version.Name)
+	fmt.Fprintf(w, "%sDigest:  %s\n", prefix, display.ColorDigest(child.Version.Name))
 	if child.Size > 0 {
 		fmt.Fprintf(w, "%sSize:    %s\n", prefix, formatSize(child.Size))
 	}

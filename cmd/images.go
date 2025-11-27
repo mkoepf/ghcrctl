@@ -94,7 +94,7 @@ func outputTable(w io.Writer, packages []string, owner string) error {
 	for _, pkg := range packages {
 		fmt.Fprintf(w, "  %s\n", pkg)
 	}
-	fmt.Fprintf(w, "\nTotal: %d image(s)\n", len(packages))
+	fmt.Fprintf(w, "\nTotal: %s image(s)\n", display.ColorCount(len(packages)))
 
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mhk/ghcrctl/internal/config"
 	"github.com/mhk/ghcrctl/internal/discovery"
+	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
 	"github.com/mhk/ghcrctl/internal/graph"
@@ -299,17 +300,18 @@ Examples:
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "\n")
 		displayGraphSummary(cmd.OutOrStdout(), g)
-		fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %d version(s) will be deleted\n\n", len(versionIDs))
+		fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
+			display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
 		// Handle dry-run
 		if deleteDryRun {
-			fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
+			fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
 			return nil
 		}
 
 		// Confirm deletion unless --force is used
 		if !deleteForce {
-			confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), "Are you sure you want to delete this graph?")
+			confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this graph?"))
 			if err != nil {
 				return fmt.Errorf("failed to read confirmation: %w", err)
 			}
@@ -327,7 +329,8 @@ Examples:
 			return err
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "\nSuccessfully deleted %d version(s) of %s\n", len(versionIDs), imageName)
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n",
+			display.ColorSuccess(fmt.Sprintf("Successfully deleted %d version(s) of %s", len(versionIDs), imageName)))
 		return nil
 	},
 }
@@ -378,13 +381,13 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 
 	// Handle dry-run
 	if deleteDryRun {
-		fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
+		fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
 		return nil
 	}
 
 	// Confirm deletion unless --force is used
 	if !deleteForce {
-		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), "Are you sure you want to delete this version?")
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this version?"))
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
 		}
@@ -402,7 +405,7 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 		return fmt.Errorf("failed to delete package version: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Successfully deleted version %d of %s\n", versionID, imageName)
+	fmt.Fprintln(cmd.OutOrStdout(), display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", versionID, imageName)))
 	return nil
 }
 
@@ -432,7 +435,8 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 	}
 
 	// Display summary of what will be deleted
-	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete %d package version(s):\n", len(matchingVersions))
+	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete %s package version(s):\n",
+		display.ColorWarning(fmt.Sprintf("%d", len(matchingVersions))))
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s\n", imageName)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Owner: %s (%s)\n\n", owner, ownerType)
 
@@ -451,13 +455,14 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 
 	// Handle dry-run
 	if deleteDryRun {
-		fmt.Fprintln(cmd.OutOrStdout(), "DRY RUN: No changes made")
+		fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
 		return nil
 	}
 
 	// Confirm deletion unless --force is used
 	if !deleteForce {
-		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), fmt.Sprintf("Are you sure you want to delete %d version(s)?", len(matchingVersions)))
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(),
+			display.ColorWarning(fmt.Sprintf("Are you sure you want to delete %d version(s)?", len(matchingVersions))))
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
 		}
@@ -475,7 +480,7 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 		fmt.Fprintf(cmd.OutOrStdout(), "Deleting version %d/%d (ID: %d)...\n", i+1, len(matchingVersions), ver.ID)
 		err := client.DeletePackageVersion(ctx, owner, ownerType, imageName, ver.ID)
 		if err != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Failed: %v\n", err)
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
 			failCount++
 		} else {
 			successCount++
@@ -484,7 +489,14 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 
 	// Summary
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %d succeeded, %d failed\n", successCount, failCount)
+	if failCount > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %s succeeded, %s failed\n",
+			display.ColorSuccess(fmt.Sprintf("%d", successCount)),
+			display.ColorError(fmt.Sprintf("%d", failCount)))
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %s succeeded\n",
+			display.ColorSuccess(fmt.Sprintf("%d", successCount)))
+	}
 
 	if failCount > 0 {
 		return fmt.Errorf("failed to delete %d version(s)", failCount)

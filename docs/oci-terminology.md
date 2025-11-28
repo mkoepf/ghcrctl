@@ -82,6 +82,37 @@ Common attestation types:
 - **sbom** - Software Bill of Materials (SPDX format)
 - **provenance** - SLSA build provenance
 
+## Known OCI Artifact Types
+
+The OCI ecosystem supports various artifact types that can be attached to images:
+
+| Type | Predicate/Format | Tools | Storage Method |
+|------|------------------|-------|----------------|
+| **SBOM (SPDX)** | `https://spdx.dev/Document` | buildx, syft | Index or Referrers API |
+| **SBOM (CycloneDX)** | CycloneDX schema | syft, trivy | Referrers API |
+| **Provenance** | `https://slsa.dev/provenance/v1` | buildx | Index or Referrers API |
+| **Signature** | - | cosign, notation | Referrers API (tag fallback) |
+| **Vulnerability Scan** | `cosign.sigstore.dev/attestation/vuln/v1` | trivy, grype | Referrers API |
+| **OpenVEX** | OpenVEX schema | vexctl | Referrers API |
+| **Custom Attestations** | Any URI | cosign | Referrers API |
+
+### What ghcrctl Currently Supports
+
+ghcrctl discovers artifacts stored **within the image index** (Docker buildx style):
+- ✅ SBOM attestations
+- ✅ Provenance attestations
+- ✅ Platform manifests
+
+**Not yet supported** (OCI 1.1 Referrers API):
+- ❌ Cosign signatures (stored via Referrers API or tag schema)
+- ❌ Vulnerability scan results
+- ❌ External SBOMs attached after build
+- ❌ Other referrer-based artifacts
+
+The key difference is **when** the artifact is attached:
+- **Build-time** (buildx): Embedded in index → ghcrctl sees it
+- **Post-build** (cosign, trivy): Attached via Referrers API → ghcrctl doesn't see it yet
+
 ## Why We Use a Single TYPE Column
 
 The `versions` command displays a single TYPE column showing the artifact's **role**:

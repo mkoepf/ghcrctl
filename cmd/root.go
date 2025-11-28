@@ -9,6 +9,9 @@ import (
 )
 
 var (
+	// Version is set at build time via ldflags
+	// Example: go build -ldflags "-X github.com/mkoepf/ghcrctl/cmd.Version=v1.0.0"
+	Version     = "dev"
 	logAPICalls bool
 )
 
@@ -41,6 +44,9 @@ func Execute() {
 }
 
 func init() {
+	// Set version for --version flag
+	rootCmd.Version = Version
+
 	// Add persistent flag for API call logging
 	rootCmd.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 }

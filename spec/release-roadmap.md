@@ -24,22 +24,12 @@ This document outlines what needs to be done before releasing ghcrctl v1.0 to th
 
 ## MUST-HAVE (Before Public Release)
 
-### 1. Add `--version` flag
+### 1. ~~Add `--version` flag~~ ✅ DONE
 
-**Issue:** No way to identify which version is running.
-
-**Impact:** Users can't report bugs accurately or verify they have the latest version.
-
-**Solution:** Add version variable with ldflags injection:
-```go
-var version = "dev"
-
-func init() {
-    rootCmd.Version = version
-}
+Version flag implemented in `cmd/root.go`. Build with ldflags:
+```bash
+go build -ldflags "-X github.com/mkoepf/ghcrctl/cmd.Version=v1.0.0"
 ```
-
-Build with: `go build -ldflags "-X main.version=v1.0.0"`
 
 ---
 
@@ -133,7 +123,7 @@ These TODOs exist in the codebase:
 
 ### Pre-Release
 
-- [ ] Add `--version` flag with build-time injection
+- [x] Add `--version` flag with build-time injection
 - [x] Unify repository/module path
 - [ ] Update README with `go install` instructions
 - [ ] Remove unused `BuildGraph` stub

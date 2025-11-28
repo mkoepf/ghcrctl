@@ -65,16 +65,13 @@ func TestRootCommandHelp(t *testing.T) {
 }
 
 func TestRootCommandVersion(t *testing.T) {
-	// Test that root command can be executed
-	// We're testing the Cobra command structure, not Execute()
-	// which calls os.Exit and is hard to test
-
-	if rootCmd == nil {
-		t.Error("rootCmd should not be nil")
+	// Test that --version flag is available and returns version info
+	if rootCmd.Version == "" {
+		t.Error("rootCmd.Version should not be empty")
 	}
 
-	// Verify it's a valid cobra command
-	if rootCmd.Use == "" {
-		t.Error("rootCmd.Use should not be empty")
+	// Version should be set (either "dev" or injected at build time)
+	if rootCmd.Version != "dev" && !strings.HasPrefix(rootCmd.Version, "v") {
+		t.Errorf("Expected version to be 'dev' or start with 'v', got %q", rootCmd.Version)
 	}
 }

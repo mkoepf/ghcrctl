@@ -1,234 +1,141 @@
-# Plan: Support Additional OCI Artifact Types
+# Plan: Unified OCI Artifact Type Recognition
 
-This document outlines the plan to expand ghcrctl's support for OCI artifact types beyond buildx-embedded attestations.
+This document outlines the plan to ensure ghcrctl correctly recognizes and displays all OCI artifact types that may appear on GHCR, using consistent OCI terminology.
+
+## Scope
+
+**Target registry**: GitHub Container Registry (GHCR) only.
+
+**Goal**: Recognize and display artifact types consistently with OCI terminology, even if ghcrctl cannot currently discover all artifact types through GHCR's APIs.
 
 ## Current State
 
-ghcrctl currently discovers artifacts stored **within the image index** (Docker buildx style):
+### What ghcrctl discovers
+
+ghcrctl discovers artifacts stored **within the image index** (Docker buildx style):
 - ✅ SBOM attestations (in-toto format via buildx)
 - ✅ Provenance attestations (SLSA format via buildx)
-- ✅ Platform manifests (multi-arch)
+- ✅ Platform manifests (multi-arch images)
 
-**Not supported:**
-- ❌ Cosign signatures
+### What ghcrctl cannot discover (GHCR limitation)
+
+GHCR does **not** support the OCI 1.1 Referrers API:
+- Requests to `/v2/<name>/referrers/<digest>` return 303 redirect → 404
+
+This means ghcrctl cannot discover:
+- ❌ Cosign signatures (attached via `cosign sign`)
 - ❌ Notation signatures
-- ❌ Vulnerability scan results
-- ❌ External SBOMs attached post-build
+- ❌ Vulnerability scan results (attached via `cosign attest`)
+- ❌ External SBOMs attached post-build (via cosign/oras)
 - ❌ Any artifact attached via OCI Referrers API
 
-## Goal
+### Type recognition vs discovery
 
-Support all common OCI artifact types by implementing the OCI 1.1 Referrers API.
-
----
-
-## Phase 1: Create Test Images with Additional Artifact Types
-
-### 1.1 Update `prepare_integration_test.yml`
-
-Add workflow steps to create test images with:
-
-#### Cosign Signature
-```yaml
-- name: Sign image with Cosign
-  env:
-    COSIGN_EXPERIMENTAL: "true"
-  run: |
-    cosign sign --yes ghcr.io/${{ github.repository_owner }}/ghcrctl-test-signed:latest
-```
-
-#### Vulnerability Scan Result (Trivy)
-```yaml
-- name: Attach vulnerability scan
-  run: |
-    trivy image --format cosign-vuln --output vuln.json ghcr.io/${{ github.repository_owner }}/ghcrctl-test-with-sbom:latest
-    cosign attest --predicate vuln.json --type vuln ghcr.io/${{ github.repository_owner }}/ghcrctl-test-with-sbom:latest
-```
-
-#### External SBOM (Syft via Cosign)
-```yaml
-- name: Generate and attach SBOM with Syft
-  run: |
-    syft ghcr.io/${{ github.repository_owner }}/ghcrctl-test-no-sbom:latest -o spdx-json > sbom.json
-    cosign attest --predicate sbom.json --type spdxjson ghcr.io/${{ github.repository_owner }}/ghcrctl-test-no-sbom:latest
-```
-
-### 1.2 New Test Images
-
-| Image Name | Artifact Types | Purpose |
-|------------|----------------|---------|
-| `ghcrctl-test-signed` | Cosign signature | Test signature discovery |
-| `ghcrctl-test-with-vuln` | Vuln scan + SBOM + provenance | Test multiple referrers |
-| `ghcrctl-test-external-sbom` | SBOM via Cosign (not buildx) | Test Referrers API SBOM |
+Even though we can't discover all artifact types, we should recognize them correctly when:
+1. Processing manifest media types
+2. Displaying artifact information
+3. Future GHCR API support
 
 ---
 
-## Phase 2: Implement OCI Referrers API Support
+## Implementation Plan
 
-### 2.1 Add Referrers Discovery to `internal/oras/resolver.go`
+### Phase 1: Artifact Type Mapping ✅ DONE
 
-```go
-// DiscoverReferrers queries the OCI Referrers API for artifacts attached to a digest.
-// Returns artifacts discovered via /v2/<name>/referrers/<digest>
-func DiscoverReferrers(ctx context.Context, imageRef string, digest string) ([]ReferrerInfo, error) {
-    // 1. Try OCI Referrers API: GET /v2/<name>/referrers/<digest>
-    // 2. Fall back to tag schema: GET /v2/<name>/manifests/sha256-<digest>
-    // 3. Parse response as OCI Index
-    // 4. Return list of referrers with artifactType
-}
-
-type ReferrerInfo struct {
-    Digest       string
-    ArtifactType string // e.g., "application/vnd.dev.cosign.simplesigning.v1+json"
-    Annotations  map[string]string
-}
-```
-
-### 2.2 Artifact Type Mapping
-
-Map OCI artifact types to display names:
+Map OCI media types to human-readable display names:
 
 ```go
-var artifactTypeNames = map[string]string{
-    "application/vnd.dev.cosign.simplesigning.v1+json": "signature",
-    "application/vnd.in-toto+json":                      "attestation",
-    "application/spdx+json":                             "sbom",
-    "application/vnd.cyclonedx+json":                    "sbom",
-    "application/sarif+json":                            "vuln-scan",
-    "application/vnd.dev.sigstore.verificationmaterial": "signature",
-}
-```
-
-### 2.3 Integrate into Graph Building
-
-Update `buildVersionGraphs` in `cmd/versions.go`:
-
-```go
-func buildVersionGraphs(ctx context.Context, fullImage string, ...) ([]VersionGraph, error) {
-    // Existing: discover children from index manifests array
-
-    // NEW: Also discover referrers for the root digest
-    referrers, err := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
-    if err == nil {
-        for _, ref := range referrers {
-            // Add referrer as child with appropriate type
-            child := VersionChild{
-                Version:      lookupVersionByDigest(ref.Digest),
-                ArtifactType: mapArtifactType(ref.ArtifactType),
-                IsReferrer:   true, // NEW field to distinguish from index children
-            }
-            graph.Children = append(graph.Children, child)
-        }
+// determineArtifactType in internal/oras/resolver.go
+func determineArtifactType(mediaType string) string {
+    // SBOM types
+    if strings.Contains(mediaType, "spdx") || strings.Contains(mediaType, "cyclonedx") {
+        return "sbom"
     }
-}
-```
-
-### 2.4 Update VersionChild Structure
-
-```go
-type VersionChild struct {
-    Version      gh.PackageVersionInfo
-    ArtifactType string
-    Platform     string
-    RefCount     int
-    IsReferrer   bool   // NEW: true if discovered via Referrers API
-    Subject      string // NEW: digest this artifact refers to (for referrers)
-}
-```
-
----
-
-## Phase 3: Display and Delete Support
-
-### 3.1 Display Referrers in `versions` Output
-
-```
-  VERSION ID  TYPE         DIGEST        TAGS  CREATED
-  ----------  -----------  ------------  ----  -------------------
-┌ 585861918   index        01af50cc8b0d  []    2025-01-15 10:30:45
-├ 585861919   linux/amd64  62f946a8267d  []    2025-01-15 10:30:44
-├ 585861921   sbom         9a1636d22702  []    2025-01-15 10:30:46
-├ 585861922   provenance   9a1636d22702  []    2025-01-15 10:30:46
-├ 585861923   signature    abc123def456  []    2025-01-15 10:31:00  ← NEW (via Referrers API)
-└ 585861924   vuln-scan    def456abc123  []    2025-01-15 10:32:00  ← NEW (via Referrers API)
-```
-
-### 3.2 Include Referrers in `delete graph`
-
-When deleting a graph, also delete referrers that point to versions being deleted:
-
-```go
-func collectVersionsToDelete(graph *VersionGraph) []int64 {
-    ids := []int64{graph.RootVersion.ID}
-
-    for _, child := range graph.Children {
-        // Include both index children and referrers
-        ids = append(ids, child.Version.ID)
+    // Provenance types
+    if strings.Contains(mediaType, "in-toto") || strings.Contains(mediaType, "slsa") {
+        return "provenance"
     }
-
-    return ids
+    // Signature types (cosign, sigstore)
+    if strings.Contains(mediaType, "cosign") || strings.Contains(mediaType, "sigstore") {
+        return "signature"
+    }
+    // Vulnerability scan types (SARIF)
+    if strings.Contains(mediaType, "sarif") {
+        return "vuln-scan"
+    }
+    return "unknown"
 }
 ```
 
-### 3.3 Color Coding for Referrers
+**Status**: Implemented in commit `49169e9`.
 
-Add new color for referrer-based artifacts (to distinguish from index children):
+### Phase 2: Display Color Coding ✅ DONE
 
-```go
-// In internal/display/color.go
-colorReferrer = color.New(color.FgMagenta) // For signature, vuln-scan, etc.
-```
+Add color support for new artifact types:
 
----
+| Type | Color | Used for |
+|------|-------|----------|
+| index | Cyan | Multi-arch image indexes |
+| platform | Green | Platform-specific manifests (linux/amd64, etc.) |
+| sbom | Yellow | SBOM attestations |
+| provenance | Yellow | Provenance attestations |
+| attestation | Yellow | Generic attestations |
+| signature | Magenta | Cosign/sigstore signatures |
+| vuln-scan | Magenta | Vulnerability scan results |
 
-## Phase 4: Testing
+**Status**: Implemented in commit `74d52f4`.
 
-### 4.1 Unit Tests
+### Phase 3: Ensure Type Consistency in ResolveType
 
-- `TestDiscoverReferrers` - Mock Referrers API responses
-- `TestArtifactTypeMapping` - Verify type name resolution
-- `TestGraphBuildingWithReferrers` - Combined index + referrers
+Update `ResolveType` in `internal/oras/types.go` to handle signature and vuln-scan types when determining attestation roles.
 
-### 4.2 Integration Tests
+Current `determineAttestationRole` returns:
+- "sbom" for spdx/cyclonedx predicates
+- "provenance" for slsa/provenance predicates
+- "vuln-scan" for vuln predicates
+- "attestation" as default
 
-- Verify signature discovery on `ghcrctl-test-signed`
-- Verify vuln scan discovery on `ghcrctl-test-with-vuln`
-- Verify external SBOM discovery on `ghcrctl-test-external-sbom`
-- Verify `delete graph` removes referrers
+**Action needed**: Verify that signature artifacts would be correctly identified if they appeared in an image index. Currently, cosign signatures don't appear in buildx-style indexes, so this is future-proofing.
 
----
+### Phase 4: Documentation
 
-## Implementation Order
-
-1. **Phase 1.1**: Update workflow to create signed test image
-2. **Phase 2.1**: Implement `DiscoverReferrers` function
-3. **Phase 2.2**: Add artifact type mapping
-4. **Phase 2.3**: Integrate into graph building
-5. **Phase 3.1**: Update display to show referrers
-6. **Phase 1.2**: Add remaining test images (vuln, external SBOM)
-7. **Phase 3.2**: Update delete to handle referrers
-8. **Phase 4**: Add tests
+Update documentation to explain:
+1. What artifact types ghcrctl can discover (buildx-style only)
+2. What artifact types ghcrctl recognizes for display
+3. GHCR's lack of OCI 1.1 Referrers API support
 
 ---
 
-## Notes
+## Future Considerations
 
-### GHCR Referrers API Support
+### If GHCR adds Referrers API support
 
-GitHub Container Registry supports the OCI Referrers API as of 2024. Verify with:
-```bash
-curl -H "Authorization: Bearer $GITHUB_TOKEN" \
-  https://ghcr.io/v2/<owner>/<image>/referrers/sha256:<digest>
-```
+If GHCR implements the OCI 1.1 Referrers API in the future:
 
-### Fallback Tag Schema
+1. Update `DiscoverReferrers` to call the Referrers API endpoint
+2. Merge discovered referrers with buildx-style attestations
+3. Add `IsReferrer` field to `VersionChild` if needed to distinguish discovery method
 
-For registries without Referrers API, cosign uses tag-based fallback:
-- Tag format: `sha256-<digest>.sig` for signatures
-- Tag format: `sha256-<digest>.att` for attestations
+### Fallback tag schema
 
-ghcrctl should support both discovery methods.
+Cosign uses a fallback tag schema for registries without Referrers API:
+- `sha256-<digest>.sig` for signatures
+- `sha256-<digest>.att` for attestations
 
-### Shared Referrers
+This is **not** planned for implementation because:
+1. These artifacts don't have GHCR version IDs
+2. They can't be managed through GitHub's package API
+3. Discovery would require listing all tags and pattern matching
 
-Referrers can potentially be shared (e.g., same signature for multiple digests). The `RefCount` mechanism should apply to referrers as well.
+---
+
+## Summary
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Artifact type mapping (media type → display name) | ✅ Done |
+| 2 | Display color coding for new types | ✅ Done |
+| 3 | Verify ResolveType handles all types | 🔲 To verify |
+| 4 | Documentation | 🔲 Pending |
+
+The implementation is **forward-compatible**: when/if GHCR adds support for OCI 1.1 Referrers API or other artifact attachment methods, the type recognition and display code is ready.

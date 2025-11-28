@@ -403,7 +403,7 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		if idLen := len(fmt.Sprintf("%d", ver.ID)); idLen > maxIDLen {
 			maxIDLen = idLen
 		}
-		if typeLen := len(determineVersionType(ver, g.Type)); typeLen > maxTypeLen {
+		if typeLen := len(g.Type); typeLen > maxTypeLen {
 			maxTypeLen = typeLen
 		}
 		digest := display.ShortDigest(ver.Name)
@@ -520,7 +520,7 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, sharedIndicatorWid
 	}
 
 	// Print root version (refCount=0 means not a child, so no sharing indicator)
-	printVersion(w, rootIndicator, g.RootVersion, determineVersionType(g.RootVersion, g.Type),
+	printVersion(w, rootIndicator, g.RootVersion, g.Type,
 		maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen, 0)
 
 	// Print children
@@ -610,8 +610,7 @@ func printVerboseGraph(w io.Writer, g VersionGraph, isLast bool) {
 	hasChildren := len(g.Children) > 0
 
 	// Print root version with colored tree indicators and type
-	// Use determineVersionType for consistency with table output
-	versionType := determineVersionType(g.RootVersion, g.Type)
+	versionType := g.Type
 	if hasChildren {
 		fmt.Fprintf(w, "%s %d  %s\n",
 			display.ColorTreeIndicator("┌─"),
@@ -696,20 +695,6 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%d bytes", bytes)
 	}
-}
-
-func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
-	// graphType now contains the actual resolved type from ResolveType()
-	// This can be "index", "manifest", or a platform string like "linux/amd64"
-	// For index types discovered via discoverRelatedVersionsByDigest, return "index"
-	if graphType == "index" {
-		return "index"
-	}
-
-	// For standalone manifests, graphType already contains the display type
-	// from ResolveType().DisplayType() (e.g., "linux/amd64", "sbom", etc.)
-	// Return it directly
-	return graphType
 }
 
 // parseUserDate parses a date string in multiple user-friendly formats

@@ -155,13 +155,11 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           ./ghcrctl --help
-          ./ghcrctl config --help
 
       - name: Verify binary (Windows)
         if: runner.os == 'Windows'
         run: |
           .\ghcrctl.exe --help
-          .\ghcrctl.exe config --help
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5

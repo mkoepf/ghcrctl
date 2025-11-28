@@ -135,20 +135,29 @@ This command shows all package versions in GHCR organized by their OCI relations
 ```
 Versions for myimage:
 
-  VERSION ID  TYPE         DIGEST        TAGS                          CREATED
-  ----------  -----------  ------------  ----------------------------  -------------------
-┌ 585861918   index        01af50cc8b0d  [v1.0.0, latest]              2025-01-15 10:30:45
-├ 585861919   linux/amd64  62f946a8267d  []                            2025-01-15 10:30:44
-├ 585861920   linux/arm64  89c3b5f1a432  []                            2025-01-15 10:30:44
-├ 585861921   sbom         9a1636d22702  []                            2025-01-15 10:30:46
-└ 585861922   provenance   9a1636d22702  []                            2025-01-15 10:30:46
+  VERSION ID       TYPE         DIGEST        TAGS                          CREATED
+  ---------------  -----------  ------------  ----------------------------  -------------------
+┌ 585861918        index        01af50cc8b0d  [v1.0.0, latest]              2025-01-15 10:30:45
+├ 585861919        linux/amd64  62f946a8267d  []                            2025-01-15 10:30:44
+├ 585861920        linux/arm64  89c3b5f1a432  []                            2025-01-15 10:30:44
+├ 585861921        sbom         9a1636d22702  []                            2025-01-15 10:30:46
+└ 585861922        provenance   9a1636d22702  []                            2025-01-15 10:30:46
 
-┌ 585850123   index        abc123def456  [v0.9.0]                      2025-01-14 15:20:10
-├ 585850124   linux/amd64  def456abc123  []                            2025-01-14 15:20:09
-└ 585850125   linux/arm64  789xyz123456  []                            2025-01-14 15:20:09
+┌ 585850123        index        abc123def456  [v0.9.0]                      2025-01-14 15:20:10
+├ 585861919 (2*)   linux/amd64  62f946a8267d  []                            2025-01-15 10:30:44
+└ 585861920 (2*)   linux/arm64  89c3b5f1a432  []                            2025-01-15 10:30:44
 
-Total: 8 version(s) in 2 graph(s)
+Total: 7 versions in 2 graphs. 2 versions appear in multiple graphs.
 ```
+
+**Shared manifests:**
+
+When multiple image indexes reference the same platform manifests (e.g., two tags pointing to the same underlying builds), those shared versions are marked with `(N*)` where N indicates how many graphs reference them. This is common when:
+- Multiple tags point to the same multi-arch image
+- An image is re-tagged without rebuilding
+- Different index manifests share platform manifests
+
+The summary line reports the count of distinct versions and how many appear in multiple graphs.
 
 **Filter options:**
 ```bash
@@ -369,8 +378,9 @@ Delete an individual package version by version ID or digest:
 # Delete by version ID
 ghcrctl delete version myimage 12345678
 
-# Delete by digest
+# Delete by digest (full or short format)
 ghcrctl delete version myimage --digest sha256:abc123...
+ghcrctl delete version myimage --digest abc123  # short form from DIGEST column
 
 # Skip confirmation prompt
 ghcrctl delete version myimage 12345678 --force
@@ -378,6 +388,18 @@ ghcrctl delete version myimage 12345678 --force
 # Preview what would be deleted (dry-run)
 ghcrctl delete version myimage 12345678 --dry-run
 ```
+
+The command shows how many graphs the version belongs to:
+```
+Preparing to delete package version:
+  Image:      myimage
+  Owner:      myorg (org)
+  Version ID: 12345678
+  Tags:       []
+  Graphs:     2 graphs
+```
+
+If a version belongs to multiple graphs, deleting it will affect all those graphs.
 
 **Use cases:**
 - Remove specific untagged versions (e.g., orphaned attestations)
@@ -477,9 +499,11 @@ ghcrctl delete graph myimage v1.0.0 --dry-run
 **What gets deleted:**
 
 For a multi-arch image with attestations, this command discovers and deletes:
-1. All attestations (SBOM, provenance) - deleted first
-2. All platform manifests (linux/amd64, linux/arm64, etc.)
+1. All **exclusive** attestations (SBOM, provenance) - deleted first
+2. All **exclusive** platform manifests (linux/amd64, linux/arm64, etc.)
 3. The root image index or manifest - deleted last
+
+**Shared manifests are preserved:** If a platform manifest or attestation is referenced by multiple graphs (e.g., two tags share the same builds), those shared artifacts are NOT deleted. They remain available for the other graphs that still reference them. Only when deleting the last graph that references a shared artifact will it be deleted.
 
 Example output:
 ```bash
@@ -493,11 +517,11 @@ Root (Image): sha256:01af50c...
   Tags: [v1.0.0]
   Version ID: 585861918
 
-Platforms (2):
+Platforms to delete (2):
   - linux/amd64 (version 585861919)
   - linux/arm64 (version 585861920)
 
-Attestations (2):
+Attestations to delete (2):
   - sbom (version 585861921)
   - provenance (version 585861922)
 
@@ -505,6 +529,27 @@ Total: 5 version(s) will be deleted
 
 Are you sure you want to delete this graph? [y/N]:
 ```
+
+**Example with shared manifests:**
+```bash
+$ ghcrctl delete graph myimage v0.9.0 --dry-run
+
+Preparing to delete complete OCI graph:
+  Image: myimage
+
+Root (Image): sha256:abc123d...
+  Version ID: 585850123
+
+Shared artifacts (preserved, used by other graphs):
+  - linux/amd64 (version 585861919, shared by 2 graphs)
+  - linux/arm64 (version 585861920, shared by 2 graphs)
+
+Total: 1 version(s) will be deleted
+
+DRY RUN: No changes made
+```
+
+In this example, only the root index is deleted because the platform manifests are shared with another graph (v1.0.0).
 
 **Use cases:**
 - Remove an entire release (tag)

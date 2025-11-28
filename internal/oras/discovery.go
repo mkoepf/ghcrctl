@@ -181,10 +181,17 @@ func determineRolesFromManifest(ctx context.Context, repo *remote.Repository, de
 	// Collect all unique roles from layers
 	roleSet := make(map[string]bool)
 
-	// Check layer annotations - buildx stores predicate type in layers
+	// Check layer annotations for predicate type
+	// buildx uses "in-toto.io/predicate-type", cosign uses "predicateType"
 	for _, layer := range manifest.Layers {
 		if layer.Annotations != nil {
+			// Check buildx annotation key
 			if predType, ok := layer.Annotations["in-toto.io/predicate-type"]; ok {
+				role := predicateTypeToRole(predType)
+				roleSet[role] = true
+			}
+			// Check cosign annotation key
+			if predType, ok := layer.Annotations["predicateType"]; ok {
 				role := predicateTypeToRole(predType)
 				roleSet[role] = true
 			}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mhk/ghcrctl/internal/logging"
+	"github.com/mkoepf/ghcrctl/internal/logging"
 	"github.com/spf13/cobra"
 )
 

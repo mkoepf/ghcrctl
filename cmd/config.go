@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/spf13/cobra"
 )
 

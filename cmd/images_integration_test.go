@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/config"
 )
 
 // TestImagesCommandWithRepoScopedToken tests that images command works with valid token

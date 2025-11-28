@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/discovery"
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/discovery"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // TestDeleteCommandStructure verifies the delete command is properly set up

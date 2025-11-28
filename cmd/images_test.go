@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/display"
+	"github.com/mkoepf/ghcrctl/internal/display"
 )
 
 func TestImagesCommandStructure(t *testing.T) {

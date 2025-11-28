@@ -23,7 +23,7 @@ ghcrctl provides functionality for:
 ### From Source
 
 ```bash
-git clone https://github.com/mhk/ghcrctl.git
+git clone https://github.com/mkoepf/ghcrctl.git
 cd ghcrctl
 go build -o ghcrctl .
 ```

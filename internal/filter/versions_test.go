@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mhk/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/stretchr/testify/assert"
 )
 

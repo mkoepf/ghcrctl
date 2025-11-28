@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/config"
 )
 
 // TestProvenanceCommandWithImage tests provenance command against real image with provenance

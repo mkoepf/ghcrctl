@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mhk/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
 // VersionFilter defines filtering criteria for package versions

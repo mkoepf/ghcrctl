@@ -43,21 +43,9 @@ Build with: `go build -ldflags "-X main.version=v1.0.0"`
 
 ---
 
-### 2. Fix module path inconsistency
+### 2. ~~Fix module path inconsistency~~ ✅ DONE
 
-**Issue:** Module path mismatch between code and documentation.
-
-| Location | Value |
-|----------|-------|
-| `go.mod` | `github.com/mhk/ghcrctl` |
-| README badges | `github.com/mkoepf/ghcrctl` |
-
-**Impact:**
-- `go install` won't work
-- Badges may be broken
-- Confusing for contributors
-
-**Solution:** Pick one canonical path and update all references.
+Module path unified to `github.com/mkoepf/ghcrctl` across all files.
 
 ---
 
@@ -146,7 +134,7 @@ These TODOs exist in the codebase:
 ### Pre-Release
 
 - [ ] Add `--version` flag with build-time injection
-- [ ] Unify repository/module path
+- [x] Unify repository/module path
 - [ ] Update README with `go install` instructions
 - [ ] Remove unused `BuildGraph` stub
 - [ ] Add goreleaser configuration

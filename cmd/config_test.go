@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/config"
 )
 
 func TestConfigOrgCommandExecution(t *testing.T) {

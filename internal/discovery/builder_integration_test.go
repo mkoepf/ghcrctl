@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // Integration tests for GraphBuilder that require GITHUB_TOKEN

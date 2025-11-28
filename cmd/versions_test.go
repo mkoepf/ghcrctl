@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // TestDiscoverRelatedVersionsByDigest verifies that we can discover relationships

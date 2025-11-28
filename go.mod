@@ -1,4 +1,4 @@
-module github.com/mhk/ghcrctl
+module github.com/mkoepf/ghcrctl
 
 go 1.23.0
 

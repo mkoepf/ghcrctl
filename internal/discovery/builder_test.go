@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // mockGHClient is a mock implementation of gh.Client for testing

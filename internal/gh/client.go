@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v58/github"
-	"github.com/mhk/ghcrctl/internal/logging"
+	"github.com/mkoepf/ghcrctl/internal/logging"
 )
 
 // Client wraps the GitHub API client

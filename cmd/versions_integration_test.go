@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mhk/ghcrctl/internal/config"
-	"github.com/mhk/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
 // Integration tests for the versions command

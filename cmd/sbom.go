@@ -7,10 +7,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/mhk/ghcrctl/internal/config"
-	"github.com/mhk/ghcrctl/internal/display"
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/config"
+	"github.com/mkoepf/ghcrctl/internal/display"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
 

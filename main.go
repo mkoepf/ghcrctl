@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mhk/ghcrctl/cmd"
+import "github.com/mkoepf/ghcrctl/cmd"
 
 func main() {
 	cmd.Execute()

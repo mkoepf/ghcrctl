@@ -3,8 +3,8 @@ package discovery
 import (
 	"context"
 
-	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // GHClient defines the interface for GitHub API operations needed by GraphBuilder.

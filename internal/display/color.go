@@ -14,6 +14,8 @@ var (
 	colorManifest    = color.New(color.FgBlue)
 	colorPlatform    = color.New(color.FgGreen)
 	colorAttestation = color.New(color.FgYellow)
+	colorSignature   = color.New(color.FgMagenta)
+	colorVulnScan    = color.New(color.FgMagenta)
 
 	// Tag colors
 	colorTag      = color.New(color.FgGreen, color.Bold)
@@ -41,6 +43,8 @@ var (
 // - manifest: blue
 // - platforms (linux/amd64, etc.): green
 // - attestations (sbom, provenance): yellow
+// - signatures: magenta
+// - vuln-scan: magenta
 func ColorVersionType(versionType string) string {
 	lower := strings.ToLower(versionType)
 
@@ -55,6 +59,10 @@ func ColorVersionType(versionType string) string {
 	case lower == "sbom" || lower == "provenance" || lower == "attestation" ||
 		strings.HasPrefix(lower, "attestation:"):
 		return colorAttestation.Sprint(versionType)
+	case lower == "signature":
+		return colorSignature.Sprint(versionType)
+	case lower == "vuln-scan":
+		return colorVulnScan.Sprint(versionType)
 	default:
 		return versionType
 	}

@@ -62,6 +62,16 @@ func TestColorVersionType(t *testing.T) {
 			versionType: "attestation: sbom",
 			expected:    "attestation: sbom",
 		},
+		{
+			name:        "signature type",
+			versionType: "signature",
+			expected:    "signature",
+		},
+		{
+			name:        "vuln-scan type",
+			versionType: "vuln-scan",
+			expected:    "vuln-scan",
+		},
 	}
 
 	for _, tt := range tests {

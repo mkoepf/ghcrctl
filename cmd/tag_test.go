@@ -6,7 +6,13 @@ import (
 )
 
 func TestTagCommandStructure(t *testing.T) {
+	t.Parallel()
 	// Verify tag command exists and is properly structured
+	cmd := NewRootCmd()
+	tagCmd, _, err := cmd.Find([]string{"tag"})
+	if err != nil {
+		t.Fatalf("Failed to find tag command: %v", err)
+	}
 	if tagCmd == nil {
 		t.Fatal("tagCmd should not be nil")
 	}
@@ -25,6 +31,7 @@ func TestTagCommandStructure(t *testing.T) {
 }
 
 func TestTagCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		args      []string
@@ -53,8 +60,9 @@ func TestTagCommandArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			if tt.wantError {
 				if err == nil {
@@ -67,8 +75,6 @@ func TestTagCommandArguments(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 				}
 			}
-
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }

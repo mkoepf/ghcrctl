@@ -20,39 +20,46 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	deleteForce      bool
-	deleteDryRun     bool
-	deleteVersionDig string
-	deleteGraphDig   string
-	deleteGraphVer   int64
-
-	// Filter flags for bulk deletion
-	deleteTagPattern    string
-	deleteOnlyTagged    bool
-	deleteOnlyUntagged  bool
-	deleteOlderThan     string
-	deleteNewerThan     string
-	deleteOlderThanDays int
-	deleteNewerThanDays int
-)
-
-var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete package versions from GitHub Container Registry",
-	Long: `Delete package versions from GitHub Container Registry.
+// newDeleteCmd creates the delete command and its subcommands with isolated flag state.
+func newDeleteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete package versions from GitHub Container Registry",
+		Long: `Delete package versions from GitHub Container Registry.
 
 Use subcommands to delete individual versions or complete OCI graphs.
 
 Available Commands:
   version     Delete a single package version
   graph       Delete an entire OCI artifact graph (image + platforms + attestations)`,
+	}
+
+	// Add subcommands via their factories
+	cmd.AddCommand(newDeleteVersionCmd())
+	cmd.AddCommand(newDeleteGraphCmd())
+
+	return cmd
 }
 
-var deleteVersionCmd = &cobra.Command{
-	Use:   "version <image> [version-id]",
-	Short: "Delete package version(s)",
-	Long: `Delete package version(s) from GitHub Container Registry.
+// newDeleteVersionCmd creates the delete version subcommand with isolated flag state.
+func newDeleteVersionCmd() *cobra.Command {
+	var (
+		force         bool
+		dryRun        bool
+		digest        string
+		tagPattern    string
+		onlyTagged    bool
+		onlyUntagged  bool
+		olderThan     string
+		newerThan     string
+		olderThanDays int
+		newerThanDays int
+	)
+
+	cmd := &cobra.Command{
+		Use:   "version <image> [version-id]",
+		Short: "Delete package version(s)",
+		Long: `Delete package version(s) from GitHub Container Registry.
 
 This command can delete a single version by ID/digest, or multiple versions using filters.
 By default, it will prompt for confirmation before deleting.
@@ -81,82 +88,111 @@ Examples:
 
   # Skip confirmation for bulk deletion
   ghcrctl delete version myimage --untagged --older-than-days 30 --force`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		// Check if any filter flags are set (indicates bulk deletion)
-		filterFlagsSet := deleteOnlyTagged || deleteOnlyUntagged || deleteTagPattern != "" ||
-			deleteOlderThan != "" || deleteNewerThan != "" ||
-			deleteOlderThanDays > 0 || deleteNewerThanDays > 0
+		Args: func(cmd *cobra.Command, args []string) error {
+			// Check if any filter flags are set (indicates bulk deletion)
+			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
+				olderThan != "" || newerThan != "" ||
+				olderThanDays > 0 || newerThanDays > 0
 
-		// If --digest is provided, we need exactly 1 arg (image name)
-		if deleteVersionDig != "" {
-			if len(args) != 1 {
-				return fmt.Errorf("accepts 1 arg(s) when using --digest, received %d", len(args))
+			// If --digest is provided, we need exactly 1 arg (image name)
+			if digest != "" {
+				if len(args) != 1 {
+					return fmt.Errorf("accepts 1 arg(s) when using --digest, received %d", len(args))
+				}
+				return nil
 			}
-			return nil
-		}
 
-		// If filter flags are set (bulk deletion), we need exactly 1 arg (image name)
-		if filterFlagsSet {
-			if len(args) != 1 {
-				return fmt.Errorf("accepts 1 arg (image name) when using filters, received %d", len(args))
+			// If filter flags are set (bulk deletion), we need exactly 1 arg (image name)
+			if filterFlagsSet {
+				if len(args) != 1 {
+					return fmt.Errorf("accepts 1 arg (image name) when using filters, received %d", len(args))
+				}
+				return nil
 			}
-			return nil
-		}
 
-		// Otherwise, we need exactly 2 args (image name and version-id)
-		return cobra.ExactArgs(2)(cmd, args)
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
+			// Otherwise, we need exactly 2 args (image name and version-id)
+			return cobra.ExactArgs(2)(cmd, args)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
 
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to read configuration: %w", err)
+			}
 
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+			}
 
-		// Get GitHub token
-		token, err := gh.GetToken()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
-		// Create GitHub client
-		client, err := gh.NewClientWithContext(cmd.Context(), token)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to create GitHub client: %w", err)
-		}
+			// Create GitHub client
+			client, err := gh.NewClientWithContext(cmd.Context(), token)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to create GitHub client: %w", err)
+			}
 
-		ctx := cmd.Context()
+			ctx := cmd.Context()
 
-		// Check if this is bulk deletion mode
-		filterFlagsSet := deleteOnlyTagged || deleteOnlyUntagged || deleteTagPattern != "" ||
-			deleteOlderThan != "" || deleteNewerThan != "" ||
-			deleteOlderThanDays > 0 || deleteNewerThanDays > 0
+			// Check if this is bulk deletion mode
+			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
+				olderThan != "" || newerThan != "" ||
+				olderThanDays > 0 || newerThanDays > 0
 
-		if filterFlagsSet {
-			// Bulk deletion mode
-			return runBulkDelete(ctx, cmd, client, owner, ownerType, imageName)
-		}
+			if filterFlagsSet {
+				// Bulk deletion mode
+				return runBulkDeleteWithFlags(ctx, cmd, client, owner, ownerType, imageName,
+					tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan,
+					olderThanDays, newerThanDays, force, dryRun)
+			}
 
-		// Single deletion mode
-		return runSingleDelete(ctx, cmd, args, client, owner, ownerType, imageName)
-	},
+			// Single deletion mode
+			return runSingleDeleteWithFlags(ctx, cmd, args, client, owner, ownerType, imageName,
+				digest, force, dryRun)
+		},
+	}
+
+	// Flags for delete version
+	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
+	cmd.Flags().StringVar(&digest, "digest", "", "Delete version by digest")
+
+	// Filter flags for bulk deletion
+	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "Delete versions matching regex pattern")
+	cmd.Flags().BoolVar(&onlyTagged, "tagged", false, "Delete only tagged versions")
+	cmd.Flags().BoolVar(&onlyUntagged, "untagged", false, "Delete only untagged versions")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Delete versions older than date (YYYY-MM-DD or RFC3339)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Delete versions newer than date (YYYY-MM-DD or RFC3339)")
+	cmd.Flags().IntVar(&olderThanDays, "older-than-days", 0, "Delete versions older than N days")
+	cmd.Flags().IntVar(&newerThanDays, "newer-than-days", 0, "Delete versions newer than N days")
+
+	return cmd
 }
 
-var deleteGraphCmd = &cobra.Command{
-	Use:   "graph <image> <tag>",
-	Short: "Delete an entire OCI artifact graph",
-	Long: `Delete an entire OCI artifact graph from GitHub Container Registry.
+// newDeleteGraphCmd creates the delete graph subcommand with isolated flag state.
+func newDeleteGraphCmd() *cobra.Command {
+	var (
+		force     bool
+		dryRun    bool
+		digest    string
+		versionID int64
+	)
+
+	cmd := &cobra.Command{
+		Use:   "graph <image> <tag>",
+		Short: "Delete an entire OCI artifact graph",
+		Long: `Delete an entire OCI artifact graph from GitHub Container Registry.
 
 This command discovers and deletes all versions that make up an OCI artifact graph,
 including the root image/index, platform manifests, and attestations (SBOM, provenance).
@@ -184,76 +220,100 @@ Examples:
 
   # Preview what would be deleted
   ghcrctl delete graph myimage v1.0.0 --dry-run`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		// Count how many lookup methods are provided
-		flagsSet := 0
-		if cmd.Flags().Changed("digest") {
-			flagsSet++
-		}
-		if cmd.Flags().Changed("version") {
-			flagsSet++
-		}
-
-		// If flags are provided, we need exactly 1 arg (image name)
-		if flagsSet > 0 {
-			if flagsSet > 1 {
-				return fmt.Errorf("flags --digest and --version are mutually exclusive")
+		Args: func(cmd *cobra.Command, args []string) error {
+			// Count how many lookup methods are provided
+			flagsSet := 0
+			if cmd.Flags().Changed("digest") {
+				flagsSet++
 			}
-			if len(args) != 1 {
-				return fmt.Errorf("accepts 1 arg when using --digest or --version, received %d", len(args))
-			}
-			return nil
-		}
-
-		// Otherwise, we need exactly 2 args (image name and tag)
-		return cobra.ExactArgs(2)(cmd, args)
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
-
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
-
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
-
-		// Get GitHub token
-		token, err := gh.GetToken()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
-
-		// Create clients
-		ghClient, err := gh.NewClientWithContext(cmd.Context(), token)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to create GitHub client: %w", err)
-		}
-
-		ctx := cmd.Context()
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-
-		// Determine the root digest based on which flag/argument was used
-		var rootDigest string
-		var tag string
-
-		if deleteGraphDig != "" {
-			// Lookup by digest - support both full and short (prefix) format
-			digestInput := deleteGraphDig
-			if !strings.HasPrefix(digestInput, "sha256:") {
-				digestInput = "sha256:" + digestInput
+			if cmd.Flags().Changed("version") {
+				flagsSet++
 			}
 
-			// If it looks like a short digest, resolve to full digest
-			if len(digestInput) < 71 { // sha256: (7) + 64 hex chars = 71
+			// If flags are provided, we need exactly 1 arg (image name)
+			if flagsSet > 0 {
+				if flagsSet > 1 {
+					return fmt.Errorf("flags --digest and --version are mutually exclusive")
+				}
+				if len(args) != 1 {
+					return fmt.Errorf("accepts 1 arg when using --digest or --version, received %d", len(args))
+				}
+				return nil
+			}
+
+			// Otherwise, we need exactly 2 args (image name and tag)
+			return cobra.ExactArgs(2)(cmd, args)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
+
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to read configuration: %w", err)
+			}
+
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+			}
+
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Create clients
+			ghClient, err := gh.NewClientWithContext(cmd.Context(), token)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to create GitHub client: %w", err)
+			}
+
+			ctx := cmd.Context()
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+
+			// Determine the root digest based on which flag/argument was used
+			var rootDigest string
+			var tag string
+
+			if digest != "" {
+				// Lookup by digest - support both full and short (prefix) format
+				digestInput := digest
+				if !strings.HasPrefix(digestInput, "sha256:") {
+					digestInput = "sha256:" + digestInput
+				}
+
+				// If it looks like a short digest, resolve to full digest
+				if len(digestInput) < 71 { // sha256: (7) + 64 hex chars = 71
+					allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("failed to list package versions: %w", err)
+					}
+
+					var found bool
+					for _, ver := range allVersions {
+						if strings.HasPrefix(ver.Name, digestInput) {
+							rootDigest = ver.Name
+							found = true
+							break
+						}
+					}
+
+					if !found {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("no version found matching digest prefix %s", digest)
+					}
+				} else {
+					rootDigest = digestInput
+				}
+			} else if versionID != 0 {
+				// Lookup by version ID - need to find the digest first
 				allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
 				if err != nil {
 					cmd.SilenceUsage = true
@@ -262,7 +322,7 @@ Examples:
 
 				var found bool
 				for _, ver := range allVersions {
-					if strings.HasPrefix(ver.Name, digestInput) {
+					if ver.ID == versionID {
 						rootDigest = ver.Name
 						found = true
 						break
@@ -271,108 +331,94 @@ Examples:
 
 				if !found {
 					cmd.SilenceUsage = true
-					return fmt.Errorf("no version found matching digest prefix %s", deleteGraphDig)
+					return fmt.Errorf("version ID %d not found", versionID)
 				}
 			} else {
-				rootDigest = digestInput
-			}
-		} else if deleteGraphVer != 0 {
-			// Lookup by version ID - need to find the digest first
-			allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to list package versions: %w", err)
-			}
-
-			var found bool
-			for _, ver := range allVersions {
-				if ver.ID == deleteGraphVer {
-					rootDigest = ver.Name
-					found = true
-					break
+				// Lookup by tag (positional argument)
+				tag = args[1]
+				rootDigest, err = oras.ResolveTag(ctx, fullImage, tag)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
 				}
 			}
 
-			if !found {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("version ID %d not found", deleteGraphVer)
-			}
-		} else {
-			// Lookup by tag (positional argument)
-			tag = args[1]
-			rootDigest, err = oras.ResolveTag(ctx, fullImage, tag)
+			// Build the graph (reuse logic from graph command)
+			g, err := buildGraph(ctx, ghClient, fullImage, owner, ownerType, imageName, rootDigest, tag)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
+				return fmt.Errorf("failed to build graph: %w", err)
 			}
-		}
-
-		// Build the graph (reuse logic from graph command)
-		g, err := buildGraph(ctx, ghClient, fullImage, owner, ownerType, imageName, rootDigest, tag)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to build graph: %w", err)
-		}
-		if g == nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("no graph found for digest %s", rootDigest)
-		}
-
-		// Collect all version IDs to delete
-		versionIDs := collectVersionIDs(g)
-
-		// Display what will be deleted
-		fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI graph:\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s\n", imageName)
-		if tag != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "\n")
-		displayGraphSummary(cmd.OutOrStdout(), g)
-		fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
-			display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
-
-		// Handle dry-run
-		if deleteDryRun {
-			fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
-			return nil
-		}
-
-		// Confirm deletion unless --force is used
-		if !deleteForce {
-			confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this graph?"))
-			if err != nil {
-				return fmt.Errorf("failed to read confirmation: %w", err)
+			if g == nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("no graph found for digest %s", rootDigest)
 			}
 
-			if !confirmed {
-				fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+			// Collect all version IDs to delete
+			versionIDs := collectVersionIDs(g)
+
+			// Display what will be deleted
+			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI graph:\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s\n", imageName)
+			if tag != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "\n")
+			displayGraphSummary(cmd.OutOrStdout(), g)
+			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
+				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
+
+			// Handle dry-run
+			if dryRun {
+				fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
 				return nil
 			}
-		}
 
-		// Perform deletions (children first, then root)
-		err = deleteGraph(ctx, ghClient, owner, ownerType, imageName, versionIDs, cmd.OutOrStdout())
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
+			// Confirm deletion unless --force is used
+			if !force {
+				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this graph?"))
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n",
-			display.ColorSuccess(fmt.Sprintf("Successfully deleted %d version(s) of %s", len(versionIDs), imageName)))
-		return nil
-	},
+				if !confirmed {
+					fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+					return nil
+				}
+			}
+
+			// Perform deletions (children first, then root)
+			err = deleteGraphVersions(ctx, ghClient, owner, ownerType, imageName, versionIDs, cmd.OutOrStdout())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n",
+				display.ColorSuccess(fmt.Sprintf("Successfully deleted %d version(s) of %s", len(versionIDs), imageName)))
+			return nil
+		},
+	}
+
+	// Flags for delete graph
+	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
+	cmd.Flags().StringVar(&digest, "digest", "", "Find graph by digest")
+	cmd.Flags().Int64Var(&versionID, "version", 0, "Find graph containing this version ID")
+
+	return cmd
 }
 
-// runSingleDelete handles deletion of a single version
-func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, client *gh.Client, owner, ownerType, imageName string) error {
+// runSingleDeleteWithFlags handles deletion of a single version with explicit flag values
+func runSingleDeleteWithFlags(ctx context.Context, cmd *cobra.Command, args []string, client *gh.Client, owner, ownerType, imageName string,
+	digestFlag string, force, dryRun bool) error {
 	var versionID int64
 	var err error
 
 	// Determine version ID from either positional arg or --digest flag
-	if deleteVersionDig != "" {
+	if digestFlag != "" {
 		// Normalize digest format
-		digest := deleteVersionDig
+		digest := digestFlag
 		if !strings.HasPrefix(digest, "sha256:") {
 			digest = "sha256:" + digest
 		}
@@ -411,8 +457,8 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 		versionID:  versionID,
 		tags:       tags,
 		graphCount: graphCount,
-		force:      deleteForce,
-		dryRun:     deleteDryRun,
+		force:      force,
+		dryRun:     dryRun,
 	}
 
 	confirmFn := func() (bool, error) {
@@ -427,10 +473,12 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 	return nil
 }
 
-// runBulkDelete handles deletion of multiple versions using filters
-func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, imageName string) error {
+// runBulkDeleteWithFlags handles deletion of multiple versions using filters with explicit flag values
+func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, imageName string,
+	tagPattern string, onlyTagged, onlyUntagged bool, olderThan, newerThan string,
+	olderThanDays, newerThanDays int, force, dryRun bool) error {
 	// Build filter from flags
-	filter, err := buildDeleteFilter()
+	versionFilter, err := buildDeleteFilterWithFlags(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
 	if err != nil {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("invalid filter options: %w", err)
@@ -444,7 +492,7 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 	}
 
 	// Apply filters
-	matchingVersions := filter.Apply(allVersions)
+	matchingVersions := versionFilter.Apply(allVersions)
 
 	// Check if any versions match
 	if len(matchingVersions) == 0 {
@@ -499,8 +547,8 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 		ownerType: ownerType,
 		imageName: imageName,
 		versions:  matchingVersions,
-		force:     deleteForce,
-		dryRun:    deleteDryRun,
+		force:     force,
+		dryRun:    dryRun,
 	}
 
 	confirmFn := func(count int) (bool, error) {
@@ -509,34 +557,6 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 	}
 
 	return executeBulkDelete(ctx, client, params, cmd.OutOrStdout(), confirmFn)
-}
-
-func init() {
-	rootCmd.AddCommand(deleteCmd)
-
-	// Add subcommands
-	deleteCmd.AddCommand(deleteVersionCmd)
-	deleteCmd.AddCommand(deleteGraphCmd)
-
-	// Flags for delete version
-	deleteVersionCmd.Flags().BoolVar(&deleteForce, "force", false, "Skip confirmation prompt")
-	deleteVersionCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Show what would be deleted without deleting")
-	deleteVersionCmd.Flags().StringVar(&deleteVersionDig, "digest", "", "Delete version by digest")
-
-	// Filter flags for bulk deletion
-	deleteVersionCmd.Flags().StringVar(&deleteTagPattern, "tag-pattern", "", "Delete versions matching regex pattern")
-	deleteVersionCmd.Flags().BoolVar(&deleteOnlyTagged, "tagged", false, "Delete only tagged versions")
-	deleteVersionCmd.Flags().BoolVar(&deleteOnlyUntagged, "untagged", false, "Delete only untagged versions")
-	deleteVersionCmd.Flags().StringVar(&deleteOlderThan, "older-than", "", "Delete versions older than date (YYYY-MM-DD or RFC3339)")
-	deleteVersionCmd.Flags().StringVar(&deleteNewerThan, "newer-than", "", "Delete versions newer than date (YYYY-MM-DD or RFC3339)")
-	deleteVersionCmd.Flags().IntVar(&deleteOlderThanDays, "older-than-days", 0, "Delete versions older than N days")
-	deleteVersionCmd.Flags().IntVar(&deleteNewerThanDays, "newer-than-days", 0, "Delete versions newer than N days")
-
-	// Flags for delete graph
-	deleteGraphCmd.Flags().BoolVar(&deleteForce, "force", false, "Skip confirmation prompt")
-	deleteGraphCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Show what would be deleted without deleting")
-	deleteGraphCmd.Flags().StringVar(&deleteGraphDig, "digest", "", "Find graph by digest")
-	deleteGraphCmd.Flags().Int64Var(&deleteGraphVer, "version", 0, "Find graph containing this version ID")
 }
 
 // Helper functions for delete version bulk operations
@@ -719,24 +739,25 @@ func parseDeleteDate(dateStr string) (time.Time, error) {
 	return time.Time{}, lastErr
 }
 
-// buildDeleteFilter constructs a VersionFilter from delete command flags
-func buildDeleteFilter() (*filter.VersionFilter, error) {
+// buildDeleteFilterWithFlags constructs a VersionFilter from explicit flag values
+func buildDeleteFilterWithFlags(tagPattern string, onlyTagged, onlyUntagged bool,
+	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
 	// Check for conflicting flags
-	if deleteOnlyTagged && deleteOnlyUntagged {
+	if onlyTagged && onlyUntagged {
 		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
 	}
 
 	vf := &filter.VersionFilter{
-		OnlyTagged:    deleteOnlyTagged,
-		OnlyUntagged:  deleteOnlyUntagged,
-		TagPattern:    deleteTagPattern,
-		OlderThanDays: deleteOlderThanDays,
-		NewerThanDays: deleteNewerThanDays,
+		OnlyTagged:    onlyTagged,
+		OnlyUntagged:  onlyUntagged,
+		TagPattern:    tagPattern,
+		OlderThanDays: olderThanDays,
+		NewerThanDays: newerThanDays,
 	}
 
 	// Parse older-than date
-	if deleteOlderThan != "" {
-		t, err := parseDeleteDate(deleteOlderThan)
+	if olderThan != "" {
+		t, err := parseDeleteDate(olderThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --older-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
 		}
@@ -744,8 +765,8 @@ func buildDeleteFilter() (*filter.VersionFilter, error) {
 	}
 
 	// Parse newer-than date
-	if deleteNewerThan != "" {
-		t, err := parseDeleteDate(deleteNewerThan)
+	if newerThan != "" {
+		t, err := parseDeleteDate(newerThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --newer-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
 		}
@@ -983,7 +1004,7 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 	}
 }
 
-func deleteGraph(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionIDs []int64, w io.Writer) error {
+func deleteGraphVersions(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionIDs []int64, w io.Writer) error {
 	return deleteGraphWithDeleter(ctx, client, owner, ownerType, imageName, versionIDs, w)
 }
 

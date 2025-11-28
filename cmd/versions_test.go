@@ -11,6 +11,7 @@ import (
 // TestDiscoverRelatedVersionsByDigest verifies that we can discover relationships
 // using a digest directly without needing to call ResolveTag
 func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Test with a simple digest
@@ -28,6 +29,7 @@ func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
 // TestBuildVersionGraphsUsesDigestDirectly verifies optimization:
 // buildVersionGraphs should use ver.Name (digest) directly instead of calling ResolveTag
 func TestBuildVersionGraphsUsesDigestDirectly(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Create test versions with digests already set
@@ -64,94 +66,73 @@ func TestBuildVersionGraphsUsesDigestDirectly(t *testing.T) {
 
 // TestBuildVersionFilter verifies that the filter is built correctly from flags
 func TestBuildVersionFilter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name        string
-		setup       func()
-		wantErr     bool
-		errContains string
+		name          string
+		tag           string
+		tagPattern    string
+		onlyTagged    bool
+		onlyUntagged  bool
+		olderThan     string
+		newerThan     string
+		olderThanDays int
+		newerThanDays int
+		versionID     int64
+		digest        string
+		wantErr       bool
+		errContains   string
 	}{
 		{
-			name: "no filters",
-			setup: func() {
-				versionsTag = ""
-				versionsTagPattern = ""
-				versionsOnlyTagged = false
-				versionsOnlyUntagged = false
-				versionsOlderThan = ""
-				versionsNewerThan = ""
-				versionsOlderThanDays = 0
-				versionsNewerThanDays = 0
-				versionsVersionID = 0
-				versionsDigest = ""
-			},
+			name:    "no filters",
 			wantErr: false,
 		},
 		{
-			name: "conflicting tagged/untagged flags",
-			setup: func() {
-				versionsOnlyTagged = true
-				versionsOnlyUntagged = true
-			},
-			wantErr:     true,
-			errContains: "cannot use --tagged and --untagged together",
+			name:         "conflicting tagged/untagged flags",
+			onlyTagged:   true,
+			onlyUntagged: true,
+			wantErr:      true,
+			errContains:  "cannot use --tagged and --untagged together",
 		},
 		{
-			name: "invalid older-than date",
-			setup: func() {
-				versionsOnlyTagged = false
-				versionsOnlyUntagged = false
-				versionsOlderThan = "invalid-date"
-			},
+			name:        "invalid older-than date",
+			olderThan:   "invalid-date",
 			wantErr:     true,
 			errContains: "invalid --older-than date format",
 		},
 		{
-			name: "valid older-than date RFC3339",
-			setup: func() {
-				versionsOlderThan = "2025-01-01T00:00:00Z"
-				versionsNewerThan = ""
-			},
-			wantErr: false,
+			name:      "valid older-than date RFC3339",
+			olderThan: "2025-01-01T00:00:00Z",
+			wantErr:   false,
 		},
 		{
-			name: "valid older-than date (date only)",
-			setup: func() {
-				versionsOlderThan = "2025-01-01"
-				versionsNewerThan = ""
-			},
-			wantErr: false,
+			name:      "valid older-than date (date only)",
+			olderThan: "2025-01-01",
+			wantErr:   false,
 		},
 		{
-			name: "valid newer-than date (date only)",
-			setup: func() {
-				versionsOlderThan = ""
-				versionsNewerThan = "2025-11-01"
-			},
-			wantErr: false,
+			name:      "valid newer-than date (date only)",
+			newerThan: "2025-11-01",
+			wantErr:   false,
 		},
 		{
-			name: "version ID filter",
-			setup: func() {
-				versionsNewerThan = ""
-				versionsVersionID = 12345
-				versionsDigest = ""
-			},
-			wantErr: false,
+			name:      "version ID filter",
+			versionID: 12345,
+			wantErr:   false,
 		},
 		{
-			name: "digest filter",
-			setup: func() {
-				versionsVersionID = 0
-				versionsDigest = "sha256:abc123"
-			},
+			name:    "digest filter",
+			digest:  "sha256:abc123",
 			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
-			filter, err := buildVersionFilter()
+			filter, err := buildVersionFilter(
+				tt.tag, tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
+				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays,
+				tt.versionID, tt.digest,
+			)
 
 			if tt.wantErr {
 				if err == nil {
@@ -187,7 +168,8 @@ func findSubstring(s, substr string) bool {
 
 // TestVersionsCommandStructure verifies the versions command is properly set up
 func TestVersionsCommandStructure(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	versionsCmd, _, err := cmd.Find([]string{"versions"})
 	if err != nil {
 		t.Fatalf("Failed to find versions command: %v", err)
@@ -223,22 +205,24 @@ func TestVersionsCommandArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			// Should fail with usage error
 			if err == nil {
 				t.Error("Expected error but got none")
 			}
-
-			// Reset args
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 // TestVersionsCommandHasFlags verifies required flags exist
 func TestVersionsCommandHasFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	versionsCmd, _, _ := cmd.Find([]string{"versions"})
+
 	requiredFlags := []string{
 		"json",
 		"tag",
@@ -264,6 +248,7 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 // TestSharedChildrenAppearInMultipleGraphs verifies that when multiple indexes
 // reference the same platform manifest, it appears in all graphs with a reference count
 func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
+	t.Parallel()
 	// This test verifies the fix for the bug where shared platform manifests
 	// were only shown in the first graph that claimed them.
 	//

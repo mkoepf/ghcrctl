@@ -1,21 +1,25 @@
 package cmd
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
 
 func TestRootCommand(t *testing.T) {
+	t.Parallel()
 	// Test root command structure
-	if rootCmd.Use != "ghcrctl" {
-		t.Errorf("Expected Use to be 'ghcrctl', got '%s'", rootCmd.Use)
+	cmd := NewRootCmd()
+
+	if cmd.Use != "ghcrctl" {
+		t.Errorf("Expected Use to be 'ghcrctl', got '%s'", cmd.Use)
 	}
 
-	if rootCmd.Short == "" {
+	if cmd.Short == "" {
 		t.Error("Expected Short description to be non-empty")
 	}
 
-	if rootCmd.Long == "" {
+	if cmd.Long == "" {
 		t.Error("Expected Long description to be non-empty")
 	}
 
@@ -29,17 +33,19 @@ func TestRootCommand(t *testing.T) {
 	}
 
 	for _, keyword := range expectedKeywords {
-		if !strings.Contains(rootCmd.Long, keyword) {
+		if !strings.Contains(cmd.Long, keyword) {
 			t.Errorf("Expected Long description to contain '%s'", keyword)
 		}
 	}
 }
 
 func TestRootCommandHasConfigSubcommand(t *testing.T) {
+	t.Parallel()
 	// Verify config subcommand is registered
+	cmd := NewRootCmd()
 	found := false
-	for _, cmd := range rootCmd.Commands() {
-		if strings.HasPrefix(cmd.Use, "config") {
+	for _, c := range cmd.Commands() {
+		if strings.HasPrefix(c.Use, "config") {
 			found = true
 			break
 		}
@@ -51,27 +57,36 @@ func TestRootCommandHasConfigSubcommand(t *testing.T) {
 }
 
 func TestRootCommandHelp(t *testing.T) {
+	t.Parallel()
 	// Test that help command works
-	rootCmd.SetArgs([]string{"--help"})
-	err := rootCmd.Execute()
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"--help"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
 
 	// Help returns nil error but sets flag
 	if err != nil {
 		t.Errorf("Expected --help to succeed, got error: %v", err)
 	}
-
-	// Reset
-	rootCmd.SetArgs([]string{})
 }
 
 func TestRootCommandVersion(t *testing.T) {
+	t.Parallel()
 	// Test that --version flag is available and returns version info
-	if rootCmd.Version == "" {
-		t.Error("rootCmd.Version should not be empty")
+	cmd := NewRootCmd()
+
+	if cmd.Version == "" {
+		t.Error("cmd.Version should not be empty")
 	}
 
 	// Version should be set (either "dev" or injected at build time)
-	if rootCmd.Version != "dev" && !strings.HasPrefix(rootCmd.Version, "v") {
-		t.Errorf("Expected version to be 'dev' or start with 'v', got %q", rootCmd.Version)
+	if cmd.Version != "dev" && !strings.HasPrefix(cmd.Version, "v") {
+		t.Errorf("Expected version to be 'dev' or start with 'v', got %q", cmd.Version)
 	}
 }

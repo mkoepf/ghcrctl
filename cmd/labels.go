@@ -12,17 +12,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	labelsTag          string
-	labelsKey          string
-	labelsJSON         bool
-	labelsOutputFormat string
-)
+// newLabelsCmd creates the labels command with isolated flag state.
+func newLabelsCmd() *cobra.Command {
+	var (
+		tag          string
+		key          string
+		jsonOutput   bool
+		outputFormat string
+	)
 
-var labelsCmd = &cobra.Command{
-	Use:   "labels <image>",
-	Short: "Display OCI labels from a container image",
-	Long: `Display OCI labels (annotations/metadata) from a container image.
+	cmd := &cobra.Command{
+		Use:   "labels <image>",
+		Short: "Display OCI labels from a container image",
+		Long: `Display OCI labels (annotations/metadata) from a container image.
 
 Labels are key-value pairs embedded in the image config at build time using
 Docker LABEL instructions or equivalent mechanisms. Common labels include:
@@ -43,62 +45,70 @@ Examples:
 
   # JSON output
   ghcrctl labels myimage --json`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
 
-		// Handle output format flag (-o)
-		if labelsOutputFormat != "" {
-			switch labelsOutputFormat {
-			case "json":
-				labelsJSON = true
-			case "table":
-				labelsJSON = false
-			default:
-				cmd.SilenceUsage = true
-				return fmt.Errorf("invalid output format %q. Supported formats: json, table", labelsOutputFormat)
+			// Handle output format flag (-o)
+			if outputFormat != "" {
+				switch outputFormat {
+				case "json":
+					jsonOutput = true
+				case "table":
+					jsonOutput = false
+				default:
+					cmd.SilenceUsage = true
+					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
+				}
 			}
-		}
 
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
-
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
-
-		// Construct full image reference
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-
-		// Get labels from image
-		labels, err := getImageLabels(cmd.Context(), fullImage, labelsTag)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to get labels: %w", err)
-		}
-
-		// Filter by key if specified
-		if labelsKey != "" {
-			if value, ok := labels[labelsKey]; ok {
-				labels = map[string]string{labelsKey: value}
-			} else {
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("label key %q not found", labelsKey)
+				return fmt.Errorf("failed to read configuration: %w", err)
 			}
-		}
 
-		// Output results
-		if labelsJSON {
-			return display.OutputJSON(cmd.OutOrStdout(), labels)
-		}
-		return outputLabelsTable(cmd.OutOrStdout(), labels, imageName, labelsTag)
-	},
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+			}
+
+			// Construct full image reference
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+
+			// Get labels from image
+			labels, err := getImageLabels(cmd.Context(), fullImage, tag)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to get labels: %w", err)
+			}
+
+			// Filter by key if specified
+			if key != "" {
+				if value, ok := labels[key]; ok {
+					labels = map[string]string{key: value}
+				} else {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("label key %q not found", key)
+				}
+			}
+
+			// Output results
+			if jsonOutput {
+				return display.OutputJSON(cmd.OutOrStdout(), labels)
+			}
+			return outputLabelsTable(cmd.OutOrStdout(), labels, imageName, tag)
+		},
+	}
+
+	cmd.Flags().StringVar(&tag, "tag", "latest", "Tag to resolve (default: latest)")
+	cmd.Flags().StringVar(&key, "key", "", "Show only specific label key")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
+
+	return cmd
 }
 
 func getImageLabels(ctx context.Context, image, tag string) (map[string]string, error) {
@@ -147,12 +157,4 @@ func outputLabelsTable(w io.Writer, labels map[string]string, image, tag string)
 
 	fmt.Fprintf(w, "\nTotal: %d label(s)\n", len(labels))
 	return nil
-}
-
-func init() {
-	rootCmd.AddCommand(labelsCmd)
-	labelsCmd.Flags().StringVar(&labelsTag, "tag", "latest", "Tag to resolve (default: latest)")
-	labelsCmd.Flags().StringVar(&labelsKey, "key", "", "Show only specific label key")
-	labelsCmd.Flags().BoolVar(&labelsJSON, "json", false, "Output in JSON format")
-	labelsCmd.Flags().StringVarP(&labelsOutputFormat, "output", "o", "", "Output format (json, table)")
 }

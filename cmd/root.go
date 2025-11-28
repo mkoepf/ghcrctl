@@ -11,29 +11,55 @@ import (
 var (
 	// Version is set at build time via ldflags
 	// Example: go build -ldflags "-X github.com/mkoepf/ghcrctl/cmd.Version=v1.0.0"
-	Version     = "dev"
-	logAPICalls bool
+	Version = "dev"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "ghcrctl",
-	Short: "A CLI tool for managing GitHub Container Registry",
-	Long: `ghcrctl is a command-line tool for interacting with GitHub Container Registry (GHCR).
+// NewRootCmd creates a new root command with isolated flag state.
+// This enables parallel test execution by avoiding shared global state.
+func NewRootCmd() *cobra.Command {
+	var logAPICalls bool
+
+	root := &cobra.Command{
+		Use:   "ghcrctl",
+		Short: "A CLI tool for managing GitHub Container Registry",
+		Long: `ghcrctl is a command-line tool for interacting with GitHub Container Registry (GHCR).
 
 It provides functionality for:
 - Exploring images and their OCI artifact graph (image, SBOM, provenance)
 - Managing GHCR version metadata (labels, tags)
 - Safe deletion of package versions
 - Configuration of owner/org and authentication`,
-	SilenceErrors: true,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Enable API call logging if flag is set
-		if logAPICalls {
-			ctx := logging.EnableLogging(cmd.Context())
-			cmd.SetContext(ctx)
-		}
-	},
+		SilenceErrors: true,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Enable API call logging if flag is set
+			if logAPICalls {
+				ctx := logging.EnableLogging(cmd.Context())
+				cmd.SetContext(ctx)
+			}
+		},
+	}
+
+	// Set version for --version flag
+	root.Version = Version
+
+	// Add persistent flag for API call logging
+	root.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
+
+	// Add subcommands via their factories
+	root.AddCommand(newConfigCmd())
+	root.AddCommand(newImagesCmd())
+	root.AddCommand(newVersionsCmd())
+	root.AddCommand(newDeleteCmd())
+	root.AddCommand(newLabelsCmd())
+	root.AddCommand(newSBOMCmd())
+	root.AddCommand(newProvenanceCmd())
+	root.AddCommand(newTagCmd())
+
+	return root
 }
+
+// rootCmd is the global command instance used by main.go
+var rootCmd = NewRootCmd()
 
 // Execute runs the root command
 func Execute() {
@@ -41,12 +67,4 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	// Set version for --version flag
-	rootCmd.Version = Version
-
-	// Add persistent flag for API call logging
-	rootCmd.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 }

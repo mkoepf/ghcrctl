@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
@@ -16,33 +15,24 @@ import (
 
 // TestVersionsCommandWithMultiarch tests versions command with multiarch image
 func TestVersionsCommandWithMultiarch(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Test with the multiarch image with SBOM and provenance
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -79,42 +69,28 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 	if !strings.Contains(output, "Total:") {
 		t.Error("Expected 'Total:' in output")
 	}
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }
 
 // TestVersionsCommandWithTagFilter tests versions command with --tag filter
 func TestVersionsCommandWithTagFilter(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Test with --tag filter
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--tag", "v1.0"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--tag", "v1.0"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -131,42 +107,28 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 	if !strings.Contains(output, "v1.0") {
 		t.Error("Expected filtered tag 'v1.0' in output")
 	}
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }
 
 // TestVersionsCommandJSON tests JSON output format
 func TestVersionsCommandJSON(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Test JSON output
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--json"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -198,42 +160,28 @@ func TestVersionsCommandJSON(t *testing.T) {
 			t.Error("Expected non-empty CreatedAt timestamp")
 		}
 	}
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }
 
 // TestVersionsCommandSinglePlatform tests versions with single platform image
 func TestVersionsCommandSinglePlatform(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Test with single platform image (no SBOM, no provenance)
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-no-sbom"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-no-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -251,42 +199,28 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 	if !strings.Contains(output, "VERSION ID") {
 		t.Error("Expected output to contain 'VERSION ID' header")
 	}
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }
 
 // TestVersionsCommandWithSBOMOnly tests image with SBOM but no provenance
 func TestVersionsCommandWithSBOMOnly(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Test with image that has SBOM but no provenance
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom-no-provenance"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom-no-provenance"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -318,11 +252,6 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 	if foundProvenance {
 		t.Error("Expected provenance artifact to NOT be in output for SBOM-only image")
 	}
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }
 
 // TestVersionsCommandCosignAttestationsGrouped tests that cosign attestations are grouped under parent
@@ -331,29 +260,20 @@ func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
-
-	// Reset flags to prevent state leakage
-	versionsJSON = false
-	versionsTag = ""
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
+	t.Parallel()
 
 	// Test with cosign-vuln image that has vuln-scan and vex attestations
-	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-cosign-vuln"})
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"versions", "ghcrctl-test-cosign-vuln"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -375,9 +295,4 @@ func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
 	// Count the number of graphs - should be 1 or 2 (parent + orphan), not 3 separate graphs
 	graphCount := strings.Count(output, "┌")
 	t.Logf("Number of graphs with children: %d", graphCount)
-
-	// Reset args and flags
-	rootCmd.SetArgs([]string{})
-	versionsJSON = false
-	versionsTag = ""
 }

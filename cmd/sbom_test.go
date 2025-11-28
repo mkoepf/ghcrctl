@@ -7,6 +7,13 @@ import (
 )
 
 func TestSBOMCommandStructure(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	sbomCmd, _, err := cmd.Find([]string{"sbom"})
+	if err != nil {
+		t.Fatalf("Failed to find sbom command: %v", err)
+	}
+
 	if sbomCmd.Use != "sbom <image>" {
 		t.Errorf("Expected Use 'sbom <image>', got '%s'", sbomCmd.Use)
 	}
@@ -21,6 +28,7 @@ func TestSBOMCommandStructure(t *testing.T) {
 }
 
 func TestSBOMCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		args      []string
@@ -45,6 +53,8 @@ func TestSBOMCommandArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCmd()
+			sbomCmd, _, _ := cmd.Find([]string{"sbom"})
 			err := sbomCmd.Args(sbomCmd, tt.args)
 			if tt.wantError && err == nil {
 				t.Error("Expected error but got none")
@@ -57,6 +67,10 @@ func TestSBOMCommandArguments(t *testing.T) {
 }
 
 func TestSBOMCommandHasFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	sbomCmd, _, _ := cmd.Find([]string{"sbom"})
+
 	flags := []string{"tag", "digest", "all", "json"}
 
 	for _, flagName := range flags {
@@ -74,6 +88,7 @@ func TestSBOMCommandHasFlags(t *testing.T) {
 }
 
 func TestShortDigest(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		digest   string

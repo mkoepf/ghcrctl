@@ -11,7 +11,13 @@ import (
 )
 
 func TestImagesCommandStructure(t *testing.T) {
+	t.Parallel()
 	// Verify images command exists and is properly structured
+	cmd := NewRootCmd()
+	imagesCmd, _, err := cmd.Find([]string{"images"})
+	if err != nil {
+		t.Fatalf("Failed to find images command: %v", err)
+	}
 	if imagesCmd == nil {
 		t.Fatal("imagesCmd should not be nil")
 	}
@@ -26,6 +32,7 @@ func TestImagesCommandStructure(t *testing.T) {
 }
 
 func TestImagesCommandWithoutConfig(t *testing.T) {
+	// Cannot run in parallel - modifies environment variables
 	// Test that images command fails when owner not configured
 
 	// Create a temp config directory with no config
@@ -35,9 +42,10 @@ func TestImagesCommandWithoutConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Save original HOME and USERPROFILE (for Windows)
+	// Save original env vars
 	originalHome := os.Getenv("HOME")
 	originalUserProfile := os.Getenv("USERPROFILE")
+	originalConfig := os.Getenv("GHCRCTL_CONFIG")
 	defer func() {
 		os.Setenv("HOME", originalHome)
 		if originalUserProfile != "" {
@@ -45,29 +53,43 @@ func TestImagesCommandWithoutConfig(t *testing.T) {
 		} else {
 			os.Unsetenv("USERPROFILE")
 		}
+		if originalConfig != "" {
+			os.Setenv("GHCRCTL_CONFIG", originalConfig)
+		} else {
+			os.Unsetenv("GHCRCTL_CONFIG")
+		}
 	}()
 
+	// Clear GHCRCTL_CONFIG so config.New() uses HOME
+	os.Unsetenv("GHCRCTL_CONFIG")
 	// Set HOME and USERPROFILE to temp dir (no config)
 	os.Setenv("HOME", tempDir)
 	os.Setenv("USERPROFILE", tempDir)
 
 	// Execute images command - should fail with helpful error
-	rootCmd.SetArgs([]string{"images"})
-	err = rootCmd.Execute()
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"images"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err = cmd.Execute()
 
 	if err == nil {
 		t.Error("Expected error when owner not configured, got none")
 	}
 
 	// Error should mention configuration
-	if !strings.Contains(err.Error(), "owner") && !strings.Contains(err.Error(), "config") {
+	if err != nil && !strings.Contains(err.Error(), "owner") && !strings.Contains(err.Error(), "config") {
 		t.Errorf("Expected error about configuration, got: %v", err)
 	}
-
-	rootCmd.SetArgs([]string{})
 }
 
 func TestImagesCommandArguments(t *testing.T) {
+	t.Parallel()
 	// Test that images command accepts no arguments
 
 	tests := []struct {
@@ -89,8 +111,9 @@ func TestImagesCommandArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			// For "no arguments" test, we expect it to fail but not due to args
 			if tt.name == "no arguments (valid)" {
@@ -103,14 +126,15 @@ func TestImagesCommandArguments(t *testing.T) {
 					t.Error("Expected error for extra arguments")
 				}
 			}
-
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 func TestImagesCommandHasJSONFlag(t *testing.T) {
+	t.Parallel()
 	// Verify that the images command has a --json flag
+	cmd := NewRootCmd()
+	imagesCmd, _, _ := cmd.Find([]string{"images"})
 	jsonFlag := imagesCmd.Flags().Lookup("json")
 	if jsonFlag == nil {
 		t.Error("images command should have --json flag")
@@ -118,6 +142,7 @@ func TestImagesCommandHasJSONFlag(t *testing.T) {
 }
 
 func TestOutputJSON(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		packages []string
@@ -180,6 +205,7 @@ func TestOutputJSON(t *testing.T) {
 }
 
 func TestOutputTable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		packages []string
@@ -210,7 +236,7 @@ func TestOutputTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output in buffer
 			buf := &bytes.Buffer{}
-			err := outputTable(buf, tt.packages, tt.owner)
+			err := outputImagesTable(buf, tt.packages, tt.owner)
 
 			if tt.wantErr {
 				if err == nil {

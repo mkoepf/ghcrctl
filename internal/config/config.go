@@ -15,7 +15,13 @@ type Config struct {
 }
 
 // New creates a new Config with the default path (~/.ghcrctl/config.yaml)
+// The path can be overridden by setting the GHCRCTL_CONFIG environment variable.
 func New() *Config {
+	// Check for environment variable override (useful for testing)
+	if configPath := os.Getenv("GHCRCTL_CONFIG"); configPath != "" {
+		return NewWithPath(configPath)
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		// Fallback to current directory if home directory cannot be determined

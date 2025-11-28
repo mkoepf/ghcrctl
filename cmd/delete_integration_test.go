@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/mkoepf/ghcrctl/internal/oras"
 )
@@ -20,15 +19,9 @@ func TestBuildGraphMultiarchWithSBOMAndProvenance(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -111,15 +104,9 @@ func TestBuildGraphNoSBOMImage(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -183,15 +170,9 @@ func TestBuildGraphWithSBOMOnly(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -253,15 +234,9 @@ func TestBuildGraphMultiarchNoAttestations(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -329,15 +304,9 @@ func TestCountGraphMembershipRootVersion(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -382,15 +351,9 @@ func TestCountGraphMembershipChildVersion(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -450,15 +413,9 @@ func TestCountGraphMembershipNonexistentVersion(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -490,15 +447,9 @@ func TestBuildGraphRefCountCalculation(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -546,15 +497,9 @@ func TestCollectVersionIDsIntegration(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -628,15 +573,9 @@ func TestDeleteGraphDryRunIntegration(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -719,15 +658,9 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"
@@ -822,15 +755,9 @@ func TestExecuteBulkDeleteDryRunIntegration(t *testing.T) {
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
-
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
 
 	owner := "mkoepf"
 	ownerType := "user"

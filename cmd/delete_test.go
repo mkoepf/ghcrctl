@@ -13,7 +13,8 @@ import (
 
 // TestDeleteCommandStructure verifies the delete command is properly set up
 func TestDeleteCommandStructure(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	deleteCmd, _, err := cmd.Find([]string{"delete"})
 	if err != nil {
 		t.Fatalf("Failed to find delete command: %v", err)
@@ -32,7 +33,8 @@ func TestDeleteCommandStructure(t *testing.T) {
 
 // TestDeleteVersionCommandStructure verifies the delete version subcommand
 func TestDeleteVersionCommandStructure(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	deleteVersionCmd, _, err := cmd.Find([]string{"delete", "version"})
 	if err != nil {
 		t.Fatalf("Failed to find delete version command: %v", err)
@@ -49,6 +51,7 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 
 // TestDeleteVersionCommandArguments verifies argument validation
 func TestDeleteVersionCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		args        []string
@@ -72,24 +75,25 @@ func TestDeleteVersionCommandArguments(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			// Should fail with usage error
 			if err == nil {
 				t.Error("Expected error but got none")
 			}
-
-			// Reset args
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 // TestDeleteVersionCommandHasFlags verifies required flags exist
 func TestDeleteVersionCommandHasFlags(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	deleteVersionCmd, _, err := cmd.Find([]string{"delete", "version"})
 	if err != nil {
 		t.Fatalf("Failed to find delete version command: %v", err)
@@ -118,7 +122,8 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 
 // TestDeleteGraphCommandStructure verifies the delete graph subcommand
 func TestDeleteGraphCommandStructure(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
 	if err != nil {
 		t.Fatalf("Failed to find delete graph command: %v", err)
@@ -135,6 +140,7 @@ func TestDeleteGraphCommandStructure(t *testing.T) {
 
 // TestDeleteGraphCommandArguments verifies argument validation
 func TestDeleteGraphCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		args        []string
@@ -158,24 +164,25 @@ func TestDeleteGraphCommandArguments(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			// Should fail with usage error
 			if err == nil {
 				t.Error("Expected error but got none")
 			}
-
-			// Reset args
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 // TestDeleteGraphCommandHasFlags verifies required flags exist
 func TestDeleteGraphCommandHasFlags(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
 	if err != nil {
 		t.Fatalf("Failed to find delete graph command: %v", err)
@@ -208,6 +215,7 @@ func TestDeleteGraphCommandHasFlags(t *testing.T) {
 
 // TestDeleteGraphCommandFlagExclusivity verifies mutually exclusive flags
 func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		args      []string
@@ -231,16 +239,16 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			if tt.expectErr && err == nil {
 				t.Error("Expected error for mutually exclusive flags, got none")
 			}
-
-			// Reset args
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
@@ -248,6 +256,7 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 // TestCollectVersionIDsExcludesSharedChildren verifies that collectVersionIDs
 // excludes children that are shared with other graphs (RefCount > 1)
 func TestCollectVersionIDsExcludesSharedChildren(t *testing.T) {
+	t.Parallel()
 	// Test that shared children (RefCount > 1) are NOT included in deletion
 	// Only the current graph's root and exclusive children should be deleted
 
@@ -289,74 +298,57 @@ func TestCollectVersionIDsExcludesSharedChildren(t *testing.T) {
 
 // TestBuildDeleteFilter verifies that the filter is built correctly from flags
 func TestBuildDeleteFilter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		name        string
-		setup       func()
-		wantErr     bool
-		errContains string
+		name          string
+		tagPattern    string
+		onlyTagged    bool
+		onlyUntagged  bool
+		olderThan     string
+		newerThan     string
+		olderThanDays int
+		newerThanDays int
+		wantErr       bool
+		errContains   string
 	}{
 		{
-			name: "no filters",
-			setup: func() {
-				deleteTagPattern = ""
-				deleteOnlyTagged = false
-				deleteOnlyUntagged = false
-				deleteOlderThan = ""
-				deleteNewerThan = ""
-				deleteOlderThanDays = 0
-				deleteNewerThanDays = 0
-			},
+			name:    "no filters",
 			wantErr: false,
 		},
 		{
-			name: "conflicting tagged/untagged flags",
-			setup: func() {
-				deleteOnlyTagged = true
-				deleteOnlyUntagged = true
-			},
-			wantErr:     true,
-			errContains: "cannot use --tagged and --untagged together",
+			name:         "conflicting tagged/untagged flags",
+			onlyTagged:   true,
+			onlyUntagged: true,
+			wantErr:      true,
+			errContains:  "cannot use --tagged and --untagged together",
 		},
 		{
-			name: "invalid older-than date",
-			setup: func() {
-				deleteOnlyTagged = false
-				deleteOnlyUntagged = false
-				deleteOlderThan = "invalid-date"
-			},
+			name:        "invalid older-than date",
+			olderThan:   "invalid-date",
 			wantErr:     true,
 			errContains: "invalid --older-than date format",
 		},
 		{
-			name: "valid older-than date RFC3339",
-			setup: func() {
-				deleteOlderThan = "2025-01-01T00:00:00Z"
-				deleteNewerThan = ""
-			},
-			wantErr: false,
+			name:      "valid older-than date RFC3339",
+			olderThan: "2025-01-01T00:00:00Z",
+			wantErr:   false,
 		},
 		{
-			name: "valid older-than date (date only)",
-			setup: func() {
-				deleteOlderThan = "2025-01-01"
-				deleteNewerThan = ""
-			},
-			wantErr: false,
+			name:      "valid older-than date (date only)",
+			olderThan: "2025-01-01",
+			wantErr:   false,
 		},
 		{
-			name: "valid newer-than date (date only)",
-			setup: func() {
-				deleteOlderThan = ""
-				deleteNewerThan = "2025-11-01"
-			},
-			wantErr: false,
+			name:      "valid newer-than date (date only)",
+			newerThan: "2025-11-01",
+			wantErr:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
-			filter, err := buildDeleteFilter()
+			filter, err := buildDeleteFilterWithFlags(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
+				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays)
 
 			if tt.wantErr {
 				if err == nil {
@@ -392,53 +384,35 @@ func findSubstr(s, substr string) bool {
 
 // TestDeleteVersionBulkModeArgsValidation tests that bulk mode accepts only image name
 func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		args      []string
-		setupFlag func()
 		expectErr bool
 	}{
 		{
-			name: "bulk mode with untagged flag - correct args",
-			args: []string{"delete", "version", "myimage"},
-			setupFlag: func() {
-				deleteOnlyUntagged = true
-			},
+			name:      "bulk mode with untagged flag - correct args",
+			args:      []string{"delete", "version", "myimage", "--untagged"},
 			expectErr: false,
 		},
 		{
-			name: "bulk mode with untagged flag - too many args",
-			args: []string{"delete", "version", "myimage", "12345"},
-			setupFlag: func() {
-				deleteOnlyUntagged = true
-			},
+			name:      "bulk mode with untagged flag - too many args",
+			args:      []string{"delete", "version", "myimage", "12345", "--untagged"},
 			expectErr: true,
 		},
 		{
-			name: "bulk mode with tag pattern - correct args",
-			args: []string{"delete", "version", "myimage"},
-			setupFlag: func() {
-				deleteOnlyUntagged = false
-				deleteTagPattern = ".*-rc.*"
-			},
+			name:      "bulk mode with tag pattern - correct args",
+			args:      []string{"delete", "version", "myimage", "--tag-pattern", ".*-rc.*"},
 			expectErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset flags
-			deleteOnlyUntagged = false
-			deleteTagPattern = ""
-
-			// Setup specific flag
-			if tt.setupFlag != nil {
-				tt.setupFlag()
-			}
-
 			// Test args validation
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 
 			// We expect configuration errors since we're not providing real tokens/config
 			// But we should not get args validation errors if expectErr is false
@@ -449,17 +423,13 @@ func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
 					t.Errorf("Unexpected args validation error: %v", err)
 				}
 			}
-
-			// Reset
-			rootCmd.SetArgs([]string{})
-			deleteOnlyUntagged = false
-			deleteTagPattern = ""
 		})
 	}
 }
 
 // TestDisplayGraphSummary tests the human-readable graph summary output
 func TestDisplayGraphSummary(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		graph          *discovery.VersionGraph
@@ -705,6 +675,7 @@ func TestDisplayGraphSummary(t *testing.T) {
 // TestCollectVersionIDsDeletionOrder verifies that versions are collected in correct deletion order
 // (children before root to prevent orphaning)
 func TestCollectVersionIDsDeletionOrder(t *testing.T) {
+	t.Parallel()
 	graph := &discovery.VersionGraph{
 		RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:root"},
 		Type:        "index",
@@ -752,6 +723,7 @@ func TestCollectVersionIDsDeletionOrder(t *testing.T) {
 
 // TestCollectVersionIDsEmptyGraph tests handling of edge cases
 func TestCollectVersionIDsEmptyGraph(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		graph    *discovery.VersionGraph
@@ -829,6 +801,7 @@ func TestCollectVersionIDsEmptyGraph(t *testing.T) {
 
 // TestCollectVersionIDsRefCountBoundary tests the RefCount boundary condition
 func TestCollectVersionIDsRefCountBoundary(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		refCount    int
@@ -875,6 +848,7 @@ func TestCollectVersionIDsRefCountBoundary(t *testing.T) {
 
 // TestCountVersionInGraphs tests the graph membership counting logic
 func TestCountVersionInGraphs(t *testing.T) {
+	t.Parallel()
 	// Create test graphs
 	graphs := []discovery.VersionGraph{
 		{
@@ -946,6 +920,7 @@ func TestCountVersionInGraphs(t *testing.T) {
 
 // TestCountVersionInGraphsEmptyGraphs tests edge case of empty graphs slice
 func TestCountVersionInGraphsEmptyGraphs(t *testing.T) {
+	t.Parallel()
 	count := countVersionInGraphs([]discovery.VersionGraph{}, 100)
 	if count != 0 {
 		t.Errorf("Expected 0 for empty graphs, got %d", count)
@@ -959,6 +934,7 @@ func TestCountVersionInGraphsEmptyGraphs(t *testing.T) {
 
 // TestFindGraphByDigest tests the graph lookup by digest
 func TestFindGraphByDigest(t *testing.T) {
+	t.Parallel()
 	graphs := []discovery.VersionGraph{
 		{
 			RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:digest1"},
@@ -1048,6 +1024,7 @@ func TestFindGraphByDigest(t *testing.T) {
 
 // TestFindGraphByDigestNilFallback tests handling of nil fallback
 func TestFindGraphByDigestNilFallback(t *testing.T) {
+	t.Parallel()
 	graphs := []discovery.VersionGraph{}
 
 	got, err := findGraphByDigest(graphs, "sha256:notfound", nil)
@@ -1061,6 +1038,7 @@ func TestFindGraphByDigestNilFallback(t *testing.T) {
 
 // TestFindGraphByDigestEmptyGraphs tests with empty graphs slice
 func TestFindGraphByDigestEmptyGraphs(t *testing.T) {
+	t.Parallel()
 	fallback := &discovery.VersionGraph{
 		RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:fallback"},
 		Children: []discovery.VersionChild{
@@ -1082,6 +1060,7 @@ func TestFindGraphByDigestEmptyGraphs(t *testing.T) {
 
 // TestFormatTagsForDisplay tests the tags formatting function
 func TestFormatTagsForDisplay(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		tags []string
@@ -1151,6 +1130,7 @@ func (m *mockPackageDeleter) DeletePackageVersion(ctx context.Context, owner, ow
 // =============================================================================
 
 func TestDeleteGraphWithDeleter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		versionIDs     []int64
@@ -1249,6 +1229,7 @@ func TestDeleteGraphWithDeleter(t *testing.T) {
 // =============================================================================
 
 func TestExecuteSingleDelete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name            string
 		params          deleteVersionParams
@@ -1449,6 +1430,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 // =============================================================================
 
 func TestExecuteBulkDelete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name            string
 		params          bulkDeleteParams

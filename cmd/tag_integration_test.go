@@ -8,6 +8,7 @@ import (
 )
 
 func TestTagCommandIntegration(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("GITHUB_TOKEN not set, skipping integration test")
 	}
@@ -38,12 +39,14 @@ func TestTagCommandIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
+			// Create fresh command instance for each test
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
 			var outBuf, errBuf bytes.Buffer
-			rootCmd.SetOut(&outBuf)
-			rootCmd.SetErr(&errBuf)
+			cmd.SetOut(&outBuf)
+			cmd.SetErr(&errBuf)
 
-			err := rootCmd.Execute()
+			err := cmd.Execute()
 
 			if tt.wantError {
 				if err == nil {
@@ -57,8 +60,6 @@ func TestTagCommandIntegration(t *testing.T) {
 					t.Logf("Stderr: %s", errBuf.String())
 				}
 			}
-
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }

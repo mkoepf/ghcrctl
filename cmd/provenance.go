@@ -15,18 +15,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	provenanceTag          string
-	provenanceDigest       string
-	provenanceAll          bool
-	provenanceJSON         bool
-	provenanceOutputFormat string
-)
+// newProvenanceCmd creates the provenance command with isolated flag state.
+func newProvenanceCmd() *cobra.Command {
+	var (
+		tag          string
+		digest       string
+		all          bool
+		jsonOutput   bool
+		outputFormat string
+	)
 
-var provenanceCmd = &cobra.Command{
-	Use:   "provenance <image>",
-	Short: "Display provenance attestation",
-	Long: `Display the provenance attestation for a container image. If multiple provenance documents exist, use --digest to select one or --all to show all.
+	cmd := &cobra.Command{
+		Use:   "provenance <image>",
+		Short: "Display provenance attestation",
+		Long: `Display the provenance attestation for a container image. If multiple provenance documents exist, use --digest to select one or --all to show all.
 
 Examples:
   # Show provenance for latest tag
@@ -43,97 +45,106 @@ Examples:
 
   # Output in JSON format
   ghcrctl provenance myimage --json`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
 
-		// Handle output format flag (-o)
-		if provenanceOutputFormat != "" {
-			switch provenanceOutputFormat {
-			case "json":
-				provenanceJSON = true
-			case "table":
-				provenanceJSON = false
-			default:
+			// Handle output format flag (-o)
+			if outputFormat != "" {
+				switch outputFormat {
+				case "json":
+					jsonOutput = true
+				case "table":
+					jsonOutput = false
+				default:
+					cmd.SilenceUsage = true
+					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
+				}
+			}
+
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("invalid output format %q. Supported formats: json, table", provenanceOutputFormat)
+				return fmt.Errorf("failed to read configuration: %w", err)
 			}
-		}
 
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
-
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
-
-		// Get GitHub token
-		token, err := gh.GetToken()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
-
-		// Construct full image reference
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-
-		// Resolve tag to digest
-		ctx := cmd.Context()
-		digest, err := oras.ResolveTag(ctx, fullImage, provenanceTag)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to resolve tag '%s': %w", provenanceTag, err)
-		}
-
-		// Discover children
-		children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to discover children: %w", err)
-		}
-
-		// Filter for provenance artifacts
-		var provenances []oras.ChildArtifact
-		for _, child := range children {
-			if child.Type.Role == "provenance" {
-				provenances = append(provenances, child)
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
-		}
 
-		// Check if no provenance found
-		if len(provenances) == 0 {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("no provenance found for image %s (tag: %s)", imageName, provenanceTag)
-		}
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
-		// If specific digest requested, fetch that one
-		if provenanceDigest != "" {
-			return fetchAndDisplayProvenance(cmd.OutOrStdout(), ctx, fullImage, provenanceDigest, provenanceJSON, token)
-		}
+			// Construct full image reference
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-		// If --all flag, show all provenances
-		if provenanceAll {
-			return fetchAndDisplayAllProvenances(cmd.OutOrStdout(), ctx, fullImage, provenances, provenanceJSON, token)
-		}
+			// Resolve tag to digest
+			ctx := cmd.Context()
+			resolvedDigest, err := oras.ResolveTag(ctx, fullImage, tag)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
+			}
 
-		// Smart behavior: if only one provenance, show it; otherwise list them
-		if len(provenances) == 1 {
-			return fetchAndDisplayProvenance(cmd.OutOrStdout(), ctx, fullImage, provenances[0].Digest, provenanceJSON, token)
-		}
+			// Discover children
+			children, err := oras.DiscoverChildren(ctx, fullImage, resolvedDigest, nil)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to discover children: %w", err)
+			}
 
-		// Multiple provenances: if JSON output requested, show all; otherwise list them
-		if provenanceJSON {
-			return fetchAndDisplayAllProvenances(cmd.OutOrStdout(), ctx, fullImage, provenances, provenanceJSON, token)
-		}
+			// Filter for provenance artifacts
+			var provenances []oras.ChildArtifact
+			for _, child := range children {
+				if child.Type.Role == "provenance" {
+					provenances = append(provenances, child)
+				}
+			}
 
-		return listProvenances(cmd.OutOrStdout(), provenances, imageName)
-	},
+			// Check if no provenance found
+			if len(provenances) == 0 {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("no provenance found for image %s (tag: %s)", imageName, tag)
+			}
+
+			// If specific digest requested, fetch that one
+			if digest != "" {
+				return fetchAndDisplayProvenance(cmd.OutOrStdout(), ctx, fullImage, digest, jsonOutput, token)
+			}
+
+			// If --all flag, show all provenances
+			if all {
+				return fetchAndDisplayAllProvenances(cmd.OutOrStdout(), ctx, fullImage, provenances, jsonOutput, token)
+			}
+
+			// Smart behavior: if only one provenance, show it; otherwise list them
+			if len(provenances) == 1 {
+				return fetchAndDisplayProvenance(cmd.OutOrStdout(), ctx, fullImage, provenances[0].Digest, jsonOutput, token)
+			}
+
+			// Multiple provenances: if JSON output requested, show all; otherwise list them
+			if jsonOutput {
+				return fetchAndDisplayAllProvenances(cmd.OutOrStdout(), ctx, fullImage, provenances, jsonOutput, token)
+			}
+
+			return listProvenances(cmd.OutOrStdout(), provenances, imageName)
+		},
+	}
+
+	cmd.Flags().StringVar(&tag, "tag", "latest", "Tag to resolve (default: latest)")
+	cmd.Flags().StringVar(&digest, "digest", "", "Specific provenance digest to fetch")
+	cmd.Flags().BoolVar(&all, "all", false, "Show all provenance documents")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
+
+	return cmd
 }
 
 // fetchAndDisplayProvenance fetches and displays a single provenance
@@ -226,13 +237,4 @@ func shortProvenanceDigest(digest string) string {
 		return digest[:12]
 	}
 	return digest
-}
-
-func init() {
-	rootCmd.AddCommand(provenanceCmd)
-	provenanceCmd.Flags().StringVar(&provenanceTag, "tag", "latest", "Tag to resolve (default: latest)")
-	provenanceCmd.Flags().StringVar(&provenanceDigest, "digest", "", "Specific provenance digest to fetch")
-	provenanceCmd.Flags().BoolVar(&provenanceAll, "all", false, "Show all provenance documents")
-	provenanceCmd.Flags().BoolVar(&provenanceJSON, "json", false, "Output in JSON format")
-	provenanceCmd.Flags().StringVarP(&provenanceOutputFormat, "output", "o", "", "Output format (json, table)")
 }

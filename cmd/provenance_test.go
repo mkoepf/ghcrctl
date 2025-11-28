@@ -5,6 +5,13 @@ import (
 )
 
 func TestProvenanceCommandStructure(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	provenanceCmd, _, err := cmd.Find([]string{"provenance"})
+	if err != nil {
+		t.Fatalf("Failed to find provenance command: %v", err)
+	}
+
 	if provenanceCmd.Use != "provenance <image>" {
 		t.Errorf("Expected Use 'provenance <image>', got '%s'", provenanceCmd.Use)
 	}
@@ -19,6 +26,7 @@ func TestProvenanceCommandStructure(t *testing.T) {
 }
 
 func TestProvenanceCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		args      []string
@@ -43,6 +51,8 @@ func TestProvenanceCommandArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCmd()
+			provenanceCmd, _, _ := cmd.Find([]string{"provenance"})
 			err := provenanceCmd.Args(provenanceCmd, tt.args)
 			if tt.wantError && err == nil {
 				t.Error("Expected error but got none")
@@ -55,6 +65,10 @@ func TestProvenanceCommandArguments(t *testing.T) {
 }
 
 func TestProvenanceCommandHasFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	provenanceCmd, _, _ := cmd.Find([]string{"provenance"})
+
 	flags := []string{"tag", "digest", "all", "json"}
 
 	for _, flagName := range flags {
@@ -72,6 +86,7 @@ func TestProvenanceCommandHasFlags(t *testing.T) {
 }
 
 func TestShortProvenanceDigest(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		digest   string

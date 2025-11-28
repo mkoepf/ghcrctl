@@ -9,6 +9,7 @@ import (
 
 // TestLabelsCommandWithRealImage tests the labels command with a real image
 func TestLabelsCommandWithRealImage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -17,17 +18,18 @@ func TestLabelsCommandWithRealImage(t *testing.T) {
 	// Test with the ghcrctl-test-with-sbom image which should have labels
 	image := "ghcrctl-test-with-sbom"
 
-	// Reset root command args
-	rootCmd.SetArgs([]string{"labels", image})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"labels", image})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err := rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -43,13 +45,11 @@ func TestLabelsCommandWithRealImage(t *testing.T) {
 	if !strings.Contains(output, "Total:") {
 		t.Error("Expected output to contain 'Total:'")
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }
 
 // TestLabelsCommandJSON tests JSON output format
 func TestLabelsCommandJSON(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -57,17 +57,18 @@ func TestLabelsCommandJSON(t *testing.T) {
 
 	image := "ghcrctl-test-with-sbom"
 
-	// Reset root command args
-	rootCmd.SetArgs([]string{"labels", image, "--json"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"labels", image, "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err := rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -83,13 +84,11 @@ func TestLabelsCommandJSON(t *testing.T) {
 	if !strings.HasSuffix(strings.TrimSpace(output), "}") {
 		t.Error("Expected JSON output to end with '}'")
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }
 
 // TestLabelsCommandWithKey tests filtering by specific key
 func TestLabelsCommandWithKey(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -97,18 +96,20 @@ func TestLabelsCommandWithKey(t *testing.T) {
 
 	image := "ghcrctl-test-with-sbom"
 
+	// Create fresh command instance
 	// Test with a common OCI label key
 	// Note: We don't know which labels exist, so we'll just verify the command works
-	rootCmd.SetArgs([]string{"labels", image, "--key", "org.opencontainers.image.source"})
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"labels", image, "--key", "org.opencontainers.image.source"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command - may fail if label doesn't exist
-	err := rootCmd.Execute()
+	err := cmd.Execute()
 
 	output := stdout.String()
 	stderrStr := stderr.String()
@@ -126,7 +127,4 @@ func TestLabelsCommandWithKey(t *testing.T) {
 			t.Error("Expected output to contain the requested label key")
 		}
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }

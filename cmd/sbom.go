@@ -14,18 +14,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	sbomTag          string
-	sbomDigest       string
-	sbomAll          bool
-	sbomJSON         bool
-	sbomOutputFormat string
-)
+// newSBOMCmd creates the sbom command with isolated flag state.
+func newSBOMCmd() *cobra.Command {
+	var (
+		tag          string
+		digest       string
+		all          bool
+		jsonOutput   bool
+		outputFormat string
+	)
 
-var sbomCmd = &cobra.Command{
-	Use:   "sbom <image>",
-	Short: "Display SBOM (Software Bill of Materials)",
-	Long: `Display the SBOM for a container image. If multiple SBOMs exist, use --digest to select one or --all to show all.
+	cmd := &cobra.Command{
+		Use:   "sbom <image>",
+		Short: "Display SBOM (Software Bill of Materials)",
+		Long: `Display the SBOM for a container image. If multiple SBOMs exist, use --digest to select one or --all to show all.
 
 Examples:
   # Show SBOM for latest tag
@@ -42,97 +44,106 @@ Examples:
 
   # Output in JSON format
   ghcrctl sbom myimage --json`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
 
-		// Handle output format flag (-o)
-		if sbomOutputFormat != "" {
-			switch sbomOutputFormat {
-			case "json":
-				sbomJSON = true
-			case "table":
-				sbomJSON = false
-			default:
+			// Handle output format flag (-o)
+			if outputFormat != "" {
+				switch outputFormat {
+				case "json":
+					jsonOutput = true
+				case "table":
+					jsonOutput = false
+				default:
+					cmd.SilenceUsage = true
+					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
+				}
+			}
+
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("invalid output format %q. Supported formats: json, table", sbomOutputFormat)
+				return fmt.Errorf("failed to read configuration: %w", err)
 			}
-		}
 
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
-
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
-
-		// Get GitHub token
-		token, err := gh.GetToken()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
-
-		// Construct full image reference
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-
-		// Resolve tag to digest
-		ctx := cmd.Context()
-		digest, err := oras.ResolveTag(ctx, fullImage, sbomTag)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to resolve tag '%s': %w", sbomTag, err)
-		}
-
-		// Discover children
-		children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to discover children: %w", err)
-		}
-
-		// Filter for SBOM artifacts
-		var sboms []oras.ChildArtifact
-		for _, child := range children {
-			if child.Type.Role == "sbom" {
-				sboms = append(sboms, child)
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
-		}
 
-		// Check if no SBOMs found
-		if len(sboms) == 0 {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("no SBOM found for image %s (tag: %s)", imageName, sbomTag)
-		}
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
-		// If specific digest requested, fetch that one
-		if sbomDigest != "" {
-			return fetchAndDisplaySBOM(cmd.OutOrStdout(), ctx, fullImage, sbomDigest, sbomJSON, token)
-		}
+			// Construct full image reference
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-		// If --all flag, show all SBOMs
-		if sbomAll {
-			return fetchAndDisplayAllSBOMs(cmd.OutOrStdout(), ctx, fullImage, sboms, sbomJSON, token)
-		}
+			// Resolve tag to digest
+			ctx := cmd.Context()
+			resolvedDigest, err := oras.ResolveTag(ctx, fullImage, tag)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
+			}
 
-		// Smart behavior: if only one SBOM, show it; otherwise list them
-		if len(sboms) == 1 {
-			return fetchAndDisplaySBOM(cmd.OutOrStdout(), ctx, fullImage, sboms[0].Digest, sbomJSON, token)
-		}
+			// Discover children
+			children, err := oras.DiscoverChildren(ctx, fullImage, resolvedDigest, nil)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to discover children: %w", err)
+			}
 
-		// Multiple SBOMs: if JSON output requested, show all; otherwise list them
-		if sbomJSON {
-			return fetchAndDisplayAllSBOMs(cmd.OutOrStdout(), ctx, fullImage, sboms, sbomJSON, token)
-		}
+			// Filter for SBOM artifacts
+			var sboms []oras.ChildArtifact
+			for _, child := range children {
+				if child.Type.Role == "sbom" {
+					sboms = append(sboms, child)
+				}
+			}
 
-		return listSBOMs(cmd.OutOrStdout(), sboms, imageName)
-	},
+			// Check if no SBOMs found
+			if len(sboms) == 0 {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("no SBOM found for image %s (tag: %s)", imageName, tag)
+			}
+
+			// If specific digest requested, fetch that one
+			if digest != "" {
+				return fetchAndDisplaySBOM(cmd.OutOrStdout(), ctx, fullImage, digest, jsonOutput, token)
+			}
+
+			// If --all flag, show all SBOMs
+			if all {
+				return fetchAndDisplayAllSBOMs(cmd.OutOrStdout(), ctx, fullImage, sboms, jsonOutput, token)
+			}
+
+			// Smart behavior: if only one SBOM, show it; otherwise list them
+			if len(sboms) == 1 {
+				return fetchAndDisplaySBOM(cmd.OutOrStdout(), ctx, fullImage, sboms[0].Digest, jsonOutput, token)
+			}
+
+			// Multiple SBOMs: if JSON output requested, show all; otherwise list them
+			if jsonOutput {
+				return fetchAndDisplayAllSBOMs(cmd.OutOrStdout(), ctx, fullImage, sboms, jsonOutput, token)
+			}
+
+			return listSBOMs(cmd.OutOrStdout(), sboms, imageName)
+		},
+	}
+
+	cmd.Flags().StringVar(&tag, "tag", "latest", "Tag to resolve (default: latest)")
+	cmd.Flags().StringVar(&digest, "digest", "", "Specific SBOM digest to fetch")
+	cmd.Flags().BoolVar(&all, "all", false, "Show all SBOMs")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
+
+	return cmd
 }
 
 // fetchAndDisplaySBOM fetches and displays a single SBOM
@@ -215,13 +226,4 @@ func outputSBOMReadable(w io.Writer, content []map[string]interface{}, digest st
 	}
 
 	return nil
-}
-
-func init() {
-	rootCmd.AddCommand(sbomCmd)
-	sbomCmd.Flags().StringVar(&sbomTag, "tag", "latest", "Tag to resolve (default: latest)")
-	sbomCmd.Flags().StringVar(&sbomDigest, "digest", "", "Specific SBOM digest to fetch")
-	sbomCmd.Flags().BoolVar(&sbomAll, "all", false, "Show all SBOMs")
-	sbomCmd.Flags().BoolVar(&sbomJSON, "json", false, "Output in JSON format")
-	sbomCmd.Flags().StringVarP(&sbomOutputFormat, "output", "o", "", "Output format (json, table)")
 }

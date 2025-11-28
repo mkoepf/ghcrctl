@@ -5,8 +5,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/mkoepf/ghcrctl/internal/config"
 )
 
 // TestImagesCommandWithRepoScopedToken tests that images command works with valid token
@@ -14,29 +12,24 @@ import (
 // possible to provide the exact same token type for local development and CI
 // environments due to GitHub limitations.
 func TestImagesCommandWithRepoScopedToken(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Reset root command args
-	rootCmd.SetArgs([]string{"images"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"images"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 
 	// If token has sufficient permissions (access to user / org namespace and
 	// read:packages), command should succeed. If it's a repo-scoped token (e.g.
@@ -86,36 +79,28 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 			t.Errorf("Error message should be helpful about token permissions, got: %v", err)
 		}
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }
 
 // TestImagesCommandErrorFormat verifies error handling without usage hint
 func TestImagesCommandErrorFormat(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Reset root command args
-	rootCmd.SetArgs([]string{"images"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"images"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 
 	// Should fail with operational error
 	if err != nil {
@@ -128,7 +113,4 @@ func TestImagesCommandErrorFormat(t *testing.T) {
 			t.Logf("Stderr output: %s", stderrOutput)
 		}
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }

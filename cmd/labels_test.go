@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"bytes"
 	"testing"
 )
 
 // TestLabelsCommandStructure verifies the labels command is properly set up
 func TestLabelsCommandStructure(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	labelsCmd, _, err := cmd.Find([]string{"labels"})
 	if err != nil {
 		t.Fatalf("Failed to find labels command: %v", err)
@@ -23,6 +25,7 @@ func TestLabelsCommandStructure(t *testing.T) {
 
 // TestLabelsCommandArguments verifies argument validation
 func TestLabelsCommandArguments(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		args        []string
@@ -41,24 +44,32 @@ func TestLabelsCommandArguments(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+
+			// Capture output
+			stdout := new(bytes.Buffer)
+			stderr := new(bytes.Buffer)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
+
+			err := cmd.Execute()
 
 			// Should fail with usage error
 			if err == nil {
 				t.Error("Expected error but got none")
 			}
-
-			// Reset args
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 // TestLabelsCommandHasFlags verifies required flags exist
 func TestLabelsCommandHasFlags(t *testing.T) {
-	cmd := rootCmd
+	t.Parallel()
+	cmd := NewRootCmd()
 	labelsCmd, _, err := cmd.Find([]string{"labels"})
 	if err != nil {
 		t.Fatalf("Failed to find labels command: %v", err)

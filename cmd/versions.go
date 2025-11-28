@@ -16,26 +16,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	versionsJSON          bool
-	versionsVerbose       bool
-	versionsTag           string
-	versionsTagPattern    string
-	versionsOnlyTagged    bool
-	versionsOnlyUntagged  bool
-	versionsOlderThan     string
-	versionsNewerThan     string
-	versionsOlderThanDays int
-	versionsNewerThanDays int
-	versionsOutputFormat  string
-	versionsVersionID     int64
-	versionsDigest        string
-)
+// newVersionsCmd creates the versions command with isolated flag state.
+func newVersionsCmd() *cobra.Command {
+	var (
+		jsonOutput    bool
+		verbose       bool
+		tag           string
+		tagPattern    string
+		onlyTagged    bool
+		onlyUntagged  bool
+		olderThan     string
+		newerThan     string
+		olderThanDays int
+		newerThanDays int
+		outputFormat  string
+		versionID     int64
+		digest        string
+	)
 
-var versionsCmd = &cobra.Command{
-	Use:   "versions <image>",
-	Short: "List all versions of a package",
-	Long: `List all versions of a container image package with graph relationships.
+	cmd := &cobra.Command{
+		Use:   "versions <image>",
+		Short: "List all versions of a package",
+		Long: `List all versions of a container image package with graph relationships.
 
 This command displays all versions of a package, showing how they relate to each
 other in OCI artifact graphs. Versions belonging to the same graph (image index,
@@ -79,100 +81,118 @@ Examples:
 
   # List versions in JSON format
   ghcrctl versions myimage --json`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		imageName := args[0]
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			imageName := args[0]
 
-		// Handle output format flag (-o)
-		if versionsOutputFormat != "" {
-			switch versionsOutputFormat {
-			case "json":
-				versionsJSON = true
-			case "table":
-				versionsJSON = false
-			default:
-				cmd.SilenceUsage = true
-				return fmt.Errorf("invalid output format %q. Supported formats: json, table", versionsOutputFormat)
+			// Handle output format flag (-o)
+			if outputFormat != "" {
+				switch outputFormat {
+				case "json":
+					jsonOutput = true
+				case "table":
+					jsonOutput = false
+				default:
+					cmd.SilenceUsage = true
+					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
+				}
 			}
-		}
 
-		// Load configuration
-		cfg := config.New()
-		owner, ownerType, err := cfg.GetOwner()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to read configuration: %w", err)
-		}
+			// Load configuration
+			cfg := config.New()
+			owner, ownerType, err := cfg.GetOwner()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to read configuration: %w", err)
+			}
 
-		if owner == "" || ownerType == "" {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
-		}
+			if owner == "" || ownerType == "" {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+			}
 
-		// Get GitHub token
-		token, err := gh.GetToken()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return err
-		}
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
-		// Create GitHub client
-		client, err := gh.NewClientWithContext(cmd.Context(), token)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to create GitHub client: %w", err)
-		}
+			// Create GitHub client
+			client, err := gh.NewClientWithContext(cmd.Context(), token)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to create GitHub client: %w", err)
+			}
 
-		ctx := cmd.Context()
+			ctx := cmd.Context()
 
-		// List package versions
-		allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to list versions: %w", err)
-		}
+			// List package versions
+			allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to list versions: %w", err)
+			}
 
-		// Build filter from command-line flags
-		versionFilter, err := buildVersionFilter()
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("invalid filter options: %w", err)
-		}
+			// Build filter from command-line flags
+			versionFilter, err := buildVersionFilter(tag, tagPattern, onlyTagged, onlyUntagged,
+				olderThan, newerThan, olderThanDays, newerThanDays, versionID, digest)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("invalid filter options: %w", err)
+			}
 
-		// Build full image reference
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+			// Build full image reference
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-		// For --untagged filter, discover tagged graph members first
-		// This allows the filter to exclude children of tagged versions
-		if versionFilter.OnlyUntagged {
-			versionFilter.TaggedGraphMembers = identifyTaggedGraphMembers(ctx, fullImage, allVersions)
-		}
+			// For --untagged filter, discover tagged graph members first
+			// This allows the filter to exclude children of tagged versions
+			if versionFilter.OnlyUntagged {
+				versionFilter.TaggedGraphMembers = identifyTaggedGraphMembers(ctx, fullImage, allVersions)
+			}
 
-		// Apply filters to determine which versions to graph
-		// Build graphs only for filtered roots, but provide all versions for child lookup
-		versionsToGraph := versionFilter.Apply(allVersions)
-		if len(versionsToGraph) == 0 {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("no versions found matching filter criteria")
-		}
+			// Apply filters to determine which versions to graph
+			// Build graphs only for filtered roots, but provide all versions for child lookup
+			versionsToGraph := versionFilter.Apply(allVersions)
+			if len(versionsToGraph) == 0 {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("no versions found matching filter criteria")
+			}
 
-		// Build graph relationships
-		// Pass versionsToGraph (filtered roots) and allVersions (for child lookup)
-		versionGraphs, err := buildVersionGraphs(ctx, fullImage, versionsToGraph, allVersions, client, owner, ownerType, imageName)
-		if err != nil {
-			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to build version graphs: %w", err)
-		}
+			// Build graph relationships
+			// Pass versionsToGraph (filtered roots) and allVersions (for child lookup)
+			versionGraphs, err := buildVersionGraphs(ctx, fullImage, versionsToGraph, allVersions, client, owner, ownerType, imageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to build version graphs: %w", err)
+			}
 
-		// Output results
-		if versionsJSON {
-			return display.OutputJSON(cmd.OutOrStdout(), allVersions)
-		}
-		if versionsVerbose {
-			return outputVersionsVerbose(cmd.OutOrStdout(), versionGraphs, imageName)
-		}
-		return outputVersionsTableWithGraphs(cmd.OutOrStdout(), versionGraphs, imageName)
-	},
+			// Output results
+			if jsonOutput {
+				return display.OutputJSON(cmd.OutOrStdout(), allVersions)
+			}
+			if verbose {
+				return outputVersionsVerbose(cmd.OutOrStdout(), versionGraphs, imageName)
+			}
+			return outputVersionsTableWithGraphs(cmd.OutOrStdout(), versionGraphs, imageName)
+		},
+	}
+
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed version information")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	cmd.Flags().StringVar(&tag, "tag", "", "Filter versions by exact tag match")
+	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")
+	cmd.Flags().BoolVar(&onlyTagged, "tagged", false, "Show only tagged versions")
+	cmd.Flags().BoolVar(&onlyUntagged, "untagged", false, "Show only untagged versions")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show versions older than date (YYYY-MM-DD or RFC3339)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show versions newer than date (YYYY-MM-DD or RFC3339)")
+	cmd.Flags().IntVar(&olderThanDays, "older-than-days", 0, "Show versions older than N days")
+	cmd.Flags().IntVar(&newerThanDays, "newer-than-days", 0, "Show versions newer than N days")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
+	cmd.Flags().Int64Var(&versionID, "version", 0, "Filter by exact version ID")
+	cmd.Flags().StringVar(&digest, "digest", "", "Filter by digest (supports prefix matching)")
+
+	return cmd
 }
 
 // VersionGraph is an alias for discovery.VersionGraph for backward compatibility
@@ -738,33 +758,35 @@ func parseUserDate(dateStr string) (time.Time, error) {
 }
 
 // buildVersionFilter creates a VersionFilter from command-line flags
-func buildVersionFilter() (*filter.VersionFilter, error) {
+func buildVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged bool,
+	olderThan, newerThan string, olderThanDays, newerThanDays int,
+	versionID int64, digest string) (*filter.VersionFilter, error) {
 	vf := &filter.VersionFilter{
-		OnlyTagged:    versionsOnlyTagged,
-		OnlyUntagged:  versionsOnlyUntagged,
-		TagPattern:    versionsTagPattern,
-		OlderThanDays: versionsOlderThanDays,
-		NewerThanDays: versionsNewerThanDays,
-		VersionID:     versionsVersionID,
-		Digest:        versionsDigest,
+		OnlyTagged:    onlyTagged,
+		OnlyUntagged:  onlyUntagged,
+		TagPattern:    tagPattern,
+		OlderThanDays: olderThanDays,
+		NewerThanDays: newerThanDays,
+		VersionID:     versionID,
+		Digest:        digest,
 	}
 
 	// Handle exact tag match (backward compatibility with --tag flag)
-	if versionsTag != "" {
-		vf.Tags = []string{versionsTag}
+	if tag != "" {
+		vf.Tags = []string{tag}
 	}
 
 	// Parse absolute date filters
-	if versionsOlderThan != "" {
-		t, err := parseUserDate(versionsOlderThan)
+	if olderThan != "" {
+		t, err := parseUserDate(olderThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --older-than date format: %w", err)
 		}
 		vf.OlderThan = t
 	}
 
-	if versionsNewerThan != "" {
-		t, err := parseUserDate(versionsNewerThan)
+	if newerThan != "" {
+		t, err := parseUserDate(newerThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --newer-than date format: %w", err)
 		}
@@ -772,26 +794,9 @@ func buildVersionFilter() (*filter.VersionFilter, error) {
 	}
 
 	// Validate conflicting flags
-	if versionsOnlyTagged && versionsOnlyUntagged {
+	if onlyTagged && onlyUntagged {
 		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
 	}
 
 	return vf, nil
-}
-
-func init() {
-	rootCmd.AddCommand(versionsCmd)
-	versionsCmd.Flags().BoolVarP(&versionsVerbose, "verbose", "v", false, "Show detailed version information")
-	versionsCmd.Flags().BoolVar(&versionsJSON, "json", false, "Output in JSON format")
-	versionsCmd.Flags().StringVar(&versionsTag, "tag", "", "Filter versions by exact tag match")
-	versionsCmd.Flags().StringVar(&versionsTagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")
-	versionsCmd.Flags().BoolVar(&versionsOnlyTagged, "tagged", false, "Show only tagged versions")
-	versionsCmd.Flags().BoolVar(&versionsOnlyUntagged, "untagged", false, "Show only untagged versions")
-	versionsCmd.Flags().StringVar(&versionsOlderThan, "older-than", "", "Show versions older than date (YYYY-MM-DD or RFC3339)")
-	versionsCmd.Flags().StringVar(&versionsNewerThan, "newer-than", "", "Show versions newer than date (YYYY-MM-DD or RFC3339)")
-	versionsCmd.Flags().IntVar(&versionsOlderThanDays, "older-than-days", 0, "Show versions older than N days")
-	versionsCmd.Flags().IntVar(&versionsNewerThanDays, "newer-than-days", 0, "Show versions newer than N days")
-	versionsCmd.Flags().StringVarP(&versionsOutputFormat, "output", "o", "", "Output format (json, table)")
-	versionsCmd.Flags().Int64Var(&versionsVersionID, "version", 0, "Filter by exact version ID")
-	versionsCmd.Flags().StringVar(&versionsDigest, "digest", "", "Filter by digest (supports prefix matching)")
 }

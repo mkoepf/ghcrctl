@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestConfigOrgCommandExecution(t *testing.T) {
+	// Cannot run in parallel - modifies shared config file
 	// This test verifies the org command runs without error
 	// It will modify the actual config file, but we'll restore it after
 
@@ -23,9 +25,17 @@ func TestConfigOrgCommandExecution(t *testing.T) {
 		}
 	}()
 
-	// Execute org command
-	rootCmd.SetArgs([]string{"config", "org", "testorg"})
-	err := rootCmd.Execute()
+	// Execute org command with fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"config", "org", "testorg"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
 
 	if err != nil {
 		t.Errorf("config org command failed: %v", err)
@@ -45,12 +55,10 @@ func TestConfigOrgCommandExecution(t *testing.T) {
 	if ownerType != "org" {
 		t.Errorf("Expected owner type 'org', got '%s'", ownerType)
 	}
-
-	// Reset
-	rootCmd.SetArgs([]string{})
 }
 
 func TestConfigUserCommandExecution(t *testing.T) {
+	// Cannot run in parallel - modifies shared config file
 	// This test verifies the user command runs without error
 	// It will modify the actual config file, but we'll restore it after
 
@@ -65,9 +73,17 @@ func TestConfigUserCommandExecution(t *testing.T) {
 		}
 	}()
 
-	// Execute user command
-	rootCmd.SetArgs([]string{"config", "user", "testuser"})
-	err := rootCmd.Execute()
+	// Execute user command with fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"config", "user", "testuser"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
 
 	if err != nil {
 		t.Errorf("config user command failed: %v", err)
@@ -87,12 +103,10 @@ func TestConfigUserCommandExecution(t *testing.T) {
 	if ownerType != "user" {
 		t.Errorf("Expected owner type 'user', got '%s'", ownerType)
 	}
-
-	// Reset
-	rootCmd.SetArgs([]string{})
 }
 
 func TestConfigOrgCommand(t *testing.T) {
+	t.Parallel()
 	// Test argument validation for org command
 
 	tests := []struct {
@@ -122,10 +136,20 @@ func TestConfigOrgCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			// Execute command
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			// Execute command with fresh instance
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+
+			// Capture output
+			stdout := new(bytes.Buffer)
+			stderr := new(bytes.Buffer)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
+
+			err := cmd.Execute()
 
 			if tt.wantError {
 				if err == nil {
@@ -138,14 +162,12 @@ func TestConfigOrgCommand(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 				}
 			}
-
-			// Reset for next test
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 func TestConfigUserCommand(t *testing.T) {
+	t.Parallel()
 	// Test argument validation for user command
 
 	tests := []struct {
@@ -175,10 +197,20 @@ func TestConfigUserCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			// Execute command
-			rootCmd.SetArgs(tt.args)
-			err := rootCmd.Execute()
+			t.Parallel()
+			// Execute command with fresh instance
+			cmd := NewRootCmd()
+			cmd.SetArgs(tt.args)
+
+			// Capture output
+			stdout := new(bytes.Buffer)
+			stderr := new(bytes.Buffer)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
+
+			err := cmd.Execute()
 
 			if tt.wantError {
 				if err == nil {
@@ -191,14 +223,12 @@ func TestConfigUserCommand(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 				}
 			}
-
-			// Reset for next test
-			rootCmd.SetArgs([]string{})
 		})
 	}
 }
 
 func TestConfigShowWithNoConfigFile(t *testing.T) {
+	// Cannot run in parallel - modifies HOME environment variable
 	// Test config show when no config exists
 	// This tests the empty config path (lines 27-30 in config.go)
 
@@ -209,9 +239,10 @@ func TestConfigShowWithNoConfigFile(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Save current HOME and USERPROFILE (for Windows) and restore after test
+	// Save current env vars and restore after test
 	originalHome := os.Getenv("HOME")
 	originalUserProfile := os.Getenv("USERPROFILE")
+	originalConfig := os.Getenv("GHCRCTL_CONFIG")
 	defer func() {
 		os.Setenv("HOME", originalHome)
 		if originalUserProfile != "" {
@@ -219,24 +250,37 @@ func TestConfigShowWithNoConfigFile(t *testing.T) {
 		} else {
 			os.Unsetenv("USERPROFILE")
 		}
+		if originalConfig != "" {
+			os.Setenv("GHCRCTL_CONFIG", originalConfig)
+		} else {
+			os.Unsetenv("GHCRCTL_CONFIG")
+		}
 	}()
 
-	// Set HOME and USERPROFILE to temp dir so config.New() uses it
+	// Clear GHCRCTL_CONFIG and set HOME/USERPROFILE to temp dir
+	os.Unsetenv("GHCRCTL_CONFIG")
 	os.Setenv("HOME", tempDir)
 	os.Setenv("USERPROFILE", tempDir)
 
-	// Execute config show - should show "No configuration found"
-	rootCmd.SetArgs([]string{"config", "show"})
-	err = rootCmd.Execute()
+	// Execute config show with fresh instance - should show "No configuration found"
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"config", "show"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err = cmd.Execute()
 
 	if err != nil {
 		t.Errorf("config show failed: %v", err)
 	}
-
-	rootCmd.SetArgs([]string{})
 }
 
 func TestConfigOrgAndUserToggle(t *testing.T) {
+	// Cannot run in parallel - modifies shared config file
 	// Test switching between org and user
 	// Save original config
 	originalCfg := config.New()
@@ -249,8 +293,15 @@ func TestConfigOrgAndUserToggle(t *testing.T) {
 	}()
 
 	// Set as org
-	rootCmd.SetArgs([]string{"config", "org", "myorg"})
-	if err := rootCmd.Execute(); err != nil {
+	cmd1 := NewRootCmd()
+	cmd1.SetArgs([]string{"config", "org", "myorg"})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd1.SetOut(stdout)
+	cmd1.SetErr(stderr)
+
+	if err := cmd1.Execute(); err != nil {
 		t.Errorf("Failed to set org: %v", err)
 	}
 
@@ -262,16 +313,22 @@ func TestConfigOrgAndUserToggle(t *testing.T) {
 	}
 
 	// Switch to user
-	rootCmd.SetArgs([]string{"config", "user", "myuser"})
-	if err := rootCmd.Execute(); err != nil {
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"config", "user", "myuser"})
+
+	stdout = new(bytes.Buffer)
+	stderr = new(bytes.Buffer)
+	cmd2.SetOut(stdout)
+	cmd2.SetErr(stderr)
+
+	if err := cmd2.Execute(); err != nil {
 		t.Errorf("Failed to set user: %v", err)
 	}
 
 	// Verify
+	cfg = config.New()
 	name, ownerType, _ = cfg.GetOwner()
 	if name != "myuser" || ownerType != "user" {
 		t.Errorf("Expected myuser (user), got %s (%s)", name, ownerType)
 	}
-
-	rootCmd.SetArgs([]string{})
 }

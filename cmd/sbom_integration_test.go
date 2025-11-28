@@ -6,36 +6,29 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/mkoepf/ghcrctl/internal/config"
 )
 
 // TestSBOMCommandWithImage tests sbom command against real image with SBOM
 func TestSBOMCommandWithImage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Reset root command args
+	// Create fresh command instance
 	// Use --all flag since the test image is multiarch and has multiple SBOMs (one per platform)
-	rootCmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest", "--all"})
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest", "--all"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("sbom command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -57,36 +50,28 @@ func TestSBOMCommandWithImage(t *testing.T) {
 	if !hasFormat {
 		t.Error("Expected SBOM to contain format indicators (SPDX/CycloneDX/in-toto)")
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }
 
 // TestSBOMCommandWithoutSBOM tests sbom command against image without SBOM
 func TestSBOMCommandWithoutSBOM(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Reset root command args
-	rootCmd.SetArgs([]string{"sbom", "ghcrctl-test-no-sbom", "--tag", "latest"})
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"sbom", "ghcrctl-test-no-sbom", "--tag", "latest"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command - should fail
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Error("Expected error when SBOM not found, got none")
 	}
@@ -95,39 +80,28 @@ func TestSBOMCommandWithoutSBOM(t *testing.T) {
 	if !strings.Contains(err.Error(), "no SBOM found") && !strings.Contains(err.Error(), "SBOM") {
 		t.Errorf("Expected error about missing SBOM, got: %v", err)
 	}
-
-	// Reset args
-	rootCmd.SetArgs([]string{})
 }
 
 // TestSBOMCommandJSONOutput tests sbom command with --json flag
 func TestSBOMCommandJSONOutput(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Set up config
-	cfg := config.New()
-	err := cfg.SetOwner("mkoepf", "user")
-	if err != nil {
-		t.Fatalf("Failed to set owner: %v", err)
-	}
-
-	// Reset root command args
-	rootCmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest", "--json"})
-
-	// Reset the JSON flag explicitly
-	sbomJSON = false
+	// Create fresh command instance
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"sbom", "ghcrctl-test-with-sbom", "--tag", "latest", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	rootCmd.SetOut(stdout)
-	rootCmd.SetErr(stderr)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 
 	// Execute command
-	err = rootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("sbom command failed: %v\nStderr: %s", err, stderr.String())
 	}
@@ -140,10 +114,6 @@ func TestSBOMCommandJSONOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Errorf("Output is not valid JSON: %v\nOutput: %s", err, output[:min(len(output), 200)])
 	}
-
-	// Reset args and flag
-	rootCmd.SetArgs([]string{})
-	sbomJSON = false
 }
 
 // min helper function

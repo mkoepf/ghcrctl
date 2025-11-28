@@ -16,7 +16,7 @@ ghcrctl provides functionality for:
 - **Discovering signatures** and attestations from both Docker buildx and cosign
 - **Managing GHCR version metadata** (labels, tags)
 - **Safe deletion** of package versions and complete OCI graphs
-- **Configuration** of owner/org and authentication
+- **Shell completion** with dynamic image name suggestions
 
 ## Installation
 
@@ -30,62 +30,7 @@ go build -o ghcrctl .
 
 ## Usage
 
-### Configuration
-
-Set your GitHub organization:
-
-```bash
-ghcrctl config org mycompany
-```
-
-Or set a user:
-
-```bash
-ghcrctl config user myusername
-```
-
-View current configuration:
-
-```bash
-ghcrctl config show
-```
-
-#### Configuration File
-
-Configuration is stored in `~/.ghcrctl/config.yaml`:
-
-```yaml
-owner-name: myorg
-owner-type: org
-```
-
-#### Environment Variables (Recommended for Parallel Sessions)
-
-You can override the config file by setting environment variables. This is particularly useful for working with multiple owners in parallel terminal sessions:
-
-```bash
-# Work with an organization
-export GHCRCTL_OWNER=mycompany
-export GHCRCTL_OWNER_TYPE=org
-ghcrctl images
-
-# In another terminal, work with your personal account
-export GHCRCTL_OWNER=myusername
-export GHCRCTL_OWNER_TYPE=user
-ghcrctl images
-```
-
-**Priority order:**
-1. Environment variables (`GHCRCTL_OWNER`, `GHCRCTL_OWNER_TYPE`) - highest priority
-2. Config file (`~/.ghcrctl/config.yaml`) - fallback
-
-**Default behavior:** If only `GHCRCTL_OWNER` is set, `GHCRCTL_OWNER_TYPE` defaults to `user`.
-
-**Quick one-off commands:**
-```bash
-# Run a single command with different owner without changing config
-GHCRCTL_OWNER=otherorg GHCRCTL_OWNER_TYPE=org ghcrctl images
-```
+All commands use the `owner/image[:tag]` format, where owner is automatically detected as user or organization.
 
 ### Authentication
 
@@ -104,16 +49,17 @@ export GITHUB_TOKEN=ghp_your_token_here
 
 ### List Container Images
 
-List all container images for the configured owner:
+List all container images for an owner:
 
 ```bash
-ghcrctl images
+ghcrctl images mkoepf
+ghcrctl images myorg
 ```
 
 Get output in JSON format:
 
 ```bash
-ghcrctl images --json
+ghcrctl images mkoepf --json
 ```
 
 ### List Package Versions
@@ -121,7 +67,7 @@ ghcrctl images --json
 List all versions of a package with their complete OCI artifact relationships:
 
 ```bash
-ghcrctl versions myimage
+ghcrctl versions mkoepf/myimage
 ```
 
 This command shows all package versions in GHCR organized by their OCI relationships:
@@ -163,42 +109,42 @@ The summary line reports the count of distinct versions and how many appear in m
 **Filter options:**
 ```bash
 # Show only versions with a specific tag (optimized - only graphs this version)
-ghcrctl versions myimage --tag v1.0.0
+ghcrctl versions mkoepf/myimage --tag v1.0.0
 
 # Show only tagged versions
-ghcrctl versions myimage --tagged
+ghcrctl versions mkoepf/myimage --tagged
 
 # Show only untagged versions
-ghcrctl versions myimage --untagged
+ghcrctl versions mkoepf/myimage --untagged
 
 # Show versions matching a tag pattern (regex)
-ghcrctl versions myimage --tag-pattern "^v1\\..*"
+ghcrctl versions mkoepf/myimage --tag-pattern "^v1\\..*"
 
 # Filter by specific version ID
-ghcrctl versions myimage --version 585861918
+ghcrctl versions mkoepf/myimage --version 585861918
 
 # Filter by digest (full or short format)
-ghcrctl versions myimage --digest sha256:01af50cc8b0d
-ghcrctl versions myimage --digest 01af50cc8b0d  # short form from DIGEST column
+ghcrctl versions mkoepf/myimage --digest sha256:01af50cc8b0d
+ghcrctl versions mkoepf/myimage --digest 01af50cc8b0d  # short form from DIGEST column
 
 # Show versions older than a specific date
-ghcrctl versions myimage --older-than 2025-01-01
+ghcrctl versions mkoepf/myimage --older-than 2025-01-01
 
 # Show versions newer than a specific date
-ghcrctl versions myimage --newer-than 2025-11-01
+ghcrctl versions mkoepf/myimage --newer-than 2025-11-01
 
 # Show versions older than 30 days
-ghcrctl versions myimage --older-than-days 30
+ghcrctl versions mkoepf/myimage --older-than-days 30
 
 # Combine filters: untagged versions older than 7 days
-ghcrctl versions myimage --untagged --older-than-days 7
+ghcrctl versions mkoepf/myimage --untagged --older-than-days 7
 ```
 
 **JSON output:**
 ```bash
-ghcrctl versions myimage --json
+ghcrctl versions mkoepf/myimage --json
 # or
-ghcrctl versions myimage -o json
+ghcrctl versions mkoepf/myimage -o json
 ```
 
 **Verbose output:**
@@ -206,9 +152,9 @@ ghcrctl versions myimage -o json
 For detailed information including full digests and sizes, use the `--verbose` or `-v` flag:
 
 ```bash
-ghcrctl versions myimage --tag latest --verbose
+ghcrctl versions mkoepf/myimage --tag latest --verbose
 # or
-ghcrctl versions myimage --tag latest -v
+ghcrctl versions mkoepf/myimage --tag latest -v
 ```
 
 Example verbose output:
@@ -264,7 +210,8 @@ When using `--tag` to filter, the command only discovers graph relationships for
 Display the SBOM attestation for a container image:
 
 ```bash
-ghcrctl sbom myimage
+ghcrctl sbom mkoepf/myimage
+ghcrctl sbom mkoepf/myimage:v1.0.0
 ```
 
 The command automatically handles multiple SBOMs:
@@ -275,17 +222,14 @@ The command automatically handles multiple SBOMs:
 **Options:**
 
 ```bash
-# Use a specific tag (default: latest)
-ghcrctl sbom myimage --tag v1.0.0
-
 # Select a specific SBOM by digest
-ghcrctl sbom myimage --digest abc123def456
+ghcrctl sbom mkoepf/myimage --digest abc123def456
 
 # Show all SBOMs
-ghcrctl sbom myimage --all
+ghcrctl sbom mkoepf/myimage --all
 
 # Output as raw JSON
-ghcrctl sbom myimage --json
+ghcrctl sbom mkoepf/myimage --json
 ```
 
 **Example with multiple SBOMs:**
@@ -313,7 +257,8 @@ Example: ghcrctl sbom myimage --digest abc123def456
 Display the provenance attestation for a container image:
 
 ```bash
-ghcrctl provenance myimage
+ghcrctl provenance mkoepf/myimage
+ghcrctl provenance mkoepf/myimage:v1.0.0
 ```
 
 Provenance attestations contain build information including:
@@ -325,17 +270,14 @@ Provenance attestations contain build information including:
 **Options:**
 
 ```bash
-# Use a specific tag (default: latest)
-ghcrctl provenance myimage --tag v1.0.0
-
 # Select specific provenance by digest
-ghcrctl provenance myimage --digest abc123def456
+ghcrctl provenance mkoepf/myimage --digest abc123def456
 
 # Show all provenance documents
-ghcrctl provenance myimage --all
+ghcrctl provenance mkoepf/myimage --all
 
 # Output as raw JSON
-ghcrctl provenance myimage --json
+ghcrctl provenance mkoepf/myimage --json
 ```
 
 **Smart behavior:**
@@ -354,7 +296,7 @@ ghcrctl provenance myimage --json
 Add a new tag to an existing image version:
 
 ```bash
-ghcrctl tag myimage v1.0.0 latest
+ghcrctl tag mkoepf/myimage:v1.0.0 latest
 ```
 
 This command creates a new tag reference pointing to the same image digest as the existing tag, using the OCI registry API. It works like `docker tag` but operates directly on GHCR.
@@ -364,9 +306,9 @@ This command creates a new tag reference pointing to the same image digest as th
 - Must use Personal Access Token (not GitHub App installation token)
 
 **Example use cases:**
-- Promote a version to `latest`: `ghcrctl tag myapp v2.1.0 latest`
-- Add semantic version alias: `ghcrctl tag myapp v1.2.3 v1.2`
-- Tag for environment: `ghcrctl tag myapp sha256:abc123... production`
+- Promote a version to `latest`: `ghcrctl tag mkoepf/myapp:v2.1.0 latest`
+- Add semantic version alias: `ghcrctl tag mkoepf/myapp:v1.2.3 v1.2`
+- Tag for environment: `ghcrctl tag mkoepf/myapp:sha256:abc123... production`
 
 ### Delete Package Versions
 
@@ -378,17 +320,17 @@ Delete an individual package version by version ID or digest:
 
 ```bash
 # Delete by version ID
-ghcrctl delete version myimage 12345678
+ghcrctl delete version mkoepf/myimage 12345678
 
 # Delete by digest (full or short format)
-ghcrctl delete version myimage --digest sha256:abc123...
-ghcrctl delete version myimage --digest abc123  # short form from DIGEST column
+ghcrctl delete version mkoepf/myimage --digest sha256:abc123...
+ghcrctl delete version mkoepf/myimage --digest abc123  # short form from DIGEST column
 
 # Skip confirmation prompt
-ghcrctl delete version myimage 12345678 --force
+ghcrctl delete version mkoepf/myimage 12345678 --force
 
 # Preview what would be deleted (dry-run)
-ghcrctl delete version myimage 12345678 --dry-run
+ghcrctl delete version mkoepf/myimage 12345678 --dry-run
 ```
 
 The command shows how many graphs the version belongs to:
@@ -414,22 +356,22 @@ Delete multiple versions at once using filters:
 
 ```bash
 # Delete all untagged versions
-ghcrctl delete version myimage --untagged
+ghcrctl delete version mkoepf/myimage --untagged
 
 # Delete untagged versions older than 30 days
-ghcrctl delete version myimage --untagged --older-than-days 30
+ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
 
 # Delete versions matching a tag pattern older than a specific date
-ghcrctl delete version myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
+ghcrctl delete version mkoepf/myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
 
 # Delete versions older than a specific date
-ghcrctl delete version myimage --older-than "2025-01-01"
+ghcrctl delete version mkoepf/myimage --older-than "2025-01-01"
 
 # Preview what would be deleted (dry-run)
-ghcrctl delete version myimage --untagged --dry-run
+ghcrctl delete version mkoepf/myimage --untagged --dry-run
 
 # Skip confirmation for automated cleanup
-ghcrctl delete version myimage --untagged --older-than-days 30 --force
+ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force
 ```
 
 **Available filters:**
@@ -445,7 +387,7 @@ Filters can be combined using AND logic (all must match).
 
 **Example output:**
 ```bash
-$ ghcrctl delete version myimage --untagged --older-than-days 30
+$ ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
 
 Preparing to delete 5 package version(s):
   Image: myimage
@@ -483,19 +425,19 @@ Delete a complete OCI artifact graph including the root image, all platform mani
 
 ```bash
 # Delete by tag (most common)
-ghcrctl delete graph myimage v1.0.0
+ghcrctl delete graph mkoepf/myimage:v1.0.0
 
 # Delete by digest
-ghcrctl delete graph myimage --digest sha256:abc123...
+ghcrctl delete graph mkoepf/myimage --digest sha256:abc123...
 
 # Delete graph containing a specific version
-ghcrctl delete graph myimage --version 12345678
+ghcrctl delete graph mkoepf/myimage --version 12345678
 
 # Skip confirmation
-ghcrctl delete graph myimage v1.0.0 --force
+ghcrctl delete graph mkoepf/myimage:v1.0.0 --force
 
 # Preview what would be deleted
-ghcrctl delete graph myimage v1.0.0 --dry-run
+ghcrctl delete graph mkoepf/myimage:v1.0.0 --dry-run
 ```
 
 **What gets deleted:**
@@ -509,7 +451,7 @@ For a multi-arch image with attestations, this command discovers and deletes:
 
 Example output:
 ```bash
-$ ghcrctl delete graph myimage v1.0.0
+$ ghcrctl delete graph mkoepf/myimage:v1.0.0
 
 Preparing to delete complete OCI graph:
   Image: myimage
@@ -534,7 +476,7 @@ Are you sure you want to delete this graph? [y/N]:
 
 **Example with shared manifests:**
 ```bash
-$ ghcrctl delete graph myimage v0.9.0 --dry-run
+$ ghcrctl delete graph mkoepf/myimage:v0.9.0 --dry-run
 
 Preparing to delete complete OCI graph:
   Image: myimage
@@ -571,11 +513,47 @@ In this example, only the root index is deleted because the platform manifests a
 
 **IMPORTANT:** Deletion is permanent and cannot be undone (except within 30 days via the GitHub web UI if the package namespace is still available).
 
+### Shell Completion
+
+ghcrctl supports shell completion with dynamic image name suggestions.
+
+**Setup:**
+
+```bash
+# Bash (Linux)
+ghcrctl completion bash > /etc/bash_completion.d/ghcrctl
+
+# Bash (macOS with Homebrew)
+ghcrctl completion bash > $(brew --prefix)/etc/bash_completion.d/ghcrctl
+
+# Zsh
+mkdir -p ~/.zsh/completions
+ghcrctl completion zsh > ~/.zsh/completions/_ghcrctl
+# Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath); autoload -Uz compinit && compinit
+
+# Fish
+ghcrctl completion fish > ~/.config/fish/completions/ghcrctl.fish
+
+# PowerShell
+ghcrctl completion powershell > ghcrctl.ps1
+# Source this file from your PowerShell profile
+```
+
+**Usage:**
+
+After setup, press TAB to complete commands and image names:
+
+```bash
+ghcrctl ver<TAB>           # completes to: ghcrctl versions
+ghcrctl versions mkoepf/<TAB>  # shows: mkoepf/myimage, mkoepf/otherapp, ...
+```
+
+Dynamic image completion requires `GITHUB_TOKEN` to be exported in your shell.
+
 ### Getting Help
 
 ```bash
 ghcrctl --help
-ghcrctl config --help
 ghcrctl images --help
 ghcrctl versions --help
 ghcrctl sbom --help
@@ -584,6 +562,7 @@ ghcrctl tag --help
 ghcrctl delete --help
 ghcrctl delete version --help
 ghcrctl delete graph --help
+ghcrctl completion --help
 ```
 
 ### API Call Logging
@@ -750,8 +729,7 @@ manual testing with appropriate credentials.
 
 ## Architecture
 
-- **CLI Layer**: Built with [Cobra](https://github.com/spf13/cobra)
-- **Configuration**: Managed with [Viper](https://github.com/spf13/viper)
+- **CLI Layer**: Built with [Cobra](https://github.com/spf13/cobra) with shell completion support
 - **GHCR API**: Using [go-github](https://github.com/google/go-github) for package management
 - **OCI Layer**: Using [ORAS Go SDK](https://oras.land/docs/category/oras-go-library) for tag resolution and artifact discovery
   - Supports OCI Referrers API and fallback to referrers tag schema

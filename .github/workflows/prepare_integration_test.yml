@@ -127,6 +127,72 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
+      # Build and push image 5: Cosign-signed (signature + SBOM attestation via cosign)
+      - name: Build and push test image 5 (for cosign signing)
+        id: push-cosign
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/cosign-signed.Dockerfile
+          push: true
+          platforms: linux/amd64
+          sbom: false
+          provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-signed:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-signed:v1.0
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      # Install cosign
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Sign the image with cosign (keyless signing via OIDC)
+      - name: Sign image with cosign
+        env:
+          DIGEST: ${{ steps.push-cosign.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-signed
+        run: |
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      # Create SBOM attestation with cosign
+      - name: Generate SBOM for cosign attestation
+        env:
+          DIGEST: ${{ steps.push-cosign.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-signed
+        run: |
+          # Generate a minimal SPDX SBOM
+          cat > sbom.spdx.json << EOF
+          {
+            "spdxVersion": "SPDX-2.3",
+            "dataLicense": "CC0-1.0",
+            "SPDXID": "SPDXRef-DOCUMENT",
+            "name": "ghcrctl-test-cosign-sbom",
+            "documentNamespace": "https://example.com/ghcrctl-test",
+            "creationInfo": {
+              "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "creators": ["Tool: ghcrctl-integration-test"]
+            },
+            "packages": [{
+              "SPDXID": "SPDXRef-Package",
+              "name": "test-package",
+              "versionInfo": "1.0.0",
+              "downloadLocation": "NOASSERTION"
+            }]
+          }
+          EOF
+
+      - name: Attest SBOM with cosign
+        env:
+          DIGEST: ${{ steps.push-cosign.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-signed
+        run: |
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
+
       - name: Summary
         run: |
           echo "## Integration Test Images Created" >> $GITHUB_STEP_SUMMARY
@@ -150,6 +216,12 @@ jobs:
           echo "- Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "- Tags: \`latest\`, \`v1.0\`, \`test-1\`" >> $GITHUB_STEP_SUMMARY
           echo "- Name: \`${{ inputs.image_prefix }}-no-sbom-no-provenance\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 5: Cosign-Signed (Signature + SBOM Attestation)" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`, \`v1.0\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-cosign-signed\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifacts: .sig (signature), .att (SBOM attestation)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test with ghcrctl" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY

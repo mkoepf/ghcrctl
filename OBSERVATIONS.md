@@ -12,7 +12,7 @@ The config file is not very elegant because
 
 Manifest, artifact, package, version, image, graph.
 
-## Inconsistent commands
+## Inconsistent 
 
 - flags vs positional arguments
 - verbs and nouns

@@ -390,7 +390,7 @@ func ExtractSubjectDigest(ctx context.Context, image, attestationDigest string) 
 
 		// Try to extract subject from layer content
 		subjectDigest, err := extractSubjectFromLayer(layerBytes)
-		layerBytes.Close()
+		_ = layerBytes.Close()
 		if err == nil && subjectDigest != "" {
 			return subjectDigest, nil
 		}

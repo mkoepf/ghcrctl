@@ -31,6 +31,9 @@ var (
 	colorError   = color.New(color.FgRed)
 	colorDryRun  = color.New(color.FgCyan)
 	colorCount   = color.New(color.Bold)
+
+	// Shared indicator color (magenta for visibility)
+	colorShared = color.New(color.FgMagenta, color.Bold)
 )
 
 // ColorVersionType applies color to version type strings based on their type.
@@ -118,4 +121,9 @@ func ColorDryRun(msg string) string {
 // ColorCount applies bold styling to counts/numbers.
 func ColorCount(n int) string {
 	return colorCount.Sprint(fmt.Sprintf("%d", n))
+}
+
+// ColorShared applies magenta bold styling to shared indicators.
+func ColorShared(msg string) string {
+	return colorShared.Sprint(msg)
 }

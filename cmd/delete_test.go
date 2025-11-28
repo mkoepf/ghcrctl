@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/mhk/ghcrctl/internal/discovery"
+	"github.com/mhk/ghcrctl/internal/gh"
 )
 
 // TestDeleteCommandStructure verifies the delete command is properly set up
@@ -235,6 +238,48 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 			// Reset args
 			rootCmd.SetArgs([]string{})
 		})
+	}
+}
+
+// TestCollectVersionIDsExcludesSharedChildren verifies that collectVersionIDs
+// excludes children that are shared with other graphs (RefCount > 1)
+func TestCollectVersionIDsExcludesSharedChildren(t *testing.T) {
+	// Test that shared children (RefCount > 1) are NOT included in deletion
+	// Only the current graph's root and exclusive children should be deleted
+
+	graph := &discovery.VersionGraph{
+		RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:root"},
+		Type:        "index",
+		Children: []discovery.VersionChild{
+			// Exclusive platform (only in this graph)
+			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:exclusive-platform"}, ArtifactType: "platform", Platform: "linux/amd64", RefCount: 1},
+			// Shared platform (in 2 graphs) - should be EXCLUDED
+			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:shared-platform"}, ArtifactType: "platform", Platform: "linux/arm64", RefCount: 2},
+			// Exclusive attestation
+			{Version: gh.PackageVersionInfo{ID: 103, Name: "sha256:exclusive-sbom"}, ArtifactType: "sbom", RefCount: 1},
+			// Shared attestation - should be EXCLUDED
+			{Version: gh.PackageVersionInfo{ID: 104, Name: "sha256:shared-prov"}, ArtifactType: "provenance", RefCount: 3},
+		},
+	}
+
+	ids := collectVersionIDs(graph)
+
+	// Should include: root (100), exclusive platform (101), exclusive sbom (103)
+	// Should exclude: shared platform (102), shared prov (104)
+	expectedIDs := map[int64]bool{100: true, 101: true, 103: true}
+	excludedIDs := map[int64]bool{102: true, 104: true}
+
+	for _, id := range ids {
+		if excludedIDs[id] {
+			t.Errorf("collectVersionIDs should NOT include shared child ID %d", id)
+		}
+		delete(expectedIDs, id)
+	}
+
+	if len(expectedIDs) > 0 {
+		for id := range expectedIDs {
+			t.Errorf("collectVersionIDs should include exclusive/root ID %d", id)
+		}
 	}
 }
 

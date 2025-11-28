@@ -63,6 +63,7 @@ type VersionChild struct {
 	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
 	Platform     string // e.g., "linux/amd64" for platform manifests
 	Size         int64  // Size in bytes
+	RefCount     int    // Number of graphs referencing this version (>1 means shared)
 }
 
 // NewVersionCacheFromSlice creates a VersionCache from an existing slice of versions.

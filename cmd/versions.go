@@ -185,106 +185,93 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	// Create version cache for efficient lookups (use ALL versions for child discovery)
 	cache := discovery.NewVersionCacheFromSlice(allVersions)
 
-	// Track which versions have been assigned to a graph
-	assigned := make(map[int64]bool)
+	// Track which versions are graph roots (to avoid treating them as standalone later)
+	isGraphRoot := make(map[int64]bool)
+
+	// Track reference counts for each version ID (how many graphs reference it)
+	refCounts := make(map[int64]int)
+
 	var graphs []VersionGraph
 
-	// Process tagged versions first (potential graph roots)
-	for _, ver := range versionsToGraph {
-		if len(ver.Tags) > 0 && !assigned[ver.ID] {
-			// This is a tagged version - potential graph root
-			graph := VersionGraph{
-				RootVersion: ver,
-				Children:    []VersionChild{},
-			}
+	// Helper to build a graph for a version
+	buildGraph := func(ver gh.PackageVersionInfo) *VersionGraph {
+		relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
 
-			assigned[ver.ID] = true
+		// Skip if no children and not tagged (standalone untagged versions are handled separately)
+		if len(relatedArtifacts) == 0 && len(ver.Tags) == 0 {
+			return nil
+		}
 
-			// Optimization: Use digest directly from ver.Name instead of resolving tag
-			// This eliminates redundant ORAS ResolveTag calls (2 OCI calls per version)
-			// since GitHub API already provides the digest
-			relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
-			graph.Type = graphType
+		graph := &VersionGraph{
+			RootVersion: ver,
+			Children:    []VersionChild{},
+			Type:        graphType,
+		}
 
-			// Find child versions by digest and consolidate artifact types
-			childMap := make(map[int64]*VersionChild) // Map version ID to child
-			for _, artifact := range relatedArtifacts {
-				if childVer, found := cache.ByDigest[artifact.Digest]; found && !assigned[childVer.ID] {
-					if existing, exists := childMap[childVer.ID]; exists {
-						// Consolidate artifact types for the same version
-						existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
-					} else {
-						childMap[childVer.ID] = &VersionChild{
-							Version:      childVer,
-							ArtifactType: artifact.ArtifactType,
-							Platform:     artifact.Platform,
-							Size:         artifact.Size,
-						}
+		// Find child versions by digest and consolidate artifact types
+		childMap := make(map[int64]*VersionChild)
+		for _, artifact := range relatedArtifacts {
+			if childVer, found := cache.ByDigest[artifact.Digest]; found {
+				if existing, exists := childMap[childVer.ID]; exists {
+					// Consolidate artifact types for the same version
+					existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
+				} else {
+					// Only count reference once per unique child per graph
+					refCounts[childVer.ID]++
+					childMap[childVer.ID] = &VersionChild{
+						Version:      childVer,
+						ArtifactType: artifact.ArtifactType,
+						Platform:     artifact.Platform,
+						Size:         artifact.Size,
 					}
 				}
 			}
+		}
 
-			// Add children to graph and mark as assigned
-			for _, child := range childMap {
-				graph.Children = append(graph.Children, *child)
-				assigned[child.Version.ID] = true
+		// Add children to graph
+		for _, child := range childMap {
+			graph.Children = append(graph.Children, *child)
+		}
+
+		return graph
+	}
+
+	// Process tagged versions first (potential graph roots)
+	for _, ver := range versionsToGraph {
+		if len(ver.Tags) > 0 && !isGraphRoot[ver.ID] {
+			isGraphRoot[ver.ID] = true
+			if graph := buildGraph(ver); graph != nil {
+				graphs = append(graphs, *graph)
 			}
-
-			graphs = append(graphs, graph)
 		}
 	}
 
 	// Process untagged versions as potential graph roots
 	for _, ver := range versionsToGraph {
-		if len(ver.Tags) == 0 && !assigned[ver.ID] {
-			// Try to discover children using the digest directly
-			relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
-
-			// Only create a graph if this version has children
-			if len(relatedArtifacts) > 0 {
-				graph := VersionGraph{
-					RootVersion: ver,
-					Children:    []VersionChild{},
-					Type:        graphType,
-				}
-				assigned[ver.ID] = true
-
-				// Find child versions by digest
-				childMap := make(map[int64]*VersionChild)
-				for _, artifact := range relatedArtifacts {
-					if childVer, found := cache.ByDigest[artifact.Digest]; found && !assigned[childVer.ID] {
-						if existing, exists := childMap[childVer.ID]; exists {
-							existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
-						} else {
-							childMap[childVer.ID] = &VersionChild{
-								Version:      childVer,
-								ArtifactType: artifact.ArtifactType,
-								Platform:     artifact.Platform,
-								Size:         artifact.Size,
-							}
-						}
-					}
-				}
-
-				for _, child := range childMap {
-					graph.Children = append(graph.Children, *child)
-					assigned[child.Version.ID] = true
-				}
-
-				graphs = append(graphs, graph)
+		if len(ver.Tags) == 0 && !isGraphRoot[ver.ID] {
+			if graph := buildGraph(ver); graph != nil {
+				isGraphRoot[ver.ID] = true
+				graphs = append(graphs, *graph)
 			}
 		}
 	}
 
-	// Add remaining unassigned versions as standalone
+	// Add remaining unassigned versions as standalone (not a root and not a child of any graph)
 	for _, ver := range versionsToGraph {
-		if !assigned[ver.ID] {
+		if !isGraphRoot[ver.ID] && refCounts[ver.ID] == 0 {
 			graph := VersionGraph{
 				RootVersion: ver,
 				Children:    []VersionChild{},
 				Type:        "standalone",
 			}
 			graphs = append(graphs, graph)
+		}
+	}
+
+	// Second pass: update RefCount on all children based on total references
+	for i := range graphs {
+		for j := range graphs[i].Children {
+			graphs[i].Children[j].RefCount = refCounts[graphs[i].Children[j].Version.ID]
 		}
 	}
 
@@ -377,20 +364,31 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		return nil
 	}
 
-	// Calculate total versions and graph count
-	totalVersions := 0
+	// Calculate distinct versions and shared count
+	seenVersions := make(map[int64]bool)
+	sharedCount := 0
 	for _, g := range graphs {
-		totalVersions += 1 + len(g.Children)
+		seenVersions[g.RootVersion.ID] = true
+		for _, child := range g.Children {
+			if !seenVersions[child.Version.ID] {
+				seenVersions[child.Version.ID] = true
+				if child.RefCount > 1 {
+					sharedCount++
+				}
+			}
+		}
 	}
+	totalVersions := len(seenVersions)
 
 	fmt.Fprintf(w, "Versions for %s:\n\n", imageName)
 
-	// Find column widths
+	// Find column widths and max RefCount for shared indicator
 	maxIDLen := len("VERSION ID")
 	maxTypeLen := len("TYPE")
 	maxDigestLen := len("DIGEST")
 	maxTagsLen := len("TAGS")
 	maxCreatedLen := len("CREATED")
+	maxRefCount := 0
 
 	for _, g := range graphs {
 		// Check root version
@@ -436,18 +434,31 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 			if len(ver.CreatedAt) > maxCreatedLen {
 				maxCreatedLen = len(ver.CreatedAt)
 			}
+			// Track max RefCount for shared indicator width
+			if child.RefCount > maxRefCount {
+				maxRefCount = child.RefCount
+			}
 		}
 	}
 
+	// Calculate shared indicator width: " (N*)" where N is maxRefCount
+	sharedIndicatorWidth := 0
+	if maxRefCount > 1 {
+		sharedIndicatorWidth = len(fmt.Sprintf(" (%d*)", maxRefCount))
+	}
+
+	// Total ID column width includes space for shared indicator
+	idColWidth := maxIDLen + sharedIndicatorWidth
+
 	// Print header with colors
 	fmt.Fprintf(w, "  %s  %s  %s  %s  %s\n",
-		display.ColorHeader(fmt.Sprintf("%-*s", maxIDLen, "VERSION ID")),
+		display.ColorHeader(fmt.Sprintf("%-*s", idColWidth, "VERSION ID")),
 		display.ColorHeader(fmt.Sprintf("%-*s", maxTypeLen, "TYPE")),
 		display.ColorHeader(fmt.Sprintf("%-*s", maxDigestLen, "DIGEST")),
 		display.ColorHeader(fmt.Sprintf("%-*s", maxTagsLen, "TAGS")),
 		display.ColorHeader("CREATED"))
 	fmt.Fprintf(w, "  %s  %s  %s  %s  %s\n",
-		display.ColorSeparator(strings.Repeat("-", maxIDLen)),
+		display.ColorSeparator(strings.Repeat("-", idColWidth)),
 		display.ColorSeparator(strings.Repeat("-", maxTypeLen)),
 		display.ColorSeparator(strings.Repeat("-", maxDigestLen)),
 		display.ColorSeparator(strings.Repeat("-", maxTagsLen)),
@@ -455,7 +466,7 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 
 	// Print graphs
 	for i, g := range graphs {
-		printVersionGraph(w, g, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
+		printVersionGraph(w, g, maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
 
 		// Add blank line between graphs (but not after the last one)
 		if i < len(graphs)-1 && len(g.Children) > 0 {
@@ -463,12 +474,34 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 		}
 	}
 
-	fmt.Fprintf(w, "\nTotal: %s version(s) in %s graph(s)\n",
-		display.ColorCount(totalVersions), display.ColorCount(len(graphs)))
+	// Build summary with proper plural/singular
+	versionWord := "versions"
+	if totalVersions == 1 {
+		versionWord = "version"
+	}
+	graphWord := "graphs"
+	if len(graphs) == 1 {
+		graphWord = "graph"
+	}
+
+	if sharedCount > 0 {
+		sharedWord := "versions appear"
+		if sharedCount == 1 {
+			sharedWord = "version appears"
+		}
+		fmt.Fprintf(w, "\nTotal: %s %s in %s %s. %s %s in multiple graphs.\n",
+			display.ColorCount(totalVersions), versionWord,
+			display.ColorCount(len(graphs)), graphWord,
+			display.ColorShared(fmt.Sprintf("%d", sharedCount)), sharedWord)
+	} else {
+		fmt.Fprintf(w, "\nTotal: %s %s in %s %s.\n",
+			display.ColorCount(totalVersions), versionWord,
+			display.ColorCount(len(graphs)), graphWord)
+	}
 	return nil
 }
 
-func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
+func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
 	// Determine tree indicators (apply color)
 	var rootIndicator, midIndicator, lastIndicator string
 	if len(g.Children) > 0 {
@@ -479,9 +512,9 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDig
 		rootIndicator = " "
 	}
 
-	// Print root version
+	// Print root version (refCount=0 means not a child, so no sharing indicator)
 	printVersion(w, rootIndicator, g.RootVersion, determineVersionType(g.RootVersion, g.Type),
-		maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
+		maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen, 0)
 
 	// Print children
 	for i, child := range g.Children {
@@ -496,11 +529,11 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, maxTypeLen, maxDig
 			childType = child.Platform
 		}
 
-		printVersion(w, indicator, child.Version, childType, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen)
+		printVersion(w, indicator, child.Version, childType, maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen, child.RefCount)
 	}
 }
 
-func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int) {
+func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtype string, maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen int, refCount int) {
 	// Format raw values for width calculation
 	tagsStr := display.FormatTags(ver.Tags)
 	digest := display.ShortDigest(ver.Name)
@@ -517,9 +550,33 @@ func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtyp
 		paddedTags = display.ColorTags(ver.Tags) + strings.Repeat(" ", maxTagsLen-2) // "[]" is 2 chars
 	}
 
-	fmt.Fprintf(w, "%s %-*d  %s  %s  %s  %s\n",
+	// Format VERSION ID with optional sharing indicator (directly after ID)
+	// Pad the combined ID+indicator to maintain column alignment
+	idStr := fmt.Sprintf("%d", ver.ID)
+	sharedIndicator := ""
+	sharedIndicatorLen := 0
+	if refCount > 1 {
+		sharedIndicator = fmt.Sprintf(" (%d*)", refCount)
+		sharedIndicatorLen = len(sharedIndicator)
+	}
+	// Calculate padding: total column width - ID length - indicator length
+	idColWidth := maxIDLen + sharedIndicatorWidth
+	padding := idColWidth - len(idStr) - sharedIndicatorLen
+	if padding < 0 {
+		padding = 0
+	}
+
+	// Color the shared indicator
+	coloredSharedIndicator := ""
+	if sharedIndicator != "" {
+		coloredSharedIndicator = display.ColorShared(sharedIndicator)
+	}
+
+	fmt.Fprintf(w, "%s %s%s%s  %s  %s  %s  %s\n",
 		indicator,
-		maxIDLen, ver.ID,
+		idStr,
+		coloredSharedIndicator,
+		strings.Repeat(" ", padding),
 		coloredType,
 		coloredDigest,
 		paddedTags,

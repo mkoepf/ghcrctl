@@ -245,10 +245,35 @@ Examples:
 		var tag string
 
 		if deleteGraphDig != "" {
-			// Lookup by digest
-			rootDigest = deleteGraphDig
-			if !strings.HasPrefix(rootDigest, "sha256:") {
-				rootDigest = "sha256:" + rootDigest
+			// Lookup by digest - support both full and short (prefix) format
+			digestInput := deleteGraphDig
+			if !strings.HasPrefix(digestInput, "sha256:") {
+				digestInput = "sha256:" + digestInput
+			}
+
+			// If it looks like a short digest, resolve to full digest
+			if len(digestInput) < 71 { // sha256: (7) + 64 hex chars = 71
+				allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to list package versions: %w", err)
+				}
+
+				var found bool
+				for _, ver := range allVersions {
+					if strings.HasPrefix(ver.Name, digestInput) {
+						rootDigest = ver.Name
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("no version found matching digest prefix %s", deleteGraphDig)
+				}
+			} else {
+				rootDigest = digestInput
 			}
 		} else if deleteGraphVer != 0 {
 			// Lookup by version ID - need to find the digest first
@@ -286,6 +311,10 @@ Examples:
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to build graph: %w", err)
+		}
+		if g == nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("no graph found for digest %s", rootDigest)
 		}
 
 		// Collect all version IDs to delete
@@ -370,12 +399,22 @@ func runSingleDelete(ctx context.Context, cmd *cobra.Command, args []string, cli
 		return fmt.Errorf("failed to get version details: %w", err)
 	}
 
+	// Count how many graphs this version belongs to
+	graphCount := countGraphMembership(ctx, client, owner, ownerType, imageName, versionID)
+
 	// Show what will be deleted
 	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
 	fmt.Fprintf(cmd.OutOrStdout(), "  Image:      %s\n", imageName)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", versionID)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", FormatTagsForDisplay(tags))
+	if graphCount > 0 {
+		graphWord := "graph"
+		if graphCount > 1 {
+			graphWord = "graphs"
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  Graphs:     %s\n", display.ColorShared(fmt.Sprintf("%d %s", graphCount, graphWord)))
+	}
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Handle dry-run
@@ -430,6 +469,47 @@ func runBulkDelete(ctx context.Context, cmd *cobra.Command, client *gh.Client, o
 	// Check if any versions match
 	if len(matchingVersions) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "No versions match the specified filters")
+		return nil
+	}
+
+	// Build all graphs to identify shared children that should be protected
+	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+	allGraphs, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, client, owner, ownerType, imageName)
+
+	// Track which version IDs are shared children (RefCount > 1)
+	sharedChildren := make(map[int64]bool)
+	if err == nil {
+		for _, g := range allGraphs {
+			for _, child := range g.Children {
+				if child.RefCount > 1 {
+					sharedChildren[child.Version.ID] = true
+				}
+			}
+		}
+	}
+
+	// Filter out shared children from deletion list
+	var safeToDelete []gh.PackageVersionInfo
+	var protectedVersions []gh.PackageVersionInfo
+	for _, ver := range matchingVersions {
+		if sharedChildren[ver.ID] {
+			protectedVersions = append(protectedVersions, ver)
+		} else {
+			safeToDelete = append(safeToDelete, ver)
+		}
+	}
+
+	// Update matching versions to only include safe ones
+	if len(protectedVersions) > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s %d version(s) are shared by multiple graphs and will be preserved.\n\n",
+			display.ColorWarning("Note:"), len(protectedVersions))
+	}
+
+	matchingVersions = safeToDelete
+
+	// Re-check if any versions remain after filtering
+	if len(matchingVersions) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No versions to delete (all matching versions are shared with other graphs)")
 		return nil
 	}
 
@@ -629,8 +709,45 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 		}
 	}
 
-	// Build the graph using the unified BuildGraph method
-	return builder.BuildGraph(rootDigest, cache)
+	// Build the target graph
+	targetGraph, err := builder.BuildGraph(rootDigest, cache)
+	if err != nil || targetGraph == nil {
+		return targetGraph, err
+	}
+
+	// To calculate RefCount correctly, we need to check how many OTHER graphs
+	// reference the same children. Build all graphs and count references.
+	allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+	if err != nil {
+		// If we can't list versions, return graph without RefCount (conservative: no deletion of children)
+		for i := range targetGraph.Children {
+			targetGraph.Children[i].RefCount = 2 // Assume shared to be safe
+		}
+		return targetGraph, nil
+	}
+
+	// Build all graphs to calculate reference counts
+	allGraphs, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, ghClient, owner, ownerType, imageName)
+	if err != nil {
+		// Fallback: assume shared
+		for i := range targetGraph.Children {
+			targetGraph.Children[i].RefCount = 2
+		}
+		return targetGraph, nil
+	}
+
+	// Find the target graph in allGraphs and use its RefCount values
+	for _, g := range allGraphs {
+		if g.RootVersion.Name == rootDigest {
+			return &g, nil
+		}
+	}
+
+	// If not found, return original with conservative RefCount
+	for i := range targetGraph.Children {
+		targetGraph.Children[i].RefCount = 2
+	}
+	return targetGraph, nil
 }
 
 func collectVersionIDs(g *discovery.VersionGraph) []int64 {
@@ -638,17 +755,20 @@ func collectVersionIDs(g *discovery.VersionGraph) []int64 {
 
 	// Collect IDs in deletion order: children first, then root
 	// This prevents orphaning artifacts
+	//
+	// IMPORTANT: Skip shared children (RefCount > 1) - they belong to other graphs too
+	// and should only be deleted when their last parent graph is deleted.
 
-	// First: attestations (sbom, provenance, etc.)
+	// First: attestations (sbom, provenance, etc.) - only exclusive ones
 	for _, child := range g.Children {
-		if child.ArtifactType != "platform" && child.Version.ID != 0 {
+		if child.ArtifactType != "platform" && child.Version.ID != 0 && child.RefCount <= 1 {
 			ids = append(ids, child.Version.ID)
 		}
 	}
 
-	// Second: platform manifests
+	// Second: platform manifests - only exclusive ones
 	for _, child := range g.Children {
-		if child.ArtifactType == "platform" && child.Version.ID != 0 {
+		if child.ArtifactType == "platform" && child.Version.ID != 0 && child.RefCount <= 1 {
 			ids = append(ids, child.Version.ID)
 		}
 	}
@@ -670,28 +790,49 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 		fmt.Fprintf(w, "  Version ID: %d\n", g.RootVersion.ID)
 	}
 
-	// Count platforms and attestations
-	var platforms []discovery.VersionChild
-	var attestations []discovery.VersionChild
+	// Separate children into exclusive (will delete) and shared (will preserve)
+	var exclusivePlatforms, sharedPlatforms []discovery.VersionChild
+	var exclusiveAttestations, sharedAttestations []discovery.VersionChild
+
 	for _, child := range g.Children {
 		if child.ArtifactType == "platform" {
-			platforms = append(platforms, child)
+			if child.RefCount > 1 {
+				sharedPlatforms = append(sharedPlatforms, child)
+			} else {
+				exclusivePlatforms = append(exclusivePlatforms, child)
+			}
 		} else {
-			attestations = append(attestations, child)
+			if child.RefCount > 1 {
+				sharedAttestations = append(sharedAttestations, child)
+			} else {
+				exclusiveAttestations = append(exclusiveAttestations, child)
+			}
 		}
 	}
 
-	if len(platforms) > 0 {
-		fmt.Fprintf(w, "\nPlatforms (%d):\n", len(platforms))
-		for _, p := range platforms {
+	// Show what will be deleted
+	if len(exclusivePlatforms) > 0 {
+		fmt.Fprintf(w, "\nPlatforms to delete (%d):\n", len(exclusivePlatforms))
+		for _, p := range exclusivePlatforms {
 			fmt.Fprintf(w, "  - %s (version %d)\n", p.Platform, p.Version.ID)
 		}
 	}
 
-	if len(attestations) > 0 {
-		fmt.Fprintf(w, "\nAttestations (%d):\n", len(attestations))
-		for _, att := range attestations {
+	if len(exclusiveAttestations) > 0 {
+		fmt.Fprintf(w, "\nAttestations to delete (%d):\n", len(exclusiveAttestations))
+		for _, att := range exclusiveAttestations {
 			fmt.Fprintf(w, "  - %s (version %d)\n", att.ArtifactType, att.Version.ID)
+		}
+	}
+
+	// Show what will be preserved (shared with other graphs)
+	if len(sharedPlatforms) > 0 || len(sharedAttestations) > 0 {
+		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared artifacts (preserved, used by other graphs):"))
+		for _, p := range sharedPlatforms {
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", p.Platform, p.Version.ID, p.RefCount)
+		}
+		for _, att := range sharedAttestations {
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", att.ArtifactType, att.Version.ID, att.RefCount)
 		}
 	}
 }
@@ -705,4 +846,41 @@ func deleteGraph(ctx context.Context, client *gh.Client, owner, ownerType, image
 		}
 	}
 	return nil
+}
+
+// countGraphMembership returns how many graphs the given version ID belongs to
+// (either as root or as a child). Returns 0 if unable to determine.
+func countGraphMembership(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionID int64) int {
+	// Get all versions for this image
+	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+	if err != nil {
+		return 0
+	}
+
+	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+
+	// Build all graphs
+	graphs, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, client, owner, ownerType, imageName)
+	if err != nil {
+		return 0
+	}
+
+	// Count how many graphs contain this version ID
+	count := 0
+	for _, g := range graphs {
+		// Check if it's the root
+		if g.RootVersion.ID == versionID {
+			count++
+			continue
+		}
+		// Check if it's a child
+		for _, child := range g.Children {
+			if child.Version.ID == versionID {
+				count++
+				break
+			}
+		}
+	}
+
+	return count
 }

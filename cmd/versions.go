@@ -175,20 +175,11 @@ Examples:
 	},
 }
 
-// VersionGraph represents a group of related versions
-type VersionGraph struct {
-	RootVersion gh.PackageVersionInfo
-	Children    []VersionChild
-	Type        string // "index", "manifest", or "standalone"
-}
+// VersionGraph is an alias for discovery.VersionGraph for backward compatibility
+type VersionGraph = discovery.VersionGraph
 
-// VersionChild represents a child version with its artifact type
-type VersionChild struct {
-	Version      gh.PackageVersionInfo
-	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
-	Platform     string // e.g., "linux/amd64" for platform manifests
-	Size         int64  // Size in bytes (for verbose output)
-}
+// VersionChild is an alias for discovery.VersionChild for backward compatibility
+type VersionChild = discovery.VersionChild
 
 func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph []gh.PackageVersionInfo, allVersions []gh.PackageVersionInfo, client *gh.Client, owner, ownerType, imageName string) ([]VersionGraph, error) {
 	// Create version cache for efficient lookups (use ALL versions for child discovery)

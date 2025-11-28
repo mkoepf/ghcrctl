@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/graph"
 	"github.com/mhk/ghcrctl/internal/oras"
 )
 
@@ -14,21 +13,56 @@ type GHClient interface {
 	ListPackageVersions(ctx context.Context, owner, ownerType, packageName string) ([]gh.PackageVersionInfo, error)
 }
 
+// OrasClient defines the interface for OCI registry operations needed by GraphBuilder.
+// This allows for testing with mock implementations.
+type OrasClient interface {
+	GetPlatformManifests(ctx context.Context, image, digest string) ([]oras.PlatformInfo, error)
+	DiscoverReferrers(ctx context.Context, image, digest string) ([]oras.ReferrerInfo, error)
+}
+
+// defaultOrasClient wraps the oras package functions to implement OrasClient.
+type defaultOrasClient struct{}
+
+func (d *defaultOrasClient) GetPlatformManifests(ctx context.Context, image, digest string) ([]oras.PlatformInfo, error) {
+	return oras.GetPlatformManifests(ctx, image, digest)
+}
+
+func (d *defaultOrasClient) DiscoverReferrers(ctx context.Context, image, digest string) ([]oras.ReferrerInfo, error) {
+	return oras.DiscoverReferrers(ctx, image, digest)
+}
+
 // GraphBuilder encapsulates graph discovery logic for OCI artifacts.
 // It provides a unified way to build artifact graphs across different commands.
 type GraphBuilder struct {
-	ctx       context.Context
-	ghClient  GHClient
-	fullImage string
-	owner     string
-	ownerType string
-	imageName string
+	ctx        context.Context
+	ghClient   GHClient
+	orasClient OrasClient
+	fullImage  string
+	owner      string
+	ownerType  string
+	imageName  string
 }
 
 // VersionCache provides efficient lookups of version information by digest or ID.
 type VersionCache struct {
 	ByDigest map[string]gh.PackageVersionInfo
 	ByID     map[int64]gh.PackageVersionInfo
+}
+
+// VersionGraph represents a group of related OCI artifact versions.
+// This is the unified structure used by both versions and delete commands.
+type VersionGraph struct {
+	RootVersion gh.PackageVersionInfo
+	Children    []VersionChild
+	Type        string // "index", "manifest", or "standalone"
+}
+
+// VersionChild represents a child version with its artifact type.
+type VersionChild struct {
+	Version      gh.PackageVersionInfo
+	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
+	Platform     string // e.g., "linux/amd64" for platform manifests
+	Size         int64  // Size in bytes
 }
 
 // NewVersionCacheFromSlice creates a VersionCache from an existing slice of versions.
@@ -50,20 +84,81 @@ func NewVersionCacheFromSlice(versions []gh.PackageVersionInfo) *VersionCache {
 // NewGraphBuilder creates a new GraphBuilder instance.
 func NewGraphBuilder(ctx context.Context, ghClient GHClient, fullImage, owner, ownerType, imageName string) *GraphBuilder {
 	return &GraphBuilder{
-		ctx:       ctx,
-		ghClient:  ghClient,
-		fullImage: fullImage,
-		owner:     owner,
-		ownerType: ownerType,
-		imageName: imageName,
+		ctx:        ctx,
+		ghClient:   ghClient,
+		orasClient: &defaultOrasClient{},
+		fullImage:  fullImage,
+		owner:      owner,
+		ownerType:  ownerType,
+		imageName:  imageName,
+	}
+}
+
+// NewGraphBuilderWithOras creates a new GraphBuilder with a custom OrasClient (for testing).
+func NewGraphBuilderWithOras(ctx context.Context, ghClient GHClient, orasClient OrasClient, fullImage, owner, ownerType, imageName string) *GraphBuilder {
+	return &GraphBuilder{
+		ctx:        ctx,
+		ghClient:   ghClient,
+		orasClient: orasClient,
+		fullImage:  fullImage,
+		owner:      owner,
+		ownerType:  ownerType,
+		imageName:  imageName,
 	}
 }
 
 // BuildGraph builds a complete OCI artifact graph starting from the given digest.
 // It discovers platform manifests, attestations, and handles parent finding automatically.
-func (b *GraphBuilder) BuildGraph(digest string) (*graph.Graph, error) {
-	// TODO: Implementation will be added incrementally
-	return nil, nil
+// If the digest is a child artifact (platform manifest or attestation), it will attempt
+// to find and return the parent graph instead.
+func (b *GraphBuilder) BuildGraph(rootDigest string, cache *VersionCache) (*VersionGraph, error) {
+	// Get root version info from cache
+	rootVersion, found := cache.ByDigest[rootDigest]
+	if !found {
+		return nil, nil // Digest not found in cache
+	}
+
+	graph := &VersionGraph{
+		RootVersion: rootVersion,
+		Children:    []VersionChild{},
+		Type:        "standalone", // Default, will be updated based on discovery
+	}
+
+	// Discover platform manifests
+	platforms, _ := b.orasClient.GetPlatformManifests(b.ctx, b.fullImage, rootDigest)
+	if len(platforms) > 0 {
+		graph.Type = "index"
+		for _, p := range platforms {
+			if childVer, found := cache.ByDigest[p.Digest]; found {
+				graph.Children = append(graph.Children, VersionChild{
+					Version:      childVer,
+					ArtifactType: "platform",
+					Platform:     p.Platform,
+					Size:         p.Size,
+				})
+			}
+		}
+	}
+
+	// Discover referrers (attestations)
+	referrers, _ := b.orasClient.DiscoverReferrers(b.ctx, b.fullImage, rootDigest)
+	for _, ref := range referrers {
+		if childVer, found := cache.ByDigest[ref.Digest]; found {
+			graph.Children = append(graph.Children, VersionChild{
+				Version:      childVer,
+				ArtifactType: ref.ArtifactType,
+				Platform:     "",
+				Size:         ref.Size,
+			})
+		}
+	}
+
+	// If no platforms but has referrers, it's a manifest (single-arch)
+	if len(platforms) == 0 && len(referrers) > 0 {
+		graph.Type = "manifest"
+	}
+
+	return graph, nil
 }
 
 // GetVersionCache fetches all package versions and creates an efficient lookup cache.
@@ -120,9 +215,7 @@ func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (str
 		}
 
 		// Check if this candidate has the child digest as a platform manifest
-		// Note: Using ORAS package functions directly for now
-		// TODO: Consider making ORAS operations injectable for testing
-		platforms, err := oras.GetPlatformManifests(b.ctx, b.fullImage, candidateDigest)
+		platforms, err := b.orasClient.GetPlatformManifests(b.ctx, b.fullImage, candidateDigest)
 		if err == nil {
 			for _, p := range platforms {
 				if p.Digest == digest {
@@ -133,7 +226,7 @@ func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (str
 		}
 
 		// Check if this candidate has the child digest as a referrer (attestation)
-		referrers, err := oras.DiscoverReferrers(b.ctx, b.fullImage, candidateDigest)
+		referrers, err := b.orasClient.DiscoverReferrers(b.ctx, b.fullImage, candidateDigest)
 		if err == nil {
 			for _, r := range referrers {
 				if r.Digest == digest {

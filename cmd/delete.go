@@ -14,7 +14,6 @@ import (
 	"github.com/mhk/ghcrctl/internal/display"
 	"github.com/mhk/ghcrctl/internal/filter"
 	"github.com/mhk/ghcrctl/internal/gh"
-	"github.com/mhk/ghcrctl/internal/graph"
 	"github.com/mhk/ghcrctl/internal/oras"
 	"github.com/mhk/ghcrctl/internal/prompts"
 	"github.com/spf13/cobra"
@@ -608,14 +607,8 @@ func buildDeleteFilter() (*filter.VersionFilter, error) {
 
 // Helper functions for delete graph
 
-func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, ownerType, imageName, rootDigest, tag string) (*graph.Graph, error) {
-	// Create graph with root
-	g, err := graph.NewGraph(rootDigest)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create GraphBuilder for version cache and parent finding
+func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, ownerType, imageName, rootDigest, tag string) (*discovery.VersionGraph, error) {
+	// Create GraphBuilder
 	builder := discovery.NewGraphBuilder(ctx, ghClient, fullImage, owner, ownerType, imageName)
 
 	// Fetch all versions once for efficient lookups
@@ -624,26 +617,11 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 		return nil, fmt.Errorf("failed to get version cache: %w", err)
 	}
 
-	// Use the cache for digest lookups
-	versionCache := cache.ByDigest
-
-	// Set root version info
-	if rootInfo, found := versionCache[rootDigest]; found {
-		g.Root.SetVersionID(rootInfo.ID)
-		for _, t := range rootInfo.Tags {
-			g.Root.AddTag(t)
-		}
-	} else if tag != "" {
-		g.Root.AddTag(tag)
-	}
-
-	// Get platform manifests
+	// Check if we need to find parent graph (if rootDigest has no children)
 	platformInfos, _ := oras.GetPlatformManifests(ctx, fullImage, rootDigest)
-
-	// Check if we need to find parent graph
 	initialReferrers, _ := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
 	if len(platformInfos) == 0 && len(initialReferrers) == 0 {
-		// This might be a child artifact, try to find parent using GraphBuilder
+		// This might be a child artifact, try to find parent
 		parentDigest, err := builder.FindParentDigest(rootDigest, cache)
 		if err == nil && parentDigest != "" && parentDigest != rootDigest {
 			// Found parent, rebuild graph with parent
@@ -651,130 +629,69 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 		}
 	}
 
-	// Build multi-arch or single-arch graph
-	if len(platformInfos) > 0 {
-		// Multi-arch image
-		for _, pInfo := range platformInfos {
-			platform := graph.NewPlatform(pInfo.Digest, pInfo.Platform, pInfo.Architecture, pInfo.OS, pInfo.Variant)
-			platform.Size = pInfo.Size
-
-			if pInfo, found := versionCache[pInfo.Digest]; found {
-				platform.Manifest.SetVersionID(pInfo.ID)
-			}
-
-			// Get platform-specific referrers
-			platformReferrers, _ := oras.DiscoverReferrers(ctx, fullImage, pInfo.Digest)
-			for _, ref := range platformReferrers {
-				artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
-				if err != nil {
-					continue
-				}
-				if refInfo, found := versionCache[ref.Digest]; found {
-					artifact.SetVersionID(refInfo.ID)
-				}
-				platform.AddReferrer(artifact)
-			}
-
-			g.AddPlatform(platform)
-		}
-
-		// Get index-level referrers
-		indexReferrers, _ := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
-		for _, ref := range indexReferrers {
-			artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
-			if err != nil {
-				continue
-			}
-			if refInfo, found := versionCache[ref.Digest]; found {
-				artifact.SetVersionID(refInfo.ID)
-			}
-			g.AddReferrer(artifact)
-		}
-	} else {
-		// Single-arch image
-		referrers, _ := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
-		for _, ref := range referrers {
-			artifact, err := graph.NewArtifact(ref.Digest, ref.ArtifactType)
-			if err != nil {
-				continue
-			}
-			if refInfo, found := versionCache[ref.Digest]; found {
-				artifact.SetVersionID(refInfo.ID)
-			}
-			g.AddReferrer(artifact)
-		}
-	}
-
-	return g, nil
+	// Build the graph using the unified BuildGraph method
+	return builder.BuildGraph(rootDigest, cache)
 }
 
-func collectVersionIDs(g *graph.Graph) []int64 {
+func collectVersionIDs(g *discovery.VersionGraph) []int64 {
 	ids := []int64{}
 
 	// Collect IDs in deletion order: children first, then root
 	// This prevents orphaning artifacts
 
-	// Platform-specific referrers (attestations)
-	for _, p := range g.Platforms {
-		for _, ref := range p.Referrers {
-			if ref.VersionID != 0 {
-				ids = append(ids, ref.VersionID)
-			}
+	// First: attestations (sbom, provenance, etc.)
+	for _, child := range g.Children {
+		if child.ArtifactType != "platform" && child.Version.ID != 0 {
+			ids = append(ids, child.Version.ID)
 		}
 	}
 
-	// Root-level referrers (attestations)
-	for _, ref := range g.Referrers {
-		if ref.VersionID != 0 {
-			ids = append(ids, ref.VersionID)
+	// Second: platform manifests
+	for _, child := range g.Children {
+		if child.ArtifactType == "platform" && child.Version.ID != 0 {
+			ids = append(ids, child.Version.ID)
 		}
 	}
 
-	// Platform manifests
-	for _, p := range g.Platforms {
-		if p.Manifest.VersionID != 0 {
-			ids = append(ids, p.Manifest.VersionID)
-		}
-	}
-
-	// Root (last)
-	if g.Root.VersionID != 0 {
-		ids = append(ids, g.Root.VersionID)
+	// Last: root
+	if g.RootVersion.ID != 0 {
+		ids = append(ids, g.RootVersion.ID)
 	}
 
 	return ids
 }
 
-func displayGraphSummary(w io.Writer, g *graph.Graph) {
-	fmt.Fprintf(w, "Root (Image): %s\n", g.Root.Digest)
-	if len(g.Root.Tags) > 0 {
-		fmt.Fprintf(w, "  Tags: %v\n", g.Root.Tags)
+func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
+	fmt.Fprintf(w, "Root (Image): %s\n", g.RootVersion.Name)
+	if len(g.RootVersion.Tags) > 0 {
+		fmt.Fprintf(w, "  Tags: %v\n", g.RootVersion.Tags)
 	}
-	if g.Root.VersionID != 0 {
-		fmt.Fprintf(w, "  Version ID: %d\n", g.Root.VersionID)
+	if g.RootVersion.ID != 0 {
+		fmt.Fprintf(w, "  Version ID: %d\n", g.RootVersion.ID)
 	}
 
-	if len(g.Platforms) > 0 {
-		fmt.Fprintf(w, "\nPlatforms (%d):\n", len(g.Platforms))
-		for _, p := range g.Platforms {
-			fmt.Fprintf(w, "  - %s (version %d)\n", p.Platform, p.Manifest.VersionID)
+	// Count platforms and attestations
+	var platforms []discovery.VersionChild
+	var attestations []discovery.VersionChild
+	for _, child := range g.Children {
+		if child.ArtifactType == "platform" {
+			platforms = append(platforms, child)
+		} else {
+			attestations = append(attestations, child)
 		}
 	}
 
-	totalReferrers := len(g.Referrers)
-	for _, p := range g.Platforms {
-		totalReferrers += len(p.Referrers)
+	if len(platforms) > 0 {
+		fmt.Fprintf(w, "\nPlatforms (%d):\n", len(platforms))
+		for _, p := range platforms {
+			fmt.Fprintf(w, "  - %s (version %d)\n", p.Platform, p.Version.ID)
+		}
 	}
 
-	if totalReferrers > 0 {
-		fmt.Fprintf(w, "\nAttestations (%d):\n", totalReferrers)
-		for _, ref := range g.Referrers {
-			fmt.Fprintf(w, "  - %s (version %d)\n", ref.Type, ref.VersionID)
-		}
-		for _, p := range g.Platforms {
-			for _, ref := range p.Referrers {
-				fmt.Fprintf(w, "  - %s for %s (version %d)\n", ref.Type, p.Platform, ref.VersionID)
-			}
+	if len(attestations) > 0 {
+		fmt.Fprintf(w, "\nAttestations (%d):\n", len(attestations))
+		for _, att := range attestations {
+			fmt.Fprintf(w, "  - %s (version %d)\n", att.ArtifactType, att.Version.ID)
 		}
 	}
 }

@@ -1,5 +1,35 @@
 # Performance / usability 
 
+## delete version should work without image
+
+versionid and digest are both unique 
+
+## Auo-complete missing
+
+Would be great if it would automatically auto-complete image names
+
+## Delete package function needed
+
+time ./ghcrctl versions ghcrctl-test-trivial-base
+Versions for ghcrctl-test-trivial-base:
+
+  VERSION ID  TYPE   DIGEST        TAGS      CREATED
+  ----------  -----  ------------  --------  -------------------
+  592195799   index  0a74dc9ce146  [latest]  2025-11-27 23:31:49
+
+Total: 1 version in 1 graph.
+ time ./ghcrctl delete version ghcrctl-test-trivial-base 592195799
+Preparing to delete package version:
+  Image:      ghcrctl-test-trivial-base
+  Owner:      mkoepf (user)
+  Version ID: 592195799
+  Tags:       latest
+  Graphs:     1 graph
+
+Are you sure you want to delete this version? [y/N]: y
+failed to delete package version: failed to delete version: DELETE https://api.github.com/users/mkoepf/packages/container/ghcrctl-test-trivial-base/versions/592195799: 400 You cannot delete the last tagged version of a package. You must delete the package instead. []
+./ghcrctl delete version ghcrctl-test-trivial-base 592195799  0.01s user 0.02s system 1% cpu 3.397 total
+
 ## config file awkwardness
 
 The config file is not very elegant because

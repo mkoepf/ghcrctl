@@ -211,8 +211,55 @@ func TestListPackageVersionsNonexistentPackage(t *testing.T) {
 	t.Logf("Got expected error for non-existent package: %v", err)
 }
 
-// Integration tests for GitHub client that require GITHUB_TOKEN
-// These tests will be skipped if GITHUB_TOKEN is not set
+// ===[ GetOwnerType Tests ]===
+
+// TestGetOwnerTypeUser tests that a known user returns "user"
+func TestGetOwnerTypeUser(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	ownerType, err := client.GetOwnerType(ctx, "mkoepf")
+	if err != nil {
+		t.Fatalf("GetOwnerType() error = %v", err)
+	}
+
+	if ownerType != "user" {
+		t.Errorf("Expected 'user', got '%s'", ownerType)
+	}
+}
+
+// TestGetOwnerTypeOrg tests that a known organization returns "org"
+func TestGetOwnerTypeOrg(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	ownerType, err := client.GetOwnerType(ctx, "golang")
+	if err != nil {
+		t.Fatalf("GetOwnerType() error = %v", err)
+	}
+
+	if ownerType != "org" {
+		t.Errorf("Expected 'org', got '%s'", ownerType)
+	}
+}
 
 // ===[ Version ID Mapping Tests ]===
 

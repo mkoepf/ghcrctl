@@ -338,6 +338,23 @@ func (c *Client) ListPackageVersions(ctx context.Context, owner, ownerType, pack
 	return allVersions, nil
 }
 
+// GetOwnerType determines whether the given owner is a user or organization
+func (c *Client) GetOwnerType(ctx context.Context, owner string) (string, error) {
+	if owner == "" {
+		return "", fmt.Errorf("owner cannot be empty")
+	}
+
+	user, _, err := c.client.Users.Get(ctx, owner)
+	if err != nil {
+		return "", fmt.Errorf("failed to get owner info: %w", err)
+	}
+
+	if user.Type != nil && *user.Type == "Organization" {
+		return "org", nil
+	}
+	return "user", nil
+}
+
 // DeletePackageVersion deletes a specific package version
 func (c *Client) DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error {
 	// Validate inputs

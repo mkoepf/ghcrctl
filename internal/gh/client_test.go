@@ -311,6 +311,47 @@ func TestGetVersionIDByDigest(t *testing.T) {
 	}
 }
 
+func TestGetOwnerType(t *testing.T) {
+	tests := []struct {
+		name      string
+		owner     string
+		wantError bool
+		errMsg    string
+	}{
+		{
+			name:      "empty owner",
+			owner:     "",
+			wantError: true,
+			errMsg:    "owner cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient("ghp_fake_token")
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ctx := context.Background()
+			ownerType, err := client.GetOwnerType(ctx, tt.owner)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if ownerType != "user" && ownerType != "org" {
+					t.Errorf("Expected 'user' or 'org', got '%s'", ownerType)
+				}
+			}
+		})
+	}
+}
+
 func TestGetVersionTags(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -285,14 +285,14 @@ func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
 // after the type unification refactoring. The VersionGraph.Type field now
 // directly contains the resolved type from oras.ResolveType().DisplayType().
 
-// TestVersionsCommandHasSimpleFlag verifies --simple flag exists
-func TestVersionsCommandHasSimpleFlag(t *testing.T) {
+// TestVersionsCommandHasTreeFlag verifies --tree flag exists
+func TestVersionsCommandHasTreeFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	versionsCmd, _, _ := cmd.Find([]string{"versions"})
 
-	flag := versionsCmd.Flags().Lookup("simple")
+	flag := versionsCmd.Flags().Lookup("tree")
 	if flag == nil {
-		t.Error("versions command should have --simple flag")
+		t.Error("versions command should have --tree flag")
 	}
 }

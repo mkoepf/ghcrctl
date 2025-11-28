@@ -20,7 +20,7 @@ func newVersionsCmd() *cobra.Command {
 	var (
 		jsonOutput    bool
 		verbose       bool
-		simple        bool
+		tree          bool
 		tag           string
 		tagPattern    string
 		onlyTagged    bool
@@ -156,11 +156,12 @@ Examples:
 				return display.OutputJSON(cmd.OutOrStdout(), allVersions)
 			}
 
-			// Simple output skips expensive graph discovery
-			if simple {
+			// Default: flat list output (fast, no graph discovery)
+			if !tree {
 				return outputVersionsSimple(cmd.OutOrStdout(), versionsToGraph, imageName)
 			}
 
+			// Tree view: expensive OCI discovery for hierarchical output
 			// For --untagged filter, discover tagged graph members first
 			// This allows the filter to exclude children of tagged versions
 			if versionFilter.OnlyUntagged {
@@ -197,7 +198,7 @@ Examples:
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
 	cmd.Flags().Int64Var(&versionID, "version", 0, "Filter by exact version ID")
 	cmd.Flags().StringVar(&digest, "digest", "", "Filter by digest (supports prefix matching)")
-	cmd.Flags().BoolVar(&simple, "simple", false, "Fast output without graph discovery (GitHub API only)")
+	cmd.Flags().BoolVarP(&tree, "tree", "t", false, "Show hierarchical tree view with OCI relationships (slower)")
 
 	// Enable dynamic completion for image reference
 	cmd.ValidArgsFunction = imageRefValidArgsFunc

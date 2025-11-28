@@ -21,9 +21,9 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Create fresh command instance
+	// Create fresh command instance - use --tree for hierarchical view
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tree"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -79,9 +79,9 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Create fresh command instance
+	// Create fresh command instance - use --tree for hierarchical view
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0", "--tree"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -209,9 +209,9 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Create fresh command instance
+	// Create fresh command instance - use --tree for hierarchical view
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom-no-provenance"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom-no-provenance", "--tree"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -262,9 +262,9 @@ func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
 	}
 	t.Parallel()
 
-	// Test with cosign-vuln image that has vuln-scan and vex attestations
+	// Test with cosign-vuln image that has vuln-scan and vex attestations - use --tree for hierarchical view
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-cosign-vuln"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-cosign-vuln", "--tree"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+// Prompter defines the interface for user prompts.
+// This allows for dependency injection and testing with mocks.
+type Prompter interface {
+	Confirm(reader io.Reader, writer io.Writer, message string) (bool, error)
+}
+
+// DefaultPrompter implements Prompter using standard input/output.
+type DefaultPrompter struct{}
+
+// Confirm prompts the user with a yes/no question and returns true if they answer yes.
+func (p *DefaultPrompter) Confirm(reader io.Reader, writer io.Writer, message string) (bool, error) {
+	return Confirm(reader, writer, message)
+}
+
 // Confirm prompts the user with a yes/no question and returns true if they answer yes
 // Defaults to "no" if user just presses enter
 func Confirm(reader io.Reader, writer io.Writer, message string) (bool, error) {

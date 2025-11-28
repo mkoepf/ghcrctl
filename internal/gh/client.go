@@ -17,6 +17,29 @@ type Client struct {
 	token  string
 }
 
+// PackageDeleter defines the interface for package deletion operations.
+// This interface allows for dependency injection and testing with mocks.
+type PackageDeleter interface {
+	DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error
+}
+
+// PackageVersionLister defines the interface for listing package versions.
+type PackageVersionLister interface {
+	ListPackageVersions(ctx context.Context, owner, ownerType, packageName string) ([]PackageVersionInfo, error)
+	GetVersionIDByDigest(ctx context.Context, owner, ownerType, packageName, digest string) (int64, error)
+	GetVersionTags(ctx context.Context, owner, ownerType, packageName string, versionID int64) ([]string, error)
+}
+
+// PackageClient combines all package-related operations.
+// The *Client type implements this interface.
+type PackageClient interface {
+	PackageDeleter
+	PackageVersionLister
+}
+
+// Ensure *Client implements PackageClient
+var _ PackageClient = (*Client)(nil)
+
 // GetToken retrieves the GitHub token from the GITHUB_TOKEN environment variable
 func GetToken() (string, error) {
 	token, exists := os.LookupEnv("GITHUB_TOKEN")

@@ -603,16 +603,18 @@ func printVerboseGraph(w io.Writer, g VersionGraph, isLast bool) {
 	hasChildren := len(g.Children) > 0
 
 	// Print root version with colored tree indicators and type
+	// Use determineVersionType for consistency with table output
+	versionType := determineVersionType(g.RootVersion, g.Type)
 	if hasChildren {
 		fmt.Fprintf(w, "%s %d  %s\n",
 			display.ColorTreeIndicator("┌─"),
 			g.RootVersion.ID,
-			display.ColorVersionType(g.Type))
+			display.ColorVersionType(versionType))
 	} else {
 		fmt.Fprintf(w, "%s %d  %s\n",
 			display.ColorTreeIndicator("─"),
 			g.RootVersion.ID,
-			display.ColorVersionType(g.Type))
+			display.ColorVersionType(versionType))
 	}
 	printVerboseDetails(w, g.RootVersion.Name, g.RootVersion.Tags, g.RootVersion.CreatedAt, 0, hasChildren)
 

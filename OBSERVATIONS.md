@@ -1,57 +1,21 @@
 # Performance / usability 
 
-## TYPE column inconsitencies
+## config file awkwardness
 
-The TYPE column in the version command in inconsitently used.
+The config file is not very elegant because
 
-Example 1: Some are "untagged" which is actually not a type. It is also redundant, as untagged simply means: [] in TAGS column.
+- it is one file per user and cumbersome if you want to work on several projects
+- it is a file to carry just two informatinos: owner name and type
 
-  VERSION ID  TYPE              DIGEST        TAGS                                                      CREATED
-  ----------  ----------------  ------------  --------------------------------------------------------  -------------------
-┌ 588641743   index             3be2c003c77e  [newest, classic-pat-test, stable, test-1, v1.0, latest]  2025-11-25 12:10:31
-├ 588641725   linux/amd64       f81014ec9fd5  []                                                        2025-11-25 12:10:30
-├ 588641732   linux/arm64       fee8e7f7815d  []                                                        2025-11-25 12:10:30
-├ 588641716   sbom, provenance  1a0e6756f320  []                                                        2025-11-25 12:10:29
-└ 588641739   provenance, sbom  d27cc69ebd00  []                                                        2025-11-25 12:10:30
 
-┌ 588579607   untagged          6aea791a2d8d  []                                                        2025-11-25 11:19:07
-└ 588579577   linux/amd64       f0406fcc380e  []                                                        2025-11-25 11:19:06
+## Terminology unclear, ambigous
 
-┌ 585861918   untagged          01af50cc8b0d  []                                                        2025-11-22 15:41:38
-├ 585861916   linux/amd64       62f946a8267d  []                                                        2025-11-22 15:41:37
-└ 585861917   sbom, provenance  9a1636d22702  []                                                        2025-11-22 15:41:37
+Manifest, artifact, package, version, image, graph.
 
-Example 2: Some versions are sometimes shown as untagged, sometimes as different types.  Look at DIGEST 1a0e6756f320 in these two different filtered views:
+## Inconsistent commands
 
-./ghcrctl versions ghcrctl-test-with-sbom --tagged
-Versions for ghcrctl-test-with-sbom:
-
-  VERSION ID  TYPE              DIGEST        TAGS                                                      CREATED
-  ----------  ----------------  ------------  --------------------------------------------------------  -------------------
-┌ 588641743   index             3be2c003c77e  [newest, classic-pat-test, stable, test-1, v1.0, latest]  2025-11-25 12:10:31
-├ 588641739   sbom, provenance  d27cc69ebd00  []                                                        2025-11-25 12:10:30
-├ 588641725   linux/amd64       f81014ec9fd5  []                                                        2025-11-25 12:10:30
-├ 588641732   linux/arm64       fee8e7f7815d  []                                                        2025-11-25 12:10:30
-└ 588641716   provenance, sbom  1a0e6756f320  []                                                        2025-11-25 12:10:29
-
-./ghcrctl versions ghcrctl-test-with-sbom --untagged
-Warning: failed to determine attestation type for sha256:18a6ae3b2b10a3f9e649cd8de3b434bfc0daecda644b2ed00bcd6f944d5b1369: failed to fetch manifest: sha256:18a6ae3b2b10a3f9e649cd8de3b434bfc0daecda644b2ed00bcd6f944d5b1369: not found
-Warning: failed to determine attestation type for sha256:cca2d3fbaac0f656634786844f9e002230d23100b84c4201c9f53c44392130bc: failed to fetch manifest: sha256:cca2d3fbaac0f656634786844f9e002230d23100b84c4201c9f53c44392130bc: not found
-Versions for ghcrctl-test-with-sbom:
-
-  VERSION ID  TYPE              DIGEST        TAGS  CREATED
-  ----------  ----------------  ------------  ----  -------------------
-┌ 588579607   untagged          6aea791a2d8d  []    2025-11-25 11:19:07
-└ 588579577   linux/amd64       f0406fcc380e  []    2025-11-25 11:19:06
-
-┌ 585861918   untagged          01af50cc8b0d  []    2025-11-22 15:41:38
-├ 585861916   linux/amd64       62f946a8267d  []    2025-11-22 15:41:37
-└ 585861917   provenance, sbom  9a1636d22702  []    2025-11-22 15:41:37
-
-  588641739   untagged          d27cc69ebd00  []    2025-11-25 12:10:30
-  588641732   untagged          fee8e7f7815d  []    2025-11-25 12:10:30
-  588641725   untagged          f81014ec9fd5  []    2025-11-25 12:10:30
-  588641716   untagged          1a0e6756f320  []    2025-11-25 12:10:29
+- flags vs positional arguments
+- verbs and nouns
 
 ## Delete behavior when deleting single package versions
 

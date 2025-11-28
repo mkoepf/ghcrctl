@@ -108,6 +108,11 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 		return ArtifactType{}, fmt.Errorf("failed to decode manifest: %w", err)
 	}
 
+	// Check for cosign signature first (before attestation check)
+	if isSignature := checkSignatureIndicators(&manifest); isSignature {
+		return ArtifactType{Role: "signature"}, nil
+	}
+
 	// Check for attestation indicators
 	if isAttestation := checkAttestationIndicators(&manifest); isAttestation {
 		// Determine the specific attestation type
@@ -148,6 +153,17 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	}, nil
 }
 
+// checkSignatureIndicators checks if a manifest is a cosign signature.
+func checkSignatureIndicators(manifest *ocispec.Manifest) bool {
+	// Cosign signatures use application/vnd.dev.cosign.simplesigning.v1+json media type
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.dev.cosign.simplesigning.v1+json" {
+			return true
+		}
+	}
+	return false
+}
+
 // checkAttestationIndicators checks if a manifest is an attestation based on various indicators.
 func checkAttestationIndicators(manifest *ocispec.Manifest) bool {
 	// Check config media type for attestation indicators
@@ -155,14 +171,18 @@ func checkAttestationIndicators(manifest *ocispec.Manifest) bool {
 		return true
 	}
 
-	// Check for in-toto layers
+	// Check for in-toto layers or cosign attestation layers
 	for _, layer := range manifest.Layers {
 		if strings.Contains(layer.MediaType, "in-toto") {
 			return true
 		}
-		// Check layer annotations for predicate type
+		// Check layer annotations for predicate type (buildx or cosign style)
 		if layer.Annotations != nil {
 			if _, ok := layer.Annotations["in-toto.io/predicate-type"]; ok {
+				return true
+			}
+			// Cosign stores predicate type as "predicateType"
+			if _, ok := layer.Annotations["predicateType"]; ok {
 				return true
 			}
 		}
@@ -196,11 +216,15 @@ func determineAttestationRole(manifest *ocispec.Manifest) string {
 		}
 	}
 
-	// Check layer annotations
+	// Check layer annotations (buildx uses "in-toto.io/predicate-type", cosign uses "predicateType")
 	if predicateType == "" {
 		for _, layer := range manifest.Layers {
 			if layer.Annotations != nil {
 				if pt, ok := layer.Annotations["in-toto.io/predicate-type"]; ok {
+					predicateType = pt
+					break
+				}
+				if pt, ok := layer.Annotations["predicateType"]; ok {
 					predicateType = pt
 					break
 				}

@@ -275,6 +275,61 @@ func TestResolveTypeInputValidation(t *testing.T) {
 	}
 }
 
+// TestResolveTypeCosignSignature verifies signature type resolution for cosign .sig artifacts
+func TestResolveTypeCosignSignature(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-signed"
+
+	// Get the cosign signature digest via tag
+	sigTag := "sha256-f683151837ef93048ffa68193f438b19bf5b42c183981301bbad169960bd10af.sig"
+	sigDigest, err := ResolveTag(ctx, testImage, sigTag)
+	if err != nil {
+		t.Fatalf("Failed to resolve signature tag: %v", err)
+	}
+
+	artType, err := ResolveType(ctx, testImage, sigDigest)
+	if err != nil {
+		t.Fatalf("ResolveType() error = %v", err)
+	}
+
+	if artType.Role != "signature" {
+		t.Errorf("Expected Role 'signature', got %q", artType.Role)
+	}
+}
+
+// TestResolveTypeCosignAttestation verifies attestation type resolution for cosign .att artifacts
+func TestResolveTypeCosignAttestation(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-signed"
+
+	// Get the cosign attestation digest via tag
+	attTag := "sha256-f683151837ef93048ffa68193f438b19bf5b42c183981301bbad169960bd10af.att"
+	attDigest, err := ResolveTag(ctx, testImage, attTag)
+	if err != nil {
+		t.Fatalf("Failed to resolve attestation tag: %v", err)
+	}
+
+	artType, err := ResolveType(ctx, testImage, attDigest)
+	if err != nil {
+		t.Fatalf("ResolveType() error = %v", err)
+	}
+
+	// Should be sbom since we attached an SPDX SBOM
+	if artType.Role != "sbom" {
+		t.Errorf("Expected Role 'sbom', got %q", artType.Role)
+	}
+}
+
 // Integration tests for ResolveType - require GITHUB_TOKEN
 func TestResolveTypeIntegration(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")

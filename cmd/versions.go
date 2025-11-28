@@ -20,6 +20,7 @@ func newVersionsCmd() *cobra.Command {
 	var (
 		jsonOutput    bool
 		verbose       bool
+		simple        bool
 		tag           string
 		tagPattern    string
 		onlyTagged    bool
@@ -143,21 +144,31 @@ Examples:
 			// Build full image reference
 			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-			// For --untagged filter, discover tagged graph members first
-			// This allows the filter to exclude children of tagged versions
-			if versionFilter.OnlyUntagged {
-				versionFilter.TaggedGraphMembers = identifyTaggedGraphMembers(ctx, fullImage, allVersions)
-			}
-
-			// Apply filters to determine which versions to graph
-			// Build graphs only for filtered roots, but provide all versions for child lookup
+			// Apply filters to determine which versions to display
 			versionsToGraph := versionFilter.Apply(allVersions)
 			if len(versionsToGraph) == 0 {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("no versions found matching filter criteria")
 			}
 
-			// Build graph relationships
+			// JSON output doesn't need graph discovery
+			if jsonOutput {
+				return display.OutputJSON(cmd.OutOrStdout(), allVersions)
+			}
+
+			// Simple output skips expensive graph discovery
+			if simple {
+				return outputVersionsSimple(cmd.OutOrStdout(), versionsToGraph, imageName)
+			}
+
+			// For --untagged filter, discover tagged graph members first
+			// This allows the filter to exclude children of tagged versions
+			if versionFilter.OnlyUntagged {
+				versionFilter.TaggedGraphMembers = identifyTaggedGraphMembers(ctx, fullImage, allVersions)
+				versionsToGraph = versionFilter.Apply(allVersions)
+			}
+
+			// Build graph relationships (expensive OCI discovery)
 			// Pass versionsToGraph (filtered roots) and allVersions (for child lookup)
 			versionGraphs, err := buildVersionGraphs(ctx, fullImage, versionsToGraph, allVersions, client, owner, ownerType, imageName)
 			if err != nil {
@@ -166,9 +177,6 @@ Examples:
 			}
 
 			// Output results
-			if jsonOutput {
-				return display.OutputJSON(cmd.OutOrStdout(), allVersions)
-			}
 			if verbose {
 				return outputVersionsVerbose(cmd.OutOrStdout(), versionGraphs, imageName)
 			}
@@ -189,6 +197,7 @@ Examples:
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
 	cmd.Flags().Int64Var(&versionID, "version", 0, "Filter by exact version ID")
 	cmd.Flags().StringVar(&digest, "digest", "", "Filter by digest (supports prefix matching)")
+	cmd.Flags().BoolVar(&simple, "simple", false, "Fast output without graph discovery (GitHub API only)")
 
 	// Enable dynamic completion for image reference
 	cmd.ValidArgsFunction = imageRefValidArgsFunc
@@ -625,6 +634,68 @@ func printVersion(w io.Writer, indicator string, ver gh.PackageVersionInfo, vtyp
 		coloredDigest,
 		paddedTags,
 		ver.CreatedAt)
+}
+
+// outputVersionsSimple outputs a flat list of versions without graph discovery
+func outputVersionsSimple(w io.Writer, versions []gh.PackageVersionInfo, imageName string) error {
+	if len(versions) == 0 {
+		fmt.Fprintf(w, "No versions found for %s\n", imageName)
+		return nil
+	}
+
+	fmt.Fprintf(w, "Versions for %s:\n\n", imageName)
+
+	// Find column widths
+	maxIDLen := len("VERSION ID")
+	maxDigestLen := len("DIGEST")
+	maxTagsLen := len("TAGS")
+
+	for _, ver := range versions {
+		if idLen := len(fmt.Sprintf("%d", ver.ID)); idLen > maxIDLen {
+			maxIDLen = idLen
+		}
+		digest := display.ShortDigest(ver.Name)
+		if len(digest) > maxDigestLen {
+			maxDigestLen = len(digest)
+		}
+		if tagsStr := display.FormatTags(ver.Tags); len(tagsStr) > maxTagsLen {
+			maxTagsLen = len(tagsStr)
+		}
+	}
+
+	// Print header
+	fmt.Fprintf(w, "  %s  %s  %s  %s\n",
+		display.ColorHeader(fmt.Sprintf("%-*s", maxIDLen, "VERSION ID")),
+		display.ColorHeader(fmt.Sprintf("%-*s", maxDigestLen, "DIGEST")),
+		display.ColorHeader(fmt.Sprintf("%-*s", maxTagsLen, "TAGS")),
+		display.ColorHeader("CREATED"))
+	fmt.Fprintf(w, "  %s  %s  %s  %s\n",
+		display.ColorSeparator(strings.Repeat("-", maxIDLen)),
+		display.ColorSeparator(strings.Repeat("-", maxDigestLen)),
+		display.ColorSeparator(strings.Repeat("-", maxTagsLen)),
+		display.ColorSeparator(strings.Repeat("-", len("CREATED"))))
+
+	// Print versions
+	for _, ver := range versions {
+		tagsStr := display.FormatTags(ver.Tags)
+		digest := display.ShortDigest(ver.Name)
+
+		fmt.Fprintf(w, "  %-*d  %s  %s%s  %s\n",
+			maxIDLen, ver.ID,
+			display.ColorDigest(fmt.Sprintf("%-*s", maxDigestLen, digest)),
+			display.ColorTags(ver.Tags),
+			strings.Repeat(" ", maxTagsLen-len(tagsStr)),
+			ver.CreatedAt)
+	}
+
+	// Summary
+	versionWord := "versions"
+	if len(versions) == 1 {
+		versionWord = "version"
+	}
+	fmt.Fprintf(w, "\nTotal: %s %s.\n", display.ColorCount(len(versions)), versionWord)
+
+	return nil
 }
 
 // outputVersionsVerbose outputs detailed version information

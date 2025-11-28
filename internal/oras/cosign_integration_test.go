@@ -195,3 +195,143 @@ func TestCosignAttestationTypeNotGeneric(t *testing.T) {
 		}
 	}
 }
+
+// TestDiscoverCosignVulnScanAttestation verifies vuln-scan attestation discovery and type resolution
+func TestDiscoverCosignVulnScanAttestation(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-vuln"
+
+	// Resolve tag to digest
+	digest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve tag - cosign-vuln test image must exist: %v", err)
+	}
+
+	// Construct cosign attestation tag
+	attTag := digestToTagPrefix(digest) + ".att"
+	allTags := []string{"latest", attTag}
+
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, allTags)
+	if err != nil {
+		t.Fatalf("Failed to discover children: %v", err)
+	}
+
+	// Look for vuln-scan attestation
+	var foundVuln bool
+	for _, child := range children {
+		if child.Type.Role == "vuln-scan" && child.Tag != "" {
+			foundVuln = true
+			t.Logf("✓ Found cosign vuln-scan attestation: digest=%s, tag=%s", child.Digest, child.Tag)
+			break
+		}
+	}
+
+	if !foundVuln {
+		// Log what we did find
+		for _, child := range children {
+			if child.Type.IsAttestation() && child.Tag != "" {
+				t.Logf("Found attestation with role=%s (expected vuln-scan)", child.Type.Role)
+			}
+		}
+		t.Error("Expected to find cosign vuln-scan attestation")
+	}
+}
+
+// TestDiscoverCosignVEXAttestation verifies VEX attestation discovery and type resolution
+func TestDiscoverCosignVEXAttestation(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-vuln"
+
+	// Resolve tag to digest
+	digest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve tag - cosign-vuln test image must exist: %v", err)
+	}
+
+	// Construct cosign attestation tag
+	attTag := digestToTagPrefix(digest) + ".att"
+	allTags := []string{"latest", attTag}
+
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, allTags)
+	if err != nil {
+		t.Fatalf("Failed to discover children: %v", err)
+	}
+
+	// Look for VEX attestation
+	var foundVEX bool
+	for _, child := range children {
+		if child.Type.Role == "vex" && child.Tag != "" {
+			foundVEX = true
+			t.Logf("✓ Found cosign VEX attestation: digest=%s, tag=%s", child.Digest, child.Tag)
+			break
+		}
+	}
+
+	if !foundVEX {
+		// Log what we did find
+		for _, child := range children {
+			if child.Type.IsAttestation() && child.Tag != "" {
+				t.Logf("Found attestation with role=%s (expected vex)", child.Type.Role)
+			}
+		}
+		t.Error("Expected to find cosign VEX attestation")
+	}
+}
+
+// TestDiscoverCosignMultipleAttestationTypes verifies multiple attestation types in single .att tag
+func TestDiscoverCosignMultipleAttestationTypes(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-vuln"
+
+	// Resolve tag to digest
+	digest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve tag - cosign-vuln test image must exist: %v", err)
+	}
+
+	// Construct cosign attestation tag
+	attTag := digestToTagPrefix(digest) + ".att"
+	allTags := []string{"latest", attTag}
+
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, allTags)
+	if err != nil {
+		t.Fatalf("Failed to discover children: %v", err)
+	}
+
+	// Count attestation types from cosign (identified by non-empty Tag field)
+	roleCount := make(map[string]int)
+	for _, child := range children {
+		if child.Tag != "" && child.Type.IsAttestation() {
+			roleCount[child.Type.Role]++
+			t.Logf("Found cosign attestation: role=%s", child.Type.Role)
+		}
+	}
+
+	// We expect both vuln-scan and vex
+	if roleCount["vuln-scan"] == 0 {
+		t.Error("Expected to find vuln-scan attestation")
+	}
+	if roleCount["vex"] == 0 {
+		t.Error("Expected to find vex attestation")
+	}
+
+	t.Logf("✓ Found %d distinct attestation types from cosign", len(roleCount))
+}

@@ -91,18 +91,18 @@ Examples:
 			return fmt.Errorf("failed to resolve tag '%s': %w", provenanceTag, err)
 		}
 
-		// Discover referrers
-		referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
+		// Discover children
+		children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
 		if err != nil {
 			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to discover referrers: %w", err)
+			return fmt.Errorf("failed to discover children: %w", err)
 		}
 
 		// Filter for provenance artifacts
-		var provenances []oras.ReferrerInfo
-		for _, ref := range referrers {
-			if ref.ArtifactType == "provenance" {
-				provenances = append(provenances, ref)
+		var provenances []oras.ChildArtifact
+		for _, child := range children {
+			if child.Type.Role == "provenance" {
+				provenances = append(provenances, child)
 			}
 		}
 
@@ -152,7 +152,7 @@ func fetchAndDisplayProvenance(w io.Writer, ctx context.Context, image, digest s
 }
 
 // fetchAndDisplayAllProvenances fetches and displays all provenances
-func fetchAndDisplayAllProvenances(w io.Writer, ctx context.Context, image string, provenances []oras.ReferrerInfo, jsonOutput bool, token string) error {
+func fetchAndDisplayAllProvenances(w io.Writer, ctx context.Context, image string, provenances []oras.ChildArtifact, jsonOutput bool, token string) error {
 	allContent := make([]interface{}, 0, len(provenances))
 
 	for _, prov := range provenances {
@@ -187,15 +187,12 @@ func fetchAndDisplayAllProvenances(w io.Writer, ctx context.Context, image strin
 }
 
 // listProvenances lists available provenances without fetching their content
-func listProvenances(w io.Writer, provenances []oras.ReferrerInfo, imageName string) error {
+func listProvenances(w io.Writer, provenances []oras.ChildArtifact, imageName string) error {
 	fmt.Fprintf(w, "Multiple provenance documents found for %s\n\n", imageName)
 	fmt.Fprintf(w, "Use --digest <digest> to select one, or --all to show all:\n\n")
 
 	for i, prov := range provenances {
 		fmt.Fprintf(w, "  %d. %s\n", i+1, prov.Digest)
-		if prov.MediaType != "" {
-			fmt.Fprintf(w, "     Type: %s\n", prov.MediaType)
-		}
 	}
 
 	fmt.Fprintf(w, "\nExample: ghcrctl provenance %s --digest %s\n", imageName, shortProvenanceDigest(provenances[0].Digest))

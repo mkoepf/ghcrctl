@@ -195,7 +195,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 
 	// Helper to build a graph for a version
 	buildGraph := func(ver gh.PackageVersionInfo) *VersionGraph {
-		relatedArtifacts, _ := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
+		relatedArtifacts := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
 
 		// Skip if no children and not tagged (standalone untagged versions are handled separately)
 		if len(relatedArtifacts) == 0 && len(ver.Tags) == 0 {
@@ -203,7 +203,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 		}
 
 		// Use ResolveType for consistent type determination
-		graphType := "manifest" // default fallback
+		graphType := "manifest" // default
 		if artType, err := oras.ResolveType(ctx, fullImage, ver.Name); err == nil {
 			graphType = artType.DisplayType()
 		}
@@ -225,12 +225,8 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 					refCounts[childVer.ID]++
 					childMap[childVer.ID] = &VersionChild{
 						Version: childVer,
-						Type: oras.ArtifactType{
-							ManifestType: "manifest",
-							Role:         artifact.ArtifactType,
-							Platform:     artifact.Platform,
-						},
-						Size: artifact.Size,
+						Type:    artifact.Type,
+						Size:    artifact.Size,
 					}
 				}
 			}
@@ -267,10 +263,9 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	// Add remaining unassigned versions as standalone (not a root and not a child of any graph)
 	for _, ver := range versionsToGraph {
 		if !isGraphRoot[ver.ID] && refCounts[ver.ID] == 0 {
-			// Use ResolveType to determine the actual type of standalone manifests
+			// Use ResolveType for consistent type determination
 			graphType := "manifest" // default
-			artType, err := oras.ResolveType(ctx, fullImage, ver.Name)
-			if err == nil {
+			if artType, err := oras.ResolveType(ctx, fullImage, ver.Name); err == nil {
 				graphType = artType.DisplayType()
 			}
 
@@ -293,57 +288,23 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	return graphs, nil
 }
 
-// DiscoveredArtifact represents a discovered related artifact
-type DiscoveredArtifact struct {
-	Digest       string
-	ArtifactType string // "platform", "sbom", "provenance", "attestation"
-	Platform     string // e.g., "linux/amd64" for platform manifests
-	Size         int64  // Size in bytes
-}
-
 // discoverRelatedVersionsByDigest discovers children using a digest directly
-func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, rootDigest string) ([]DiscoveredArtifact, string) {
-	var artifacts []DiscoveredArtifact
-	graphType := "manifest"
+func discoverRelatedVersionsByDigest(ctx context.Context, fullImage, digest, rootDigest string) []oras.ChildArtifact {
+	// Use unified discovery
+	children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
+	if err != nil {
+		return nil
+	}
 
-	// Get platform manifests
-	platforms, err := oras.GetPlatformManifests(ctx, fullImage, digest)
-	if err == nil && len(platforms) > 0 {
-		graphType = "index"
-		for _, platform := range platforms {
-			if platform.Digest != rootDigest {
-				artifacts = append(artifacts, DiscoveredArtifact{
-					Digest:       platform.Digest,
-					ArtifactType: "platform",
-					Platform:     platform.Platform,
-					Size:         platform.Size,
-				})
-			}
+	// Filter out the root digest
+	var filtered []oras.ChildArtifact
+	for _, child := range children {
+		if child.Digest != rootDigest {
+			filtered = append(filtered, child)
 		}
 	}
 
-	// Discover referrers (SBOM, provenance, etc.)
-	referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
-	if err == nil {
-		for _, ref := range referrers {
-			if ref.Digest != rootDigest {
-				artType := "attestation" // default
-				if ref.ArtifactType == "sbom" {
-					artType = "sbom"
-				} else if ref.ArtifactType == "provenance" {
-					artType = "provenance"
-				}
-				artifacts = append(artifacts, DiscoveredArtifact{
-					Digest:       ref.Digest,
-					ArtifactType: artType,
-					Platform:     "",
-					Size:         ref.Size,
-				})
-			}
-		}
-	}
-
-	return artifacts, graphType
+	return filtered
 }
 
 // identifyTaggedGraphMembers discovers all versions that belong to tagged graphs.
@@ -359,7 +320,7 @@ func identifyTaggedGraphMembers(ctx context.Context, fullImage string, allVersio
 			members[ver.ID] = true
 
 			// Discover children using ORAS
-			relatedArtifacts, _ := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
+			relatedArtifacts := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
 
 			// Add all children to the members set
 			for _, artifact := range relatedArtifacts {

@@ -40,19 +40,28 @@ func TestFindParentDigestIntegration_PlatformManifest(t *testing.T) {
 
 	t.Logf("Root digest: %s", rootDigest)
 
-	// Get platform manifests from the root
-	platforms, err := oras.GetPlatformManifests(ctx, fullImage, rootDigest)
+	// Get children from the root
+	children, err := oras.DiscoverChildren(ctx, fullImage, rootDigest, nil)
 	if err != nil {
-		t.Fatalf("Failed to get platform manifests: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
-	if len(platforms) == 0 {
+	// Filter for platform manifests
+	var platformChild *oras.ChildArtifact
+	for _, child := range children {
+		if child.Type.IsPlatform() {
+			platformChild = &child
+			break
+		}
+	}
+
+	if platformChild == nil {
 		t.Skip("No platform manifests found - cannot test FindParentDigest")
 	}
 
 	// Pick the first platform as child
-	childDigest := platforms[0].Digest
-	t.Logf("Child platform digest: %s (%s)", childDigest, platforms[0].Platform)
+	childDigest := platformChild.Digest
+	t.Logf("Child platform digest: %s (%s)", childDigest, platformChild.Type.Platform)
 
 	// Create builder and cache
 	builder := NewGraphBuilder(ctx, client, fullImage, owner, ownerType, imageName)
@@ -75,14 +84,14 @@ func TestFindParentDigestIntegration_PlatformManifest(t *testing.T) {
 	// pointing to different index versions that share the same platform manifest).
 	// FindParentDigest finds *a* valid parent, which may differ from rootDigest if the
 	// platform is shared. We verify the found parent actually contains the child.
-	parentPlatforms, err := oras.GetPlatformManifests(ctx, fullImage, foundParent)
+	parentChildren, err := oras.DiscoverChildren(ctx, fullImage, foundParent, nil)
 	if err != nil {
 		t.Fatalf("Failed to verify parent contains child: %v", err)
 	}
 
 	foundChild := false
-	for _, p := range parentPlatforms {
-		if p.Digest == childDigest {
+	for _, c := range parentChildren {
+		if c.Digest == childDigest {
 			foundChild = true
 			break
 		}
@@ -123,19 +132,28 @@ func TestFindParentDigestIntegration_Attestation(t *testing.T) {
 
 	t.Logf("Root digest: %s", rootDigest)
 
-	// Get referrers (attestations) from the root
-	referrers, err := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
+	// Get children (attestations) from the root
+	children, err := oras.DiscoverChildren(ctx, fullImage, rootDigest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
-	if len(referrers) == 0 {
-		t.Skip("No referrers found - cannot test FindParentDigest for attestations")
+	// Filter for attestations
+	var attestationChild *oras.ChildArtifact
+	for _, child := range children {
+		if child.Type.IsAttestation() {
+			attestationChild = &child
+			break
+		}
 	}
 
-	// Pick the first referrer as child
-	childDigest := referrers[0].Digest
-	t.Logf("Child attestation digest: %s (%s)", childDigest, referrers[0].ArtifactType)
+	if attestationChild == nil {
+		t.Skip("No attestations found - cannot test FindParentDigest for attestations")
+	}
+
+	// Pick the first attestation as child
+	childDigest := attestationChild.Digest
+	t.Logf("Child attestation digest: %s (%s)", childDigest, attestationChild.Type.Role)
 
 	// Create builder and cache
 	builder := NewGraphBuilder(ctx, client, fullImage, owner, ownerType, imageName)

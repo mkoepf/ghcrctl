@@ -90,18 +90,18 @@ Examples:
 			return fmt.Errorf("failed to resolve tag '%s': %w", sbomTag, err)
 		}
 
-		// Discover referrers
-		referrers, err := oras.DiscoverReferrers(ctx, fullImage, digest)
+		// Discover children
+		children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
 		if err != nil {
 			cmd.SilenceUsage = true
-			return fmt.Errorf("failed to discover referrers: %w", err)
+			return fmt.Errorf("failed to discover children: %w", err)
 		}
 
 		// Filter for SBOM artifacts
-		var sboms []oras.ReferrerInfo
-		for _, ref := range referrers {
-			if ref.ArtifactType == "sbom" {
-				sboms = append(sboms, ref)
+		var sboms []oras.ChildArtifact
+		for _, child := range children {
+			if child.Type.Role == "sbom" {
+				sboms = append(sboms, child)
 			}
 		}
 
@@ -151,7 +151,7 @@ func fetchAndDisplaySBOM(w io.Writer, ctx context.Context, image, digest string,
 }
 
 // fetchAndDisplayAllSBOMs fetches and displays all SBOMs
-func fetchAndDisplayAllSBOMs(w io.Writer, ctx context.Context, image string, sboms []oras.ReferrerInfo, jsonOutput bool, token string) error {
+func fetchAndDisplayAllSBOMs(w io.Writer, ctx context.Context, image string, sboms []oras.ChildArtifact, jsonOutput bool, token string) error {
 	allContent := make([]interface{}, 0, len(sboms))
 
 	for _, sbom := range sboms {
@@ -186,15 +186,12 @@ func fetchAndDisplayAllSBOMs(w io.Writer, ctx context.Context, image string, sbo
 }
 
 // listSBOMs lists available SBOMs without fetching their content
-func listSBOMs(w io.Writer, sboms []oras.ReferrerInfo, imageName string) error {
+func listSBOMs(w io.Writer, sboms []oras.ChildArtifact, imageName string) error {
 	fmt.Fprintf(w, "Multiple SBOMs found for %s\n\n", imageName)
 	fmt.Fprintf(w, "Use --digest <digest> to select one, or --all to show all:\n\n")
 
 	for i, sbom := range sboms {
 		fmt.Fprintf(w, "  %d. %s\n", i+1, sbom.Digest)
-		if sbom.MediaType != "" {
-			fmt.Fprintf(w, "     Type: %s\n", sbom.MediaType)
-		}
 	}
 
 	fmt.Fprintf(w, "\nExample: ghcrctl sbom %s --digest %s\n", imageName, display.ShortDigest(sboms[0].Digest))

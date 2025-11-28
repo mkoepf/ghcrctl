@@ -19,12 +19,7 @@ func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
 
 	// This should work without making any ORAS ResolveTag calls
 	// The function should accept the digest directly
-	artifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, digest, digest)
-
-	// Basic validation - function should not panic and return valid type
-	if graphType == "" {
-		t.Error("Expected non-empty graph type")
-	}
+	artifacts := discoverRelatedVersionsByDigest(ctx, fullImage, digest, digest)
 
 	// artifacts may be empty if no relationships found, which is OK for this test
 	_ = artifacts
@@ -285,9 +280,8 @@ func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
 			Name: "sha256:shared",
 		},
 		Type: oras.ArtifactType{
-			ManifestType: "manifest",
-			Role:         "platform",
-			Platform:     "linux/amd64",
+			Role:     "platform",
+			Platform: "linux/amd64",
 		},
 		RefCount: 2, // Shared by 2 graphs
 	}

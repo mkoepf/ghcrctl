@@ -23,22 +23,14 @@ func (m *mockGHClient) ListPackageVersions(ctx context.Context, ownerType, owner
 
 // mockOrasClient is a mock implementation of OrasClient for testing
 type mockOrasClient struct {
-	platforms map[string][]oras.PlatformInfo // digest -> platforms
-	referrers map[string][]oras.ReferrerInfo // digest -> referrers
+	children map[string][]oras.ChildArtifact // parentDigest -> children
 }
 
-func (m *mockOrasClient) GetPlatformManifests(ctx context.Context, image, digest string) ([]oras.PlatformInfo, error) {
-	if platforms, ok := m.platforms[digest]; ok {
-		return platforms, nil
+func (m *mockOrasClient) DiscoverChildren(ctx context.Context, image, parentDigest string, allTags []string) ([]oras.ChildArtifact, error) {
+	if children, ok := m.children[parentDigest]; ok {
+		return children, nil
 	}
-	return []oras.PlatformInfo{}, nil
-}
-
-func (m *mockOrasClient) DiscoverReferrers(ctx context.Context, image, digest string) ([]oras.ReferrerInfo, error) {
-	if referrers, ok := m.referrers[digest]; ok {
-		return referrers, nil
-	}
-	return []oras.ReferrerInfo{}, nil
+	return []oras.ChildArtifact{}, nil
 }
 
 func TestGetVersionCache(t *testing.T) {
@@ -323,16 +315,12 @@ func TestBuildGraph_MultiArchWithAttestations(t *testing.T) {
 
 	mockGH := &mockGHClient{versions: versions}
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: amd64Digest, Platform: "linux/amd64", OS: "linux", Architecture: "amd64", Size: 1000},
-				{Digest: arm64Digest, Platform: "linux/arm64", OS: "linux", Architecture: "arm64", Size: 1100},
-			},
-		},
-		referrers: map[string][]oras.ReferrerInfo{
-			rootDigest: {
-				{Digest: sbomDigest, ArtifactType: "sbom", Size: 5000},
-				{Digest: provDigest, ArtifactType: "provenance", Size: 3000},
+				{Digest: amd64Digest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}, Size: 1000},
+				{Digest: arm64Digest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/arm64"}, Size: 1100},
+				{Digest: sbomDigest, Type: oras.ArtifactType{Role: "sbom"}, Size: 5000},
+				{Digest: provDigest, Type: oras.ArtifactType{Role: "provenance"}, Size: 3000},
 			},
 		},
 	}
@@ -399,10 +387,9 @@ func TestBuildGraph_SingleArchImage(t *testing.T) {
 
 	mockGH := &mockGHClient{versions: versions}
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{}, // No platforms
-		referrers: map[string][]oras.ReferrerInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: sbomDigest, ArtifactType: "sbom", Size: 5000},
+				{Digest: sbomDigest, Type: oras.ArtifactType{Role: "sbom"}, Size: 5000},
 			},
 		},
 	}
@@ -442,8 +429,7 @@ func TestBuildGraph_StandaloneImage(t *testing.T) {
 
 	mockGH := &mockGHClient{versions: versions}
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{},
-		referrers: map[string][]oras.ReferrerInfo{},
+		children: map[string][]oras.ChildArtifact{},
 	}
 
 	cache := NewVersionCacheFromSlice(versions)
@@ -481,13 +467,12 @@ func TestFindParentDigest_PlatformChild(t *testing.T) {
 	}
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: amd64Digest, Platform: "linux/amd64"},
-				{Digest: arm64Digest, Platform: "linux/arm64"},
+				{Digest: amd64Digest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}},
+				{Digest: arm64Digest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/arm64"}},
 			},
 		},
-		referrers: map[string][]oras.ReferrerInfo{},
 	}
 
 	cache := NewVersionCacheFromSlice(versions)
@@ -517,11 +502,10 @@ func TestFindParentDigest_AttestationChild(t *testing.T) {
 	}
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{},
-		referrers: map[string][]oras.ReferrerInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: sbomDigest, ArtifactType: "sbom"},
-				{Digest: provDigest, ArtifactType: "provenance"},
+				{Digest: sbomDigest, Type: oras.ArtifactType{Role: "sbom"}},
+				{Digest: provDigest, Type: oras.ArtifactType{Role: "provenance"}},
 			},
 		},
 	}
@@ -551,8 +535,7 @@ func TestFindParentDigest_NoParent(t *testing.T) {
 	}
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{},
-		referrers: map[string][]oras.ReferrerInfo{},
+		children: map[string][]oras.ChildArtifact{},
 	}
 
 	cache := NewVersionCacheFromSlice(versions)
@@ -582,19 +565,13 @@ func TestFindParentDigest_SearchesNearbyIDsFirst(t *testing.T) {
 		{ID: 105, Name: childDigest, Tags: []string{}}, // Child
 	}
 
-	callOrder := []string{}
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: childDigest, Platform: "linux/amd64"},
+				{Digest: childDigest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}},
 			},
 		},
-		referrers: map[string][]oras.ReferrerInfo{},
 	}
-
-	// Wrap mock to track call order
-	originalGetPlatformManifests := mockOras.GetPlatformManifests
-	_ = originalGetPlatformManifests // Use the variable to avoid unused warning
 
 	cache := NewVersionCacheFromSlice(versions)
 	builder := NewGraphBuilderWithOras(context.Background(), nil, mockOras, "ghcr.io/test/image", "test", "user", "image")
@@ -610,7 +587,6 @@ func TestFindParentDigest_SearchesNearbyIDsFirst(t *testing.T) {
 
 	// The optimization should find rootDigest (ID 100) before farDigest (ID 1000)
 	// because 100 is closer to 105 than 1000 is
-	_ = callOrder
 }
 
 func TestFindParentDigest_SkipsSameDigest(t *testing.T) {
@@ -622,8 +598,7 @@ func TestFindParentDigest_SkipsSameDigest(t *testing.T) {
 	}
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{},
-		referrers: map[string][]oras.ReferrerInfo{},
+		children: map[string][]oras.ChildArtifact{},
 	}
 
 	cache := NewVersionCacheFromSlice(versions)
@@ -649,8 +624,7 @@ func TestFindParentDigest_EmptyCache(t *testing.T) {
 	childDigest := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{},
-		referrers: map[string][]oras.ReferrerInfo{},
+		children: map[string][]oras.ChildArtifact{},
 	}
 
 	cache := NewVersionCacheFromSlice([]gh.PackageVersionInfo{})
@@ -677,12 +651,11 @@ func TestFindParentDigest_ChildNotInCache(t *testing.T) {
 	}
 
 	mockOras := &mockOrasClient{
-		platforms: map[string][]oras.PlatformInfo{
+		children: map[string][]oras.ChildArtifact{
 			rootDigest: {
-				{Digest: childDigest, Platform: "linux/amd64"},
+				{Digest: childDigest, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}},
 			},
 		},
-		referrers: map[string][]oras.ReferrerInfo{},
 	}
 
 	cache := NewVersionCacheFromSlice(versions)
@@ -711,9 +684,8 @@ func TestVersionChild_TypeUnification(t *testing.T) {
 		{
 			name: "platform manifest",
 			artifactType: oras.ArtifactType{
-				ManifestType: "manifest",
-				Role:         "platform",
-				Platform:     "linux/amd64",
+				Role:     "platform",
+				Platform: "linux/amd64",
 			},
 			wantDisplayType:   "linux/amd64",
 			wantIsAttestation: false,
@@ -722,9 +694,7 @@ func TestVersionChild_TypeUnification(t *testing.T) {
 		{
 			name: "sbom attestation",
 			artifactType: oras.ArtifactType{
-				ManifestType: "manifest",
-				Role:         "sbom",
-				Platform:     "",
+				Role: "sbom",
 			},
 			wantDisplayType:   "sbom",
 			wantIsAttestation: true,
@@ -733,9 +703,7 @@ func TestVersionChild_TypeUnification(t *testing.T) {
 		{
 			name: "provenance attestation",
 			artifactType: oras.ArtifactType{
-				ManifestType: "manifest",
-				Role:         "provenance",
-				Platform:     "",
+				Role: "provenance",
 			},
 			wantDisplayType:   "provenance",
 			wantIsAttestation: true,

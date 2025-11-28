@@ -256,13 +256,13 @@ func TestCollectVersionIDsExcludesSharedChildren(t *testing.T) {
 		Type:        "index",
 		Children: []discovery.VersionChild{
 			// Exclusive platform (only in this graph)
-			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:exclusive-platform"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"}, RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:exclusive-platform"}, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}, RefCount: 1},
 			// Shared platform (in 2 graphs) - should be EXCLUDED
-			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:shared-platform"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/arm64"}, RefCount: 2},
+			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:shared-platform"}, Type: oras.ArtifactType{Role: "platform", Platform: "linux/arm64"}, RefCount: 2},
 			// Exclusive attestation
-			{Version: gh.PackageVersionInfo{ID: 103, Name: "sha256:exclusive-sbom"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "sbom"}, RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 103, Name: "sha256:exclusive-sbom"}, Type: oras.ArtifactType{Role: "sbom"}, RefCount: 1},
 			// Shared attestation - should be EXCLUDED
-			{Version: gh.PackageVersionInfo{ID: 104, Name: "sha256:shared-prov"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "provenance"}, RefCount: 3},
+			{Version: gh.PackageVersionInfo{ID: 104, Name: "sha256:shared-prov"}, Type: oras.ArtifactType{Role: "provenance"}, RefCount: 3},
 		},
 	}
 
@@ -500,12 +500,12 @@ func TestDisplayGraphSummary(t *testing.T) {
 				Children: []discovery.VersionChild{
 					{
 						Version:  gh.PackageVersionInfo{ID: 101, Name: "sha256:amd64"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/amd64"},
 						RefCount: 1,
 					},
 					{
 						Version:  gh.PackageVersionInfo{ID: 102, Name: "sha256:arm64"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/arm64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/arm64"},
 						RefCount: 1,
 					},
 				},
@@ -532,12 +532,12 @@ func TestDisplayGraphSummary(t *testing.T) {
 				Children: []discovery.VersionChild{
 					{
 						Version:  gh.PackageVersionInfo{ID: 201, Name: "sha256:sbomdigest"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "sbom"},
+						Type:     oras.ArtifactType{Role: "sbom"},
 						RefCount: 1,
 					},
 					{
 						Version:  gh.PackageVersionInfo{ID: 202, Name: "sha256:provdigest"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "provenance"},
+						Type:     oras.ArtifactType{Role: "provenance"},
 						RefCount: 1,
 					},
 				},
@@ -566,12 +566,12 @@ func TestDisplayGraphSummary(t *testing.T) {
 				Children: []discovery.VersionChild{
 					{
 						Version:  gh.PackageVersionInfo{ID: 301, Name: "sha256:exclusive"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/amd64"},
 						RefCount: 1,
 					},
 					{
 						Version:  gh.PackageVersionInfo{ID: 302, Name: "sha256:shared"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/arm64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/arm64"},
 						RefCount: 3,
 					},
 				},
@@ -595,12 +595,12 @@ func TestDisplayGraphSummary(t *testing.T) {
 				Children: []discovery.VersionChild{
 					{
 						Version:  gh.PackageVersionInfo{ID: 401, Name: "sha256:exclusivesbom"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "sbom"},
+						Type:     oras.ArtifactType{Role: "sbom"},
 						RefCount: 1,
 					},
 					{
 						Version:  gh.PackageVersionInfo{ID: 402, Name: "sha256:sharedprov"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "provenance"},
+						Type:     oras.ArtifactType{Role: "provenance"},
 						RefCount: 2,
 					},
 				},
@@ -625,25 +625,25 @@ func TestDisplayGraphSummary(t *testing.T) {
 					// Exclusive platform
 					{
 						Version:  gh.PackageVersionInfo{ID: 501, Name: "sha256:excplatform"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/amd64"},
 						RefCount: 1,
 					},
 					// Shared platform
 					{
 						Version:  gh.PackageVersionInfo{ID: 502, Name: "sha256:sharedplatform"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/arm64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/arm64"},
 						RefCount: 2,
 					},
 					// Exclusive attestation
 					{
 						Version:  gh.PackageVersionInfo{ID: 503, Name: "sha256:excsbom"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "sbom"},
+						Type:     oras.ArtifactType{Role: "sbom"},
 						RefCount: 1,
 					},
 					// Shared attestation
 					{
 						Version:  gh.PackageVersionInfo{ID: 504, Name: "sha256:sharedprov"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "provenance"},
+						Type:     oras.ArtifactType{Role: "provenance"},
 						RefCount: 4,
 					},
 				},
@@ -710,9 +710,9 @@ func TestCollectVersionIDsDeletionOrder(t *testing.T) {
 		Type:        "index",
 		Children: []discovery.VersionChild{
 			// Platform
-			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:platform"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"}, RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:platform"}, Type: oras.ArtifactType{Role: "platform", Platform: "linux/amd64"}, RefCount: 1},
 			// Attestation
-			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:sbom"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "sbom"}, RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:sbom"}, Type: oras.ArtifactType{Role: "sbom"}, RefCount: 1},
 		},
 	}
 
@@ -848,7 +848,7 @@ func TestCollectVersionIDsRefCountBoundary(t *testing.T) {
 				Children: []discovery.VersionChild{
 					{
 						Version:  gh.PackageVersionInfo{ID: 101, Name: "sha256:child"},
-						Type:     oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"},
+						Type:     oras.ArtifactType{Role: "platform", Platform: "linux/amd64"},
 						RefCount: tt.refCount,
 					},
 				},

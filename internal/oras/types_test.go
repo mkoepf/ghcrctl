@@ -14,85 +14,62 @@ func TestArtifactTypeDisplayType(t *testing.T) {
 		want     string
 	}{
 		{
-			name: "index type",
-			artifact: ArtifactType{
-				ManifestType: "index",
-				Role:         "index",
-				Platform:     "",
-			},
-			want: "index",
-		},
-		{
 			name: "platform manifest",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "platform",
-				Platform:     "linux/amd64",
+				Role:     "platform",
+				Platform: "linux/amd64",
 			},
 			want: "linux/amd64",
 		},
 		{
 			name: "platform manifest with variant",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "platform",
-				Platform:     "linux/arm/v7",
+				Role:     "platform",
+				Platform: "linux/arm/v7",
 			},
 			want: "linux/arm/v7",
 		},
 		{
 			name: "sbom attestation",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "sbom",
-				Platform:     "",
+				Role: "sbom",
 			},
 			want: "sbom",
 		},
 		{
 			name: "provenance attestation",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "provenance",
-				Platform:     "",
+				Role: "provenance",
 			},
 			want: "provenance",
 		},
 		{
 			name: "generic attestation",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "attestation",
-				Platform:     "",
+				Role: "attestation",
 			},
 			want: "attestation",
 		},
 		{
 			name: "signature",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "signature",
-				Platform:     "",
+				Role: "signature",
 			},
 			want: "signature",
 		},
 		{
 			name: "vuln-scan",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "vuln-scan",
-				Platform:     "",
+				Role: "vuln-scan",
 			},
 			want: "vuln-scan",
 		},
 		{
-			name: "artifact",
+			name: "vex",
 			artifact: ArtifactType{
-				ManifestType: "manifest",
-				Role:         "artifact",
-				Platform:     "",
+				Role: "vex",
 			},
-			want: "artifact",
+			want: "vex",
 		},
 	}
 
@@ -133,13 +110,13 @@ func TestArtifactTypeIsAttestation(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "platform is not attestation",
-			artifact: ArtifactType{Role: "platform"},
-			want:     false,
+			name:     "vex is attestation",
+			artifact: ArtifactType{Role: "vex"},
+			want:     true,
 		},
 		{
-			name:     "index is not attestation",
-			artifact: ArtifactType{Role: "index"},
+			name:     "platform is not attestation",
+			artifact: ArtifactType{Role: "platform"},
 			want:     false,
 		},
 		{
@@ -175,11 +152,6 @@ func TestArtifactTypeIsPlatform(t *testing.T) {
 			artifact: ArtifactType{Role: "sbom"},
 			want:     false,
 		},
-		{
-			name:     "index is not platform",
-			artifact: ArtifactType{Role: "index"},
-			want:     false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -190,6 +162,59 @@ func TestArtifactTypeIsPlatform(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChildArtifact(t *testing.T) {
+	t.Run("platform child", func(t *testing.T) {
+		child := ChildArtifact{
+			Digest: "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			Size:   1024,
+			Type:   ArtifactType{Role: "platform", Platform: "linux/amd64"},
+			Tag:    "",
+		}
+
+		if child.Type.DisplayType() != "linux/amd64" {
+			t.Errorf("Expected DisplayType 'linux/amd64', got %q", child.Type.DisplayType())
+		}
+		if !child.Type.IsPlatform() {
+			t.Error("Expected IsPlatform() to be true")
+		}
+	})
+
+	t.Run("cosign signature child", func(t *testing.T) {
+		child := ChildArtifact{
+			Digest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			Size:   512,
+			Type:   ArtifactType{Role: "signature"},
+			Tag:    "sha256-1234567890abcdef.sig",
+		}
+
+		if child.Type.DisplayType() != "signature" {
+			t.Errorf("Expected DisplayType 'signature', got %q", child.Type.DisplayType())
+		}
+		if child.Type.IsAttestation() {
+			t.Error("Expected IsAttestation() to be false for signature")
+		}
+		if child.Tag == "" {
+			t.Error("Expected non-empty Tag for cosign artifact")
+		}
+	})
+
+	t.Run("buildx sbom child", func(t *testing.T) {
+		child := ChildArtifact{
+			Digest: "sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+			Size:   2048,
+			Type:   ArtifactType{Role: "sbom"},
+			Tag:    "", // buildx artifacts have no tag
+		}
+
+		if child.Type.DisplayType() != "sbom" {
+			t.Errorf("Expected DisplayType 'sbom', got %q", child.Type.DisplayType())
+		}
+		if !child.Type.IsAttestation() {
+			t.Error("Expected IsAttestation() to be true for sbom")
+		}
+	})
 }
 
 func TestResolveTypeInputValidation(t *testing.T) {
@@ -266,73 +291,58 @@ func TestResolveTypeIntegration(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	t.Run("resolves index type", func(t *testing.T) {
+	t.Run("returns index type for index digest", func(t *testing.T) {
 		artType, err := ResolveType(ctx, testImage, indexDigest)
 		if err != nil {
-			t.Fatalf("Failed to resolve type: %v", err)
-		}
-
-		if artType.ManifestType != "index" {
-			t.Errorf("Expected ManifestType 'index', got %q", artType.ManifestType)
+			t.Fatalf("ResolveType() error = %v", err)
 		}
 		if artType.Role != "index" {
 			t.Errorf("Expected Role 'index', got %q", artType.Role)
 		}
-		if artType.DisplayType() != "index" {
-			t.Errorf("Expected DisplayType() 'index', got %q", artType.DisplayType())
-		}
 	})
 
-	// Get platform manifests to test platform type resolution
-	platforms, err := GetPlatformManifests(ctx, testImage, indexDigest)
+	// Get children to test platform type resolution
+	children, err := DiscoverChildren(ctx, testImage, indexDigest, nil)
 	if err != nil {
-		t.Fatalf("Failed to get platform manifests: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
-	if len(platforms) > 0 {
-		t.Run("resolves platform type", func(t *testing.T) {
-			platformDigest := platforms[0].Digest
-			artType, err := ResolveType(ctx, testImage, platformDigest)
-			if err != nil {
-				t.Fatalf("Failed to resolve type: %v", err)
-			}
-
-			if artType.ManifestType != "manifest" {
-				t.Errorf("Expected ManifestType 'manifest', got %q", artType.ManifestType)
-			}
-			if artType.Role != "platform" {
-				t.Errorf("Expected Role 'platform', got %q", artType.Role)
-			}
-			if artType.Platform == "" {
-				t.Error("Expected non-empty Platform for platform manifest")
-			}
-			// Platform should contain a slash (os/arch)
-			if !strings.Contains(artType.Platform, "/") {
-				t.Errorf("Expected Platform to contain '/', got %q", artType.Platform)
-			}
-		})
-	}
-
-	// Get attestations to test attestation type resolution
-	referrers, err := DiscoverReferrers(ctx, testImage, indexDigest)
-	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
-	}
-
-	for _, ref := range referrers {
-		if ref.ArtifactType == "sbom" {
-			t.Run("resolves sbom attestation type", func(t *testing.T) {
-				artType, err := ResolveType(ctx, testImage, ref.Digest)
+	// Find a platform manifest
+	for _, child := range children {
+		if child.Type.IsPlatform() {
+			t.Run("resolves platform type", func(t *testing.T) {
+				artType, err := ResolveType(ctx, testImage, child.Digest)
 				if err != nil {
 					t.Fatalf("Failed to resolve type: %v", err)
 				}
 
-				if artType.ManifestType != "manifest" {
-					t.Errorf("Expected ManifestType 'manifest', got %q", artType.ManifestType)
+				if artType.Role != "platform" {
+					t.Errorf("Expected Role 'platform', got %q", artType.Role)
 				}
-				// Role should be sbom or attestation
-				if artType.Role != "sbom" && artType.Role != "attestation" {
-					t.Errorf("Expected Role 'sbom' or 'attestation', got %q", artType.Role)
+				if artType.Platform == "" {
+					t.Error("Expected non-empty Platform for platform manifest")
+				}
+				// Platform should contain a slash (os/arch)
+				if !strings.Contains(artType.Platform, "/") {
+					t.Errorf("Expected Platform to contain '/', got %q", artType.Platform)
+				}
+			})
+			break
+		}
+	}
+
+	// Find an attestation
+	for _, child := range children {
+		if child.Type.IsAttestation() {
+			t.Run("resolves attestation type", func(t *testing.T) {
+				artType, err := ResolveType(ctx, testImage, child.Digest)
+				if err != nil {
+					t.Fatalf("Failed to resolve type: %v", err)
+				}
+
+				// Role should be sbom, provenance, or attestation
+				if artType.Role != "sbom" && artType.Role != "provenance" && artType.Role != "attestation" {
+					t.Errorf("Expected attestation Role, got %q", artType.Role)
 				}
 			})
 			break

@@ -13,30 +13,34 @@ import (
 // ArtifactType represents the canonical type of an OCI artifact.
 // It provides consistent type determination regardless of how the artifact was discovered.
 type ArtifactType struct {
-	ManifestType string // "index" or "manifest"
-	Role         string // "index", "platform", "sbom", "provenance", "signature", "vuln-scan", "attestation", "artifact"
-	Platform     string // e.g., "linux/amd64" if Role is "platform"
+	Role     string // "platform", "sbom", "provenance", "signature", "vuln-scan", "vex", "attestation"
+	Platform string // e.g., "linux/amd64" if Role is "platform"
+}
+
+// ChildArtifact represents any artifact that is a child of another artifact.
+// This includes platform manifests, attestations, and signatures.
+type ChildArtifact struct {
+	Digest string       // SHA256 digest of this artifact
+	Size   int64        // Size in bytes
+	Type   ArtifactType // Unified type information
+	Tag    string       // Tag if discovered via cosign (empty for buildx)
 }
 
 // DisplayType returns the user-facing type string for display in tables and output.
 // For platform manifests, it returns the platform string (e.g., "linux/amd64").
 // For other types, it returns the role directly.
 func (t ArtifactType) DisplayType() string {
-	switch t.Role {
-	case "platform":
+	if t.Role == "platform" {
 		return t.Platform
-	case "index":
-		return "index"
-	default:
-		return t.Role
 	}
+	return t.Role
 }
 
 // IsAttestation returns true if this artifact is an attestation type
-// (sbom, provenance, vuln-scan, or generic attestation).
+// (sbom, provenance, vuln-scan, vex, or generic attestation).
 func (t ArtifactType) IsAttestation() bool {
 	switch t.Role {
-	case "sbom", "provenance", "attestation", "vuln-scan":
+	case "sbom", "provenance", "attestation", "vuln-scan", "vex":
 		return true
 	default:
 		return false
@@ -88,11 +92,7 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	// Check if this is an index (multi-arch manifest list)
 	if desc.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" ||
 		desc.MediaType == ocispec.MediaTypeImageIndex {
-		return ArtifactType{
-			ManifestType: "index",
-			Role:         "index",
-			Platform:     "",
-		}, nil
+		return ArtifactType{Role: "index"}, nil
 	}
 
 	// It's a manifest - need to determine if it's a platform manifest or attestation
@@ -113,9 +113,7 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 		// Determine the specific attestation type
 		role := determineAttestationRole(&manifest)
 		return ArtifactType{
-			ManifestType: "manifest",
-			Role:         role,
-			Platform:     "",
+			Role: role,
 		}, nil
 	}
 
@@ -124,9 +122,8 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	if err != nil {
 		// If we can't fetch config, return as generic manifest
 		return ArtifactType{
-			ManifestType: "manifest",
-			Role:         "platform",
-			Platform:     "unknown",
+			Role:     "platform",
+			Platform: "unknown",
 		}, nil
 	}
 	defer configBytes.Close()
@@ -134,9 +131,8 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	var imageConfig ocispec.Image
 	if err := json.NewDecoder(configBytes).Decode(&imageConfig); err != nil {
 		return ArtifactType{
-			ManifestType: "manifest",
-			Role:         "platform",
-			Platform:     "unknown",
+			Role:     "platform",
+			Platform: "unknown",
 		}, nil
 	}
 
@@ -147,9 +143,8 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	}
 
 	return ArtifactType{
-		ManifestType: "manifest",
-		Role:         "platform",
-		Platform:     platform,
+		Role:     "platform",
+		Platform: platform,
 	}, nil
 }
 

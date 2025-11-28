@@ -16,19 +16,14 @@ type GHClient interface {
 // OrasClient defines the interface for OCI registry operations needed by GraphBuilder.
 // This allows for testing with mock implementations.
 type OrasClient interface {
-	GetPlatformManifests(ctx context.Context, image, digest string) ([]oras.PlatformInfo, error)
-	DiscoverReferrers(ctx context.Context, image, digest string) ([]oras.ReferrerInfo, error)
+	DiscoverChildren(ctx context.Context, image, parentDigest string, allTags []string) ([]oras.ChildArtifact, error)
 }
 
 // defaultOrasClient wraps the oras package functions to implement OrasClient.
 type defaultOrasClient struct{}
 
-func (d *defaultOrasClient) GetPlatformManifests(ctx context.Context, image, digest string) ([]oras.PlatformInfo, error) {
-	return oras.GetPlatformManifests(ctx, image, digest)
-}
-
-func (d *defaultOrasClient) DiscoverReferrers(ctx context.Context, image, digest string) ([]oras.ReferrerInfo, error) {
-	return oras.DiscoverReferrers(ctx, image, digest)
+func (d *defaultOrasClient) DiscoverChildren(ctx context.Context, image, parentDigest string, allTags []string) ([]oras.ChildArtifact, error) {
+	return oras.DiscoverChildren(ctx, image, parentDigest, allTags)
 }
 
 // GraphBuilder encapsulates graph discovery logic for OCI artifacts.
@@ -124,47 +119,57 @@ func (b *GraphBuilder) BuildGraph(rootDigest string, cache *VersionCache) (*Vers
 		Type:        "standalone", // Default, will be updated based on discovery
 	}
 
-	// Discover platform manifests
-	platforms, _ := b.orasClient.GetPlatformManifests(b.ctx, b.fullImage, rootDigest)
-	if len(platforms) > 0 {
-		graph.Type = "index"
-		for _, p := range platforms {
-			if childVer, found := cache.ByDigest[p.Digest]; found {
-				graph.Children = append(graph.Children, VersionChild{
-					Version: childVer,
-					Type: oras.ArtifactType{
-						ManifestType: "manifest",
-						Role:         "platform",
-						Platform:     p.Platform,
-					},
-					Size: p.Size,
-				})
+	// Extract all tags from cache for cosign discovery
+	allTags := extractAllTags(cache)
+
+	// Discover all children using unified discovery
+	children, _ := b.orasClient.DiscoverChildren(b.ctx, b.fullImage, rootDigest, allTags)
+
+	// Determine graph type and add children
+	hasPlatform := false
+	hasAttestation := false
+
+	for _, child := range children {
+		if childVer, found := cache.ByDigest[child.Digest]; found {
+			graph.Children = append(graph.Children, VersionChild{
+				Version: childVer,
+				Type:    child.Type,
+				Size:    child.Size,
+			})
+
+			if child.Type.IsPlatform() {
+				hasPlatform = true
+			}
+			if child.Type.IsAttestation() || child.Type.Role == "signature" {
+				hasAttestation = true
 			}
 		}
 	}
 
-	// Discover referrers (attestations)
-	referrers, _ := b.orasClient.DiscoverReferrers(b.ctx, b.fullImage, rootDigest)
-	for _, ref := range referrers {
-		if childVer, found := cache.ByDigest[ref.Digest]; found {
-			graph.Children = append(graph.Children, VersionChild{
-				Version: childVer,
-				Type: oras.ArtifactType{
-					ManifestType: "manifest",
-					Role:         ref.ArtifactType,
-					Platform:     "",
-				},
-				Size: ref.Size,
-			})
-		}
-	}
-
-	// If no platforms but has referrers, it's a manifest (single-arch)
-	if len(platforms) == 0 && len(referrers) > 0 {
+	// Determine graph type based on children
+	if hasPlatform {
+		graph.Type = "index"
+	} else if hasAttestation {
 		graph.Type = "manifest"
 	}
 
 	return graph, nil
+}
+
+// extractAllTags extracts all unique tags from a version cache.
+func extractAllTags(cache *VersionCache) []string {
+	tagSet := make(map[string]bool)
+	for _, ver := range cache.ByDigest {
+		for _, tag := range ver.Tags {
+			tagSet[tag] = true
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	return tags
 }
 
 // GetVersionCache fetches all package versions and creates an efficient lookup cache.
@@ -211,6 +216,9 @@ func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (str
 		versions = sortByIDProximity(versions, childID)
 	}
 
+	// Extract all tags for cosign discovery
+	allTags := extractAllTags(cache)
+
 	// For each version, check if it references the child digest
 	for _, ver := range versions {
 		candidateDigest := ver.Name
@@ -220,23 +228,12 @@ func (b *GraphBuilder) FindParentDigest(digest string, cache *VersionCache) (str
 			continue
 		}
 
-		// Check if this candidate has the child digest as a platform manifest
-		platforms, err := b.orasClient.GetPlatformManifests(b.ctx, b.fullImage, candidateDigest)
+		// Check if this candidate has the child digest as a child
+		children, err := b.orasClient.DiscoverChildren(b.ctx, b.fullImage, candidateDigest, allTags)
 		if err == nil {
-			for _, p := range platforms {
-				if p.Digest == digest {
-					// Found a parent! This candidate has the child as a platform manifest
-					return candidateDigest, nil
-				}
-			}
-		}
-
-		// Check if this candidate has the child digest as a referrer (attestation)
-		referrers, err := b.orasClient.DiscoverReferrers(b.ctx, b.fullImage, candidateDigest)
-		if err == nil {
-			for _, r := range referrers {
-				if r.Digest == digest {
-					// Found a parent! This candidate has the child as a referrer
+			for _, child := range children {
+				if child.Digest == digest {
+					// Found a parent! This candidate has the child
 					return candidateDigest, nil
 				}
 			}

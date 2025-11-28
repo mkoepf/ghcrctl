@@ -767,9 +767,8 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 	}
 
 	// Check if we need to find parent graph (if rootDigest has no children)
-	platformInfos, _ := oras.GetPlatformManifests(ctx, fullImage, rootDigest)
-	initialReferrers, _ := oras.DiscoverReferrers(ctx, fullImage, rootDigest)
-	if len(platformInfos) == 0 && len(initialReferrers) == 0 {
+	children, _ := oras.DiscoverChildren(ctx, fullImage, rootDigest, nil)
+	if len(children) == 0 {
 		// This might be a child artifact, try to find parent
 		parentDigest, err := builder.FindParentDigest(rootDigest, cache)
 		if err == nil && parentDigest != "" && parentDigest != rootDigest {

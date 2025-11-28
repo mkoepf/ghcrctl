@@ -67,23 +67,23 @@ func TestAuthRegistryAccess(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Now try to discover referrers - this tests the full authentication flow
-	// including access to the referrers API
-	referrers, err := DiscoverReferrers(ctx, testImage, digest)
+	// Now try to discover children - this tests the full authentication flow
+	// including access to the manifest API
+	children, err := DiscoverChildren(ctx, testImage, digest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers with valid token: %v", err)
+		t.Fatalf("Failed to discover children with valid token: %v", err)
 	}
 
-	// We should get a non-nil slice (may be empty if image has no referrers)
-	if referrers == nil {
-		t.Error("Expected non-nil referrers slice")
+	// We should get a non-nil slice (may be empty if image has no children)
+	if children == nil {
+		t.Error("Expected non-nil children slice")
 	}
 
-	t.Logf("Successfully accessed referrers API, found %d referrers", len(referrers))
+	t.Logf("Successfully accessed manifest API, found %d children", len(children))
 
 	// Log what we found for debugging
-	for _, ref := range referrers {
-		t.Logf("  Found referrer: type=%s, digest=%s", ref.ArtifactType, ref.Digest)
+	for _, child := range children {
+		t.Logf("  Found child: type=%s, digest=%s", child.Type.DisplayType(), child.Digest)
 	}
 }
 
@@ -243,18 +243,18 @@ func TestDiscoverSBOMPresent(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Discover referrers
-	referrers, err := DiscoverReferrers(ctx, testImage, digest)
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
 	// Look for SBOM
 	var foundSBOM bool
-	for _, ref := range referrers {
-		if ref.ArtifactType == "sbom" {
+	for _, child := range children {
+		if child.Type.Role == "sbom" {
 			foundSBOM = true
-			t.Logf("✓ Found SBOM: digest=%s", ref.Digest)
+			t.Logf("✓ Found SBOM: digest=%s", child.Digest)
 			break
 		}
 	}
@@ -280,16 +280,16 @@ func TestDiscoverSBOMAbsent(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Discover referrers
-	referrers, err := DiscoverReferrers(ctx, testImage, digest)
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
 	// Verify no SBOM
-	for _, ref := range referrers {
-		if ref.ArtifactType == "sbom" {
-			t.Errorf("Expected no SBOM, but found one: digest=%s", ref.Digest)
+	for _, child := range children {
+		if child.Type.Role == "sbom" {
+			t.Errorf("Expected no SBOM, but found one: digest=%s", child.Digest)
 		}
 	}
 
@@ -312,22 +312,22 @@ func TestDiscoverMultiLayerAttestations(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Discover referrers
-	referrers, err := DiscoverReferrers(ctx, testImage, digest)
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
 	// Look for both SBOM and provenance
 	var sbomDigest, provenanceDigest string
-	for _, ref := range referrers {
-		if ref.ArtifactType == "sbom" {
-			sbomDigest = ref.Digest
-			t.Logf("Found SBOM: digest=%s", ref.Digest)
+	for _, child := range children {
+		if child.Type.Role == "sbom" {
+			sbomDigest = child.Digest
+			t.Logf("Found SBOM: digest=%s", child.Digest)
 		}
-		if ref.ArtifactType == "provenance" {
-			provenanceDigest = ref.Digest
-			t.Logf("Found provenance: digest=%s", ref.Digest)
+		if child.Type.Role == "provenance" {
+			provenanceDigest = child.Digest
+			t.Logf("Found provenance: digest=%s", child.Digest)
 		}
 	}
 
@@ -366,18 +366,18 @@ func TestDiscoverProvenancePresent(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Discover referrers
-	referrers, err := DiscoverReferrers(ctx, testImage, digest)
+	// Discover children
+	children, err := DiscoverChildren(ctx, testImage, digest, nil)
 	if err != nil {
-		t.Fatalf("Failed to discover referrers: %v", err)
+		t.Fatalf("Failed to discover children: %v", err)
 	}
 
 	// Look for provenance
 	var foundProvenance bool
-	for _, ref := range referrers {
-		if ref.ArtifactType == "provenance" {
+	for _, child := range children {
+		if child.Type.Role == "provenance" {
 			foundProvenance = true
-			t.Logf("✓ Found provenance: digest=%s, mediaType=%s", ref.Digest, ref.MediaType)
+			t.Logf("✓ Found provenance: digest=%s", child.Digest)
 			break
 		}
 	}

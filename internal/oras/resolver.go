@@ -412,9 +412,14 @@ func determineArtifactType(mediaType string) string {
 		return "provenance"
 	}
 
-	// Attestation/signature types
+	// Signature types (cosign, sigstore)
 	if strings.Contains(mediaType, "cosign") || strings.Contains(mediaType, "sigstore") {
-		return "attestation"
+		return "signature"
+	}
+
+	// Vulnerability scan types (SARIF)
+	if strings.Contains(mediaType, "sarif") {
+		return "vuln-scan"
 	}
 
 	return "unknown"

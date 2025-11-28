@@ -392,9 +392,19 @@ func TestDetermineArtifactType(t *testing.T) {
 			want:         "provenance",
 		},
 		{
-			name:         "attestation",
+			name:         "cosign signature",
 			artifactType: "application/vnd.dev.cosign.simplesigning.v1+json",
-			want:         "attestation",
+			want:         "signature",
+		},
+		{
+			name:         "sigstore verification material",
+			artifactType: "application/vnd.dev.sigstore.verificationmaterial",
+			want:         "signature",
+		},
+		{
+			name:         "SARIF vuln scan",
+			artifactType: "application/sarif+json",
+			want:         "vuln-scan",
 		},
 		{
 			name:         "unknown type",

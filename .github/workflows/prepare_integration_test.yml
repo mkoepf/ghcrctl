@@ -193,6 +193,90 @@ jobs:
         run: |
           cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
 
+      # Build and push image 6: Cosign vuln-scan + VEX attestations
+      - name: Build and push test image 6 (for cosign vuln/vex)
+        id: push-cosign-vuln
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./integrationtests/cosign-vuln.Dockerfile
+          push: true
+          platforms: linux/amd64
+          sbom: false
+          provenance: false
+          build-args: |
+            GITHUB_REPOSITORY=${{ github.repository }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-vuln:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      # Create vuln-scan attestation
+      - name: Generate vuln-scan report for cosign attestation
+        run: |
+          # Generate a minimal Trivy-style vulnerability scan result
+          cat > vuln-scan.json << 'EOF'
+          {
+            "scanner": {
+              "name": "ghcrctl-test-scanner",
+              "version": "1.0.0"
+            },
+            "metadata": {
+              "scanStartedOn": "2024-01-01T00:00:00Z",
+              "scanFinishedOn": "2024-01-01T00:00:01Z"
+            },
+            "results": [
+              {
+                "target": "test-package",
+                "vulnerabilities": []
+              }
+            ]
+          }
+          EOF
+
+      - name: Attest vuln-scan with cosign
+        env:
+          DIGEST: ${{ steps.push-cosign-vuln.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-vuln
+        run: |
+          cosign attest --yes --type vuln --predicate vuln-scan.json "${IMAGE}@${DIGEST}"
+
+      # Create VEX attestation
+      - name: Generate VEX document for cosign attestation
+        run: |
+          # Generate a minimal OpenVEX document
+          cat > vex.json << 'EOF'
+          {
+            "@context": "https://openvex.dev/ns/v0.2.0",
+            "@id": "https://example.com/vex/ghcrctl-test",
+            "author": "ghcrctl-integration-test",
+            "timestamp": "2024-01-01T00:00:00Z",
+            "version": 1,
+            "statements": [
+              {
+                "vulnerability": {
+                  "@id": "CVE-2024-0000"
+                },
+                "products": [
+                  {
+                    "@id": "pkg:oci/ghcrctl-test"
+                  }
+                ],
+                "status": "not_affected",
+                "justification": "component_not_present"
+              }
+            ]
+          }
+          EOF
+
+      - name: Attest VEX with cosign
+        env:
+          DIGEST: ${{ steps.push-cosign-vuln.outputs.digest }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.image_prefix }}-cosign-vuln
+        run: |
+          cosign attest --yes --type openvex --predicate vex.json "${IMAGE}@${DIGEST}"
+
       - name: Summary
         run: |
           echo "## Integration Test Images Created" >> $GITHUB_STEP_SUMMARY
@@ -222,6 +306,12 @@ jobs:
           echo "- Tags: \`latest\`, \`v1.0\`" >> $GITHUB_STEP_SUMMARY
           echo "- Name: \`${{ inputs.image_prefix }}-cosign-signed\`" >> $GITHUB_STEP_SUMMARY
           echo "- Artifacts: .sig (signature), .att (SBOM attestation)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image 6: Cosign Vuln-scan + VEX Attestations" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: linux/amd64" >> $GITHUB_STEP_SUMMARY
+          echo "- Tags: \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Name: \`${{ inputs.image_prefix }}-cosign-vuln\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifacts: .att (vuln-scan + VEX attestations)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test with ghcrctl" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY

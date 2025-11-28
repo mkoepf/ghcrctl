@@ -7,6 +7,7 @@ import (
 )
 
 func TestDiscoverChildrenInputValidation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		image        string
@@ -71,6 +72,7 @@ func containsAt(s, substr string, start int) bool {
 }
 
 func TestDigestToTagPrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		digest string
@@ -99,6 +101,7 @@ func TestDigestToTagPrefix(t *testing.T) {
 }
 
 func TestFindCosignTags(t *testing.T) {
+	t.Parallel()
 	parentDigest := "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	prefix := "sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 
@@ -175,6 +178,7 @@ func TestFindCosignTags(t *testing.T) {
 
 // TestDetermineAttestationRolesFromDescriptor verifies that cosign attestations have their type resolved
 func TestDetermineAttestationRolesFromDescriptor(t *testing.T) {
+	t.Parallel()
 	// Unit test for determineAttestationRolesFromDescriptor
 	// The function should return specific roles like "sbom", "provenance" etc., not "attestation"
 	tests := []struct {
@@ -231,6 +235,7 @@ func TestDetermineAttestationRolesFromDescriptor(t *testing.T) {
 
 // Integration test for DiscoverChildren - requires GITHUB_TOKEN
 func TestDiscoverChildrenIntegration(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")

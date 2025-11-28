@@ -13,6 +13,7 @@ import (
 
 // TestDiscoverCosignSignature verifies cosign signature discovery via tag pattern
 func TestDiscoverCosignSignature(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -58,6 +59,7 @@ func TestDiscoverCosignSignature(t *testing.T) {
 
 // TestDiscoverCosignAttestation verifies cosign attestation discovery with type resolution
 func TestDiscoverCosignAttestation(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -105,6 +107,7 @@ func TestDiscoverCosignAttestation(t *testing.T) {
 
 // TestDiscoverCosignBothArtifacts verifies both signature and attestation are discovered
 func TestDiscoverCosignBothArtifacts(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -156,6 +159,7 @@ func TestDiscoverCosignBothArtifacts(t *testing.T) {
 
 // TestCosignAttestationTypeNotGeneric verifies cosign attestations are resolved to specific types
 func TestCosignAttestationTypeNotGeneric(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")

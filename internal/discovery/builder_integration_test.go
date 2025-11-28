@@ -14,6 +14,7 @@ import (
 
 // TestFindParentDigestIntegration_PlatformManifest tests finding parent of a platform manifest
 func TestFindParentDigestIntegration_PlatformManifest(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -106,6 +107,7 @@ func TestFindParentDigestIntegration_PlatformManifest(t *testing.T) {
 
 // TestFindParentDigestIntegration_Attestation tests finding parent of an attestation
 func TestFindParentDigestIntegration_Attestation(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -181,6 +183,7 @@ func TestFindParentDigestIntegration_Attestation(t *testing.T) {
 
 // TestFindParentDigestIntegration_RootHasNoParent tests that root returns empty parent
 func TestFindParentDigestIntegration_RootHasNoParent(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -229,6 +232,7 @@ func TestFindParentDigestIntegration_RootHasNoParent(t *testing.T) {
 
 // TestBuildGraphIntegration_MultiarchWithAttestations tests building graph for real multiarch image
 func TestBuildGraphIntegration_MultiarchWithAttestations(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")

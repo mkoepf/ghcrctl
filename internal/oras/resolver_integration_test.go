@@ -12,6 +12,7 @@ import (
 
 // TestAuthWithValidToken verifies that a valid GITHUB_TOKEN allows access to test images
 func TestAuthWithValidToken(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -48,6 +49,7 @@ func TestAuthWithValidToken(t *testing.T) {
 // TestAuthRegistryAccess verifies that ORAS can authenticate to ghcr.io
 // and access the referrers API
 func TestAuthRegistryAccess(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -123,6 +125,7 @@ func TestAuthWithoutToken(t *testing.T) {
 
 // TestResolveTagLatest verifies resolving "latest" tag returns valid sha256 digest
 func TestResolveTagLatest(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -149,6 +152,7 @@ func TestResolveTagLatest(t *testing.T) {
 
 // TestResolveTagSemanticVersion verifies resolving semantic version tag
 func TestResolveTagSemanticVersion(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -186,6 +190,7 @@ func TestResolveTagSemanticVersion(t *testing.T) {
 
 // TestResolveMultipleTagsSameDigest verifies multiple tags can point to same digest
 func TestResolveMultipleTagsSameDigest(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -229,6 +234,7 @@ func TestResolveMultipleTagsSameDigest(t *testing.T) {
 
 // TestDiscoverSBOMPresent verifies SBOM is discovered for image with attestations
 func TestDiscoverSBOMPresent(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -266,6 +272,7 @@ func TestDiscoverSBOMPresent(t *testing.T) {
 
 // TestDiscoverSBOMAbsent verifies no SBOM found for image without attestations
 func TestDiscoverSBOMAbsent(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -298,6 +305,7 @@ func TestDiscoverSBOMAbsent(t *testing.T) {
 
 // TestDiscoverMultiLayerAttestations verifies SBOM and provenance from same manifest
 func TestDiscoverMultiLayerAttestations(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -352,6 +360,7 @@ func TestDiscoverMultiLayerAttestations(t *testing.T) {
 
 // TestDiscoverProvenancePresent verifies provenance attestation is discovered
 func TestDiscoverProvenancePresent(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -391,6 +400,7 @@ func TestDiscoverProvenancePresent(t *testing.T) {
 
 // TestMultipleTagsSameImage verifies digest consistency across tags
 func TestMultipleTagsSameImage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")

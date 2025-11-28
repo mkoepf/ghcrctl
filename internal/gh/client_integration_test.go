@@ -13,6 +13,7 @@ import (
 
 // TestListPackageVersionsWithRealImage tests listing versions for a real image
 func TestListPackageVersionsWithRealImage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -77,6 +78,7 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 
 // TestListPackageVersionsMultipleImages tests listing versions for different test images
 func TestListPackageVersionsMultipleImages(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -120,6 +122,7 @@ func TestListPackageVersionsMultipleImages(t *testing.T) {
 
 // TestListPackageVersionsInputValidation tests input validation
 func TestListPackageVersionsInputValidation(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -184,6 +187,7 @@ func TestListPackageVersionsInputValidation(t *testing.T) {
 
 // TestListPackageVersionsNonexistentPackage tests error handling for non-existent package
 func TestListPackageVersionsNonexistentPackage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -214,6 +218,7 @@ func TestListPackageVersionsNonexistentPackage(t *testing.T) {
 
 // TestGetVersionIDByDigestWithRealImage uses a complete workflow
 func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -285,6 +290,7 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 
 // TestVersionIDNotFound verifies error handling for non-existent digest
 func TestVersionIDNotFound(t *testing.T) {
+	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")

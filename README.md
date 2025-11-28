@@ -10,9 +10,10 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 
 ghcrctl provides functionality for:
 
-- **Exploring images** and their versions (multi-arch platforms, SBOM, provenance)
+- **Exploring images** and their versions (multi-arch platforms, SBOM, provenance, signatures)
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
+- **Discovering signatures** and attestations from both Docker buildx and cosign
 - **Managing GHCR version metadata** (labels, tags)
 - **Safe deletion** of package versions and complete OCI graphs
 - **Configuration** of owner/org and authentication
@@ -247,7 +248,8 @@ When using `--tag` to filter, the command only discovers graph relationships for
 **Understanding version types:**
 - `index` - Multi-arch image manifest list (references platform manifests)
 - `linux/amd64`, `linux/arm64` - Platform-specific manifests
-- `sbom`, `provenance` - Attestation artifacts
+- `sbom`, `provenance` - Attestation artifacts (from buildx or cosign)
+- `signature` - Cosign signatures
 - `untagged` - Standalone version with no relationships
 
 **Use cases:**
@@ -723,8 +725,9 @@ In GitHub Actions CI, **all tests must run** - if any tests are skipped, the bui
 The scoped token used in the integration tests allows to test
 
 - Tag resolution (latest, semantic versions, multiple tags)
-- SBOM and provenance discovery
+- SBOM and provenance discovery (both buildx and cosign formats)
 - Multi-layer attestation detection (Docker buildx pattern)
+- Cosign signature and attestation discovery via tag patterns
 - Platform manifest extraction (multi-arch images)
 - Versions command with verbose output
 - SBOM command end-to-end functionality
@@ -754,6 +757,8 @@ manual testing with appropriate credentials.
   - Supports OCI Referrers API and fallback to referrers tag schema
   - Discovers Docker buildx attestations stored in image indexes
   - Handles multi-layer attestation manifests (SBOM + provenance in single manifest)
+  - Discovers cosign signatures (`.sig` tags) and attestations (`.att` tags)
+  - Resolves attestation types from predicate annotations (SPDX, CycloneDX, SLSA, etc.)
 
 ## License
 

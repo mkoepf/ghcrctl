@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mhk/ghcrctl/internal/gh"
+	"github.com/mhk/ghcrctl/internal/oras"
 )
 
 // TestDiscoverRelatedVersionsByDigest verifies that we can discover relationships
@@ -283,9 +284,12 @@ func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
 			ID:   101,
 			Name: "sha256:shared",
 		},
-		ArtifactType: "platform",
-		Platform:     "linux/amd64",
-		RefCount:     2, // Shared by 2 graphs
+		Type: oras.ArtifactType{
+			ManifestType: "manifest",
+			Role:         "platform",
+			Platform:     "linux/amd64",
+		},
+		RefCount: 2, // Shared by 2 graphs
 	}
 
 	if child.RefCount != 2 {

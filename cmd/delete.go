@@ -761,14 +761,14 @@ func collectVersionIDs(g *discovery.VersionGraph) []int64 {
 
 	// First: attestations (sbom, provenance, etc.) - only exclusive ones
 	for _, child := range g.Children {
-		if child.ArtifactType != "platform" && child.Version.ID != 0 && child.RefCount <= 1 {
+		if !child.Type.IsPlatform() && child.Version.ID != 0 && child.RefCount <= 1 {
 			ids = append(ids, child.Version.ID)
 		}
 	}
 
 	// Second: platform manifests - only exclusive ones
 	for _, child := range g.Children {
-		if child.ArtifactType == "platform" && child.Version.ID != 0 && child.RefCount <= 1 {
+		if child.Type.IsPlatform() && child.Version.ID != 0 && child.RefCount <= 1 {
 			ids = append(ids, child.Version.ID)
 		}
 	}
@@ -795,7 +795,7 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 	var exclusiveAttestations, sharedAttestations []discovery.VersionChild
 
 	for _, child := range g.Children {
-		if child.ArtifactType == "platform" {
+		if child.Type.IsPlatform() {
 			if child.RefCount > 1 {
 				sharedPlatforms = append(sharedPlatforms, child)
 			} else {
@@ -814,14 +814,14 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 	if len(exclusivePlatforms) > 0 {
 		fmt.Fprintf(w, "\nPlatforms to delete (%d):\n", len(exclusivePlatforms))
 		for _, p := range exclusivePlatforms {
-			fmt.Fprintf(w, "  - %s (version %d)\n", p.Platform, p.Version.ID)
+			fmt.Fprintf(w, "  - %s (version %d)\n", p.Type.Platform, p.Version.ID)
 		}
 	}
 
 	if len(exclusiveAttestations) > 0 {
 		fmt.Fprintf(w, "\nAttestations to delete (%d):\n", len(exclusiveAttestations))
 		for _, att := range exclusiveAttestations {
-			fmt.Fprintf(w, "  - %s (version %d)\n", att.ArtifactType, att.Version.ID)
+			fmt.Fprintf(w, "  - %s (version %d)\n", att.Type.Role, att.Version.ID)
 		}
 	}
 
@@ -829,10 +829,10 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 	if len(sharedPlatforms) > 0 || len(sharedAttestations) > 0 {
 		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared artifacts (preserved, used by other graphs):"))
 		for _, p := range sharedPlatforms {
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", p.Platform, p.Version.ID, p.RefCount)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", p.Type.Platform, p.Version.ID, p.RefCount)
 		}
 		for _, att := range sharedAttestations {
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", att.ArtifactType, att.Version.ID, att.RefCount)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d graphs)\n", att.Type.Role, att.Version.ID, att.RefCount)
 		}
 	}
 }

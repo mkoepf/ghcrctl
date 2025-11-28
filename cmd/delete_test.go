@@ -5,6 +5,7 @@ import (
 
 	"github.com/mhk/ghcrctl/internal/discovery"
 	"github.com/mhk/ghcrctl/internal/gh"
+	"github.com/mhk/ghcrctl/internal/oras"
 )
 
 // TestDeleteCommandStructure verifies the delete command is properly set up
@@ -252,13 +253,13 @@ func TestCollectVersionIDsExcludesSharedChildren(t *testing.T) {
 		Type:        "index",
 		Children: []discovery.VersionChild{
 			// Exclusive platform (only in this graph)
-			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:exclusive-platform"}, ArtifactType: "platform", Platform: "linux/amd64", RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:exclusive-platform"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/amd64"}, RefCount: 1},
 			// Shared platform (in 2 graphs) - should be EXCLUDED
-			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:shared-platform"}, ArtifactType: "platform", Platform: "linux/arm64", RefCount: 2},
+			{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:shared-platform"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "platform", Platform: "linux/arm64"}, RefCount: 2},
 			// Exclusive attestation
-			{Version: gh.PackageVersionInfo{ID: 103, Name: "sha256:exclusive-sbom"}, ArtifactType: "sbom", RefCount: 1},
+			{Version: gh.PackageVersionInfo{ID: 103, Name: "sha256:exclusive-sbom"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "sbom"}, RefCount: 1},
 			// Shared attestation - should be EXCLUDED
-			{Version: gh.PackageVersionInfo{ID: 104, Name: "sha256:shared-prov"}, ArtifactType: "provenance", RefCount: 3},
+			{Version: gh.PackageVersionInfo{ID: 104, Name: "sha256:shared-prov"}, Type: oras.ArtifactType{ManifestType: "manifest", Role: "provenance"}, RefCount: 3},
 		},
 	}
 

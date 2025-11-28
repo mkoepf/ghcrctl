@@ -195,11 +195,17 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 
 	// Helper to build a graph for a version
 	buildGraph := func(ver gh.PackageVersionInfo) *VersionGraph {
-		relatedArtifacts, graphType := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
+		relatedArtifacts, _ := discoverRelatedVersionsByDigest(ctx, fullImage, ver.Name, ver.Name)
 
 		// Skip if no children and not tagged (standalone untagged versions are handled separately)
 		if len(relatedArtifacts) == 0 && len(ver.Tags) == 0 {
 			return nil
+		}
+
+		// Use ResolveType for consistent type determination
+		graphType := "manifest" // default fallback
+		if artType, err := oras.ResolveType(ctx, fullImage, ver.Name); err == nil {
+			graphType = artType.DisplayType()
 		}
 
 		graph := &VersionGraph{
@@ -212,17 +218,19 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 		childMap := make(map[int64]*VersionChild)
 		for _, artifact := range relatedArtifacts {
 			if childVer, found := cache.ByDigest[artifact.Digest]; found {
-				if existing, exists := childMap[childVer.ID]; exists {
-					// Consolidate artifact types for the same version
-					existing.ArtifactType = existing.ArtifactType + ", " + artifact.ArtifactType
+				if _, exists := childMap[childVer.ID]; exists {
+					// Skip duplicates - the first type wins
 				} else {
 					// Only count reference once per unique child per graph
 					refCounts[childVer.ID]++
 					childMap[childVer.ID] = &VersionChild{
-						Version:      childVer,
-						ArtifactType: artifact.ArtifactType,
-						Platform:     artifact.Platform,
-						Size:         artifact.Size,
+						Version: childVer,
+						Type: oras.ArtifactType{
+							ManifestType: "manifest",
+							Role:         artifact.ArtifactType,
+							Platform:     artifact.Platform,
+						},
+						Size: artifact.Size,
 					}
 				}
 			}
@@ -423,11 +431,8 @@ func outputVersionsTableWithGraphs(w io.Writer, graphs []VersionGraph, imageName
 			if idLen := len(fmt.Sprintf("%d", ver.ID)); idLen > maxIDLen {
 				maxIDLen = idLen
 			}
-			// Determine child type display
-			childType := child.ArtifactType
-			if child.Platform != "" {
-				childType = child.Platform
-			}
+			// Determine child type display using unified type
+			childType := child.Type.DisplayType()
 			if typeLen := len(childType); typeLen > maxTypeLen {
 				maxTypeLen = typeLen
 			}
@@ -530,11 +535,8 @@ func printVersionGraph(w io.Writer, g VersionGraph, maxIDLen, sharedIndicatorWid
 			indicator = lastIndicator
 		}
 
-		// Determine child type display
-		childType := child.ArtifactType
-		if child.Platform != "" {
-			childType = child.Platform
-		}
+		// Determine child type display using unified type
+		childType := child.Type.DisplayType()
 
 		printVersion(w, indicator, child.Version, childType, maxIDLen, sharedIndicatorWidth, maxTypeLen, maxDigestLen, maxTagsLen, maxCreatedLen, child.RefCount)
 	}
@@ -645,10 +647,10 @@ func printVerboseGraph(w io.Writer, g VersionGraph, isLast bool) {
 }
 
 func formatVerboseType(child VersionChild) string {
-	if child.Platform != "" {
-		return "platform: " + child.Platform
+	if child.Type.IsPlatform() {
+		return "platform: " + child.Type.Platform
 	}
-	return "attestation: " + child.ArtifactType
+	return "attestation: " + child.Type.Role
 }
 
 func printVerboseDetails(w io.Writer, digest string, tags []string, created string, size int64, hasChildren bool) {

@@ -59,11 +59,10 @@ type VersionGraph struct {
 
 // VersionChild represents a child version with its artifact type.
 type VersionChild struct {
-	Version      gh.PackageVersionInfo
-	ArtifactType string // "platform", "sbom", "provenance", or "attestation"
-	Platform     string // e.g., "linux/amd64" for platform manifests
-	Size         int64  // Size in bytes
-	RefCount     int    // Number of graphs referencing this version (>1 means shared)
+	Version  gh.PackageVersionInfo
+	Type     oras.ArtifactType // Unified type from oras package
+	Size     int64             // Size in bytes
+	RefCount int               // Number of graphs referencing this version (>1 means shared)
 }
 
 // NewVersionCacheFromSlice creates a VersionCache from an existing slice of versions.
@@ -132,10 +131,13 @@ func (b *GraphBuilder) BuildGraph(rootDigest string, cache *VersionCache) (*Vers
 		for _, p := range platforms {
 			if childVer, found := cache.ByDigest[p.Digest]; found {
 				graph.Children = append(graph.Children, VersionChild{
-					Version:      childVer,
-					ArtifactType: "platform",
-					Platform:     p.Platform,
-					Size:         p.Size,
+					Version: childVer,
+					Type: oras.ArtifactType{
+						ManifestType: "manifest",
+						Role:         "platform",
+						Platform:     p.Platform,
+					},
+					Size: p.Size,
 				})
 			}
 		}
@@ -146,10 +148,13 @@ func (b *GraphBuilder) BuildGraph(rootDigest string, cache *VersionCache) (*Vers
 	for _, ref := range referrers {
 		if childVer, found := cache.ByDigest[ref.Digest]; found {
 			graph.Children = append(graph.Children, VersionChild{
-				Version:      childVer,
-				ArtifactType: ref.ArtifactType,
-				Platform:     "",
-				Size:         ref.Size,
+				Version: childVer,
+				Type: oras.ArtifactType{
+					ManifestType: "manifest",
+					Role:         ref.ArtifactType,
+					Platform:     "",
+				},
+				Size: ref.Size,
 			})
 		}
 	}

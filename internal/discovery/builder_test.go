@@ -364,10 +364,10 @@ func TestBuildGraph_MultiArchWithAttestations(t *testing.T) {
 	// Verify platforms are present
 	platformCount := 0
 	for _, child := range graph.Children {
-		if child.ArtifactType == "platform" {
+		if child.Type.IsPlatform() {
 			platformCount++
-			if child.Platform != "linux/amd64" && child.Platform != "linux/arm64" {
-				t.Errorf("Unexpected platform: %s", child.Platform)
+			if child.Type.Platform != "linux/amd64" && child.Type.Platform != "linux/arm64" {
+				t.Errorf("Unexpected platform: %s", child.Type.Platform)
 			}
 		}
 	}
@@ -378,7 +378,7 @@ func TestBuildGraph_MultiArchWithAttestations(t *testing.T) {
 	// Verify attestations are present
 	attestationCount := 0
 	for _, child := range graph.Children {
-		if child.ArtifactType == "sbom" || child.ArtifactType == "provenance" {
+		if child.Type.Role == "sbom" || child.Type.Role == "provenance" {
 			attestationCount++
 		}
 	}
@@ -427,8 +427,8 @@ func TestBuildGraph_SingleArchImage(t *testing.T) {
 	if len(graph.Children) != 1 {
 		t.Errorf("Children count = %d, want 1", len(graph.Children))
 	}
-	if graph.Children[0].ArtifactType != "sbom" {
-		t.Errorf("Child artifact type = %s, want sbom", graph.Children[0].ArtifactType)
+	if graph.Children[0].Type.Role != "sbom" {
+		t.Errorf("Child artifact type = %s, want sbom", graph.Children[0].Type.Role)
 	}
 }
 
@@ -465,5 +465,75 @@ func TestBuildGraph_StandaloneImage(t *testing.T) {
 	// Verify no children
 	if len(graph.Children) != 0 {
 		t.Errorf("Children count = %d, want 0", len(graph.Children))
+	}
+}
+
+func TestVersionChild_TypeUnification(t *testing.T) {
+	// Test that VersionChild stores the unified ArtifactType correctly
+	tests := []struct {
+		name              string
+		artifactType      oras.ArtifactType
+		wantDisplayType   string
+		wantIsAttestation bool
+		wantIsPlatform    bool
+	}{
+		{
+			name: "platform manifest",
+			artifactType: oras.ArtifactType{
+				ManifestType: "manifest",
+				Role:         "platform",
+				Platform:     "linux/amd64",
+			},
+			wantDisplayType:   "linux/amd64",
+			wantIsAttestation: false,
+			wantIsPlatform:    true,
+		},
+		{
+			name: "sbom attestation",
+			artifactType: oras.ArtifactType{
+				ManifestType: "manifest",
+				Role:         "sbom",
+				Platform:     "",
+			},
+			wantDisplayType:   "sbom",
+			wantIsAttestation: true,
+			wantIsPlatform:    false,
+		},
+		{
+			name: "provenance attestation",
+			artifactType: oras.ArtifactType{
+				ManifestType: "manifest",
+				Role:         "provenance",
+				Platform:     "",
+			},
+			wantDisplayType:   "provenance",
+			wantIsAttestation: true,
+			wantIsPlatform:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			child := VersionChild{
+				Version: gh.PackageVersionInfo{
+					ID:   100,
+					Name: "sha256:test",
+				},
+				Type:     tt.artifactType,
+				Size:     1000,
+				RefCount: 1,
+			}
+
+			// Verify the unified type is stored correctly
+			if got := child.Type.DisplayType(); got != tt.wantDisplayType {
+				t.Errorf("DisplayType() = %q, want %q", got, tt.wantDisplayType)
+			}
+			if got := child.Type.IsAttestation(); got != tt.wantIsAttestation {
+				t.Errorf("IsAttestation() = %v, want %v", got, tt.wantIsAttestation)
+			}
+			if got := child.Type.IsPlatform(); got != tt.wantIsPlatform {
+				t.Errorf("IsPlatform() = %v, want %v", got, tt.wantIsPlatform)
+			}
+		})
 	}
 }

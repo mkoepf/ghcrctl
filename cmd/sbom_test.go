@@ -14,8 +14,8 @@ func TestSBOMCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find sbom command: %v", err)
 	}
 
-	if sbomCmd.Use != "sbom <image>" {
-		t.Errorf("Expected Use 'sbom <image>', got '%s'", sbomCmd.Use)
+	if sbomCmd.Use != "sbom <owner/image[:tag]>" {
+		t.Errorf("Expected Use 'sbom <owner/image[:tag]>', got '%s'", sbomCmd.Use)
 	}
 
 	if sbomCmd.Short == "" {
@@ -40,8 +40,8 @@ func TestSBOMCommandArguments(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "valid single argument",
-			args:      []string{"test-image"},
+			name:      "valid single argument with owner/image",
+			args:      []string{"mkoepf/test-image"},
 			wantError: false,
 		},
 		{
@@ -71,19 +71,14 @@ func TestSBOMCommandHasFlags(t *testing.T) {
 	cmd := NewRootCmd()
 	sbomCmd, _, _ := cmd.Find([]string{"sbom"})
 
-	flags := []string{"tag", "digest", "all", "json"}
+	// Tag is now part of the image reference, not a separate flag
+	flags := []string{"digest", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := sbomCmd.Flags().Lookup(flagName)
 		if flag == nil {
 			t.Errorf("Expected flag '%s' to exist", flagName)
 		}
-	}
-
-	// Check default values
-	tagFlag := sbomCmd.Flags().Lookup("tag")
-	if tagFlag.DefValue != "latest" {
-		t.Errorf("Expected tag default 'latest', got '%s'", tagFlag.DefValue)
 	}
 }
 

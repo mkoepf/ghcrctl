@@ -16,7 +16,7 @@ func TestLabelsCommandWithRealImage(t *testing.T) {
 	}
 
 	// Test with the ghcrctl-test-with-sbom image which should have labels
-	image := "ghcrctl-test-with-sbom"
+	image := "mkoepf/ghcrctl-test-with-sbom"
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -55,7 +55,7 @@ func TestLabelsCommandJSON(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	image := "ghcrctl-test-with-sbom"
+	image := "mkoepf/ghcrctl-test-with-sbom"
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -94,7 +94,7 @@ func TestLabelsCommandWithKey(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	image := "ghcrctl-test-with-sbom"
+	image := "mkoepf/ghcrctl-test-with-sbom"
 
 	// Create fresh command instance
 	// Test with a common OCI label key

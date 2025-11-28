@@ -27,8 +27,7 @@ func NewRootCmd() *cobra.Command {
 It provides functionality for:
 - Exploring images and their OCI artifact graph (image, SBOM, provenance)
 - Managing GHCR version metadata (labels, tags)
-- Safe deletion of package versions
-- Configuration of owner/org and authentication`,
+- Safe deletion of package versions`,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Enable API call logging if flag is set
@@ -46,7 +45,6 @@ It provides functionality for:
 	root.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 
 	// Add subcommands via their factories
-	root.AddCommand(newConfigCmd())
 	root.AddCommand(newImagesCmd())
 	root.AddCommand(newVersionsCmd())
 	root.AddCommand(newDeleteCmd())

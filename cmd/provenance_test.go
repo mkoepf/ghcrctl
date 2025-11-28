@@ -12,8 +12,8 @@ func TestProvenanceCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find provenance command: %v", err)
 	}
 
-	if provenanceCmd.Use != "provenance <image>" {
-		t.Errorf("Expected Use 'provenance <image>', got '%s'", provenanceCmd.Use)
+	if provenanceCmd.Use != "provenance <owner/image[:tag]>" {
+		t.Errorf("Expected Use 'provenance <owner/image[:tag]>', got '%s'", provenanceCmd.Use)
 	}
 
 	if provenanceCmd.Short == "" {
@@ -38,8 +38,8 @@ func TestProvenanceCommandArguments(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "valid single argument",
-			args:      []string{"test-image"},
+			name:      "valid single argument with owner/image",
+			args:      []string{"mkoepf/test-image"},
 			wantError: false,
 		},
 		{
@@ -69,19 +69,14 @@ func TestProvenanceCommandHasFlags(t *testing.T) {
 	cmd := NewRootCmd()
 	provenanceCmd, _, _ := cmd.Find([]string{"provenance"})
 
-	flags := []string{"tag", "digest", "all", "json"}
+	// Tag is now part of the image reference, not a separate flag
+	flags := []string{"digest", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := provenanceCmd.Flags().Lookup(flagName)
 		if flag == nil {
 			t.Errorf("Expected flag '%s' to exist", flagName)
 		}
-	}
-
-	// Check default values
-	tagFlag := provenanceCmd.Flags().Lookup("tag")
-	if tagFlag.DefValue != "latest" {
-		t.Errorf("Expected tag default 'latest', got '%s'", tagFlag.DefValue)
 	}
 }
 

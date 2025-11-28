@@ -25,15 +25,15 @@ func TestTagCommandIntegration(t *testing.T) {
 	}{
 		{
 			name:          "missing arguments",
-			args:          []string{"tag", "myimage"},
+			args:          []string{"tag", "mkoepf/myimage:v1.0"},
 			wantError:     true,
-			errorContains: "accepts 3 arg",
+			errorContains: "accepts 2 arg",
 		},
 		{
 			name:          "too many arguments",
-			args:          []string{"tag", "myimage", "v1.0", "v2.0", "extra"},
+			args:          []string{"tag", "mkoepf/myimage:v1.0", "v2.0", "extra"},
 			wantError:     true,
-			errorContains: "accepts 3 arg",
+			errorContains: "accepts 2 arg",
 		},
 	}
 

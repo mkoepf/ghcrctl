@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +10,7 @@ import (
 // newTagCmd creates the tag command.
 func newTagCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "tag <image> <existing-tag> <new-tag>",
+		Use:   "tag <owner/image:existing-tag> <new-tag>",
 		Short: "Add a new tag to an existing image version",
 		Long: `Add a new tag to an existing GHCR package version.
 
@@ -20,31 +19,28 @@ reference that points to the same image digest as the existing tag.
 
 Examples:
   # Promote version to latest
-  ghcrctl tag myimage v1.0.0 latest
+  ghcrctl tag mkoepf/myimage:v1.0.0 latest
 
   # Add semantic version alias
-  ghcrctl tag myimage v1.2.3 v1.2
+  ghcrctl tag mkoepf/myimage:v1.2.3 v1.2
 
   # Tag for environment deployment
-  ghcrctl tag myimage v2.1.0 production`,
-		Args: cobra.ExactArgs(3),
+  ghcrctl tag mkoepf/myimage:v2.1.0 production`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
-			existingTag := args[1]
-			newTag := args[2]
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
+			// Parse owner/image:tag reference
+			owner, imageName, existingTag, err := parseImageRef(args[0])
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
+				return err
 			}
 
-			if owner == "" || ownerType == "" {
+			if existingTag == "" {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+				return fmt.Errorf("existing tag required: use format owner/image:tag")
 			}
+
+			newTag := args[1]
 
 			// Construct full image reference
 			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)

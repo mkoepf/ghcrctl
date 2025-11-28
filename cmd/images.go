@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/spf13/cobra"
@@ -18,18 +17,23 @@ func newImagesCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "images",
+		Use:   "images <owner>",
 		Short: "List container images",
-		Long: `List all container images for the configured owner from GitHub Container Registry.
+		Long: `List all container images for the specified owner from GitHub Container Registry.
 
 Examples:
-  # List all images for configured owner
-  ghcrctl images
+  # List all images for a user
+  ghcrctl images mkoepf
+
+  # List all images for an organization
+  ghcrctl images myorg
 
   # List images in JSON format
-  ghcrctl images --json`,
-		Args: cobra.NoArgs,
+  ghcrctl images mkoepf --json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			owner := args[0]
+
 			// Handle output format flag (-o)
 			if outputFormat != "" {
 				switch outputFormat {
@@ -41,19 +45,6 @@ Examples:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
 				}
-			}
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
-			}
-
-			if owner == "" || ownerType == "" {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
 
 			// Get GitHub token
@@ -70,8 +61,16 @@ Examples:
 				return fmt.Errorf("failed to create GitHub client: %w", err)
 			}
 
-			// List packages
 			ctx := cmd.Context()
+
+			// Auto-detect owner type
+			ownerType, err := client.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
+
+			// List packages
 			packages, err := client.ListPackages(ctx, owner, ownerType)
 			if err != nil {
 				cmd.SilenceUsage = true

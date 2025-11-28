@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -22,8 +21,8 @@ func TestImagesCommandStructure(t *testing.T) {
 		t.Fatal("imagesCmd should not be nil")
 	}
 
-	if imagesCmd.Use != "images" {
-		t.Errorf("Expected Use to be 'images', got '%s'", imagesCmd.Use)
+	if imagesCmd.Use != "images <owner>" {
+		t.Errorf("Expected Use to be 'images <owner>', got '%s'", imagesCmd.Use)
 	}
 
 	if imagesCmd.RunE == nil {
@@ -31,81 +30,33 @@ func TestImagesCommandStructure(t *testing.T) {
 	}
 }
 
-func TestImagesCommandWithoutConfig(t *testing.T) {
-	// Cannot run in parallel - modifies environment variables
-	// Test that images command fails when owner not configured
-
-	// Create a temp config directory with no config
-	tempDir, err := os.MkdirTemp("", "ghcrctl-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Save original env vars
-	originalHome := os.Getenv("HOME")
-	originalUserProfile := os.Getenv("USERPROFILE")
-	originalConfig := os.Getenv("GHCRCTL_CONFIG")
-	defer func() {
-		os.Setenv("HOME", originalHome)
-		if originalUserProfile != "" {
-			os.Setenv("USERPROFILE", originalUserProfile)
-		} else {
-			os.Unsetenv("USERPROFILE")
-		}
-		if originalConfig != "" {
-			os.Setenv("GHCRCTL_CONFIG", originalConfig)
-		} else {
-			os.Unsetenv("GHCRCTL_CONFIG")
-		}
-	}()
-
-	// Clear GHCRCTL_CONFIG so config.New() uses HOME
-	os.Unsetenv("GHCRCTL_CONFIG")
-	// Set HOME and USERPROFILE to temp dir (no config)
-	os.Setenv("HOME", tempDir)
-	os.Setenv("USERPROFILE", tempDir)
-
-	// Execute images command - should fail with helpful error
-	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"images"})
-
-	// Capture output
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-
-	err = cmd.Execute()
-
-	if err == nil {
-		t.Error("Expected error when owner not configured, got none")
-	}
-
-	// Error should mention configuration
-	if err != nil && !strings.Contains(err.Error(), "owner") && !strings.Contains(err.Error(), "config") {
-		t.Errorf("Expected error about configuration, got: %v", err)
-	}
-}
-
 func TestImagesCommandArguments(t *testing.T) {
 	t.Parallel()
-	// Test that images command accepts no arguments
+	// Test that images command requires exactly one argument (owner)
 
 	tests := []struct {
-		name      string
-		args      []string
-		wantError bool
+		name        string
+		args        []string
+		wantError   bool
+		errContains string
 	}{
 		{
-			name:      "no arguments (valid)",
-			args:      []string{"images"},
-			wantError: false, // Will fail for other reasons (no config), but not arg validation
+			name:        "no arguments",
+			args:        []string{"images"},
+			wantError:   true,
+			errContains: "accepts 1 arg",
 		},
 		{
-			name:      "with unexpected argument",
-			args:      []string{"images", "unexpected"},
-			wantError: true,
+			name:        "with owner argument",
+			args:        []string{"images", "mkoepf"},
+			wantError:   false, // Will fail for other reasons (no token), but not arg validation
+			errContains: "",
+		},
+		{
+			name:        "with too many arguments",
+			args:        []string{"images", "mkoepf", "extra"},
+			wantError:   true,
+			errContains: "accepts 1 arg",
 		},
 	}
 
@@ -115,15 +66,16 @@ func TestImagesCommandArguments(t *testing.T) {
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
 
-			// For "no arguments" test, we expect it to fail but not due to args
-			if tt.name == "no arguments (valid)" {
-				// Just check it doesn't complain about arguments
+			if tt.wantError {
+				if err == nil {
+					t.Error("Expected error")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Expected error containing %q, got: %v", tt.errContains, err)
+				}
+			} else {
+				// For valid args, it may still fail but not due to argument validation
 				if err != nil && strings.Contains(err.Error(), "accepts") {
 					t.Errorf("Should not fail on argument count: %v", err)
-				}
-			} else if tt.wantError {
-				if err == nil {
-					t.Error("Expected error for extra arguments")
 				}
 			}
 		})

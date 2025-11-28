@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/mkoepf/ghcrctl/internal/oras"
@@ -18,7 +17,6 @@ import (
 // newProvenanceCmd creates the provenance command with isolated flag state.
 func newProvenanceCmd() *cobra.Command {
 	var (
-		tag          string
 		digest       string
 		all          bool
 		jsonOutput   bool
@@ -26,28 +24,38 @@ func newProvenanceCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "provenance <image>",
+		Use:   "provenance <owner/image[:tag]>",
 		Short: "Display provenance attestation",
 		Long: `Display the provenance attestation for a container image. If multiple provenance documents exist, use --digest to select one or --all to show all.
 
 Examples:
   # Show provenance for latest tag
-  ghcrctl provenance myimage
+  ghcrctl provenance mkoepf/myimage
 
   # Show provenance for specific tag
-  ghcrctl provenance myimage --tag v1.0.0
+  ghcrctl provenance mkoepf/myimage:v1.0.0
 
   # Show specific provenance by digest
-  ghcrctl provenance myimage --digest abc123def456
+  ghcrctl provenance mkoepf/myimage --digest abc123def456
 
   # Show all provenance documents
-  ghcrctl provenance myimage --all
+  ghcrctl provenance mkoepf/myimage --all
 
   # Output in JSON format
-  ghcrctl provenance myimage --json`,
+  ghcrctl provenance mkoepf/myimage --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
+			// Parse owner/image[:tag] reference
+			owner, imageName, tag, err := parseImageRef(args[0])
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Default to latest if no tag specified
+			if tag == "" {
+				tag = "latest"
+			}
 
 			// Handle output format flag (-o)
 			if outputFormat != "" {
@@ -60,19 +68,6 @@ Examples:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
 				}
-			}
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
-			}
-
-			if owner == "" || ownerType == "" {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
 
 			// Get GitHub token
@@ -138,7 +133,6 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&tag, "tag", "latest", "Tag to resolve (default: latest)")
 	cmd.Flags().StringVar(&digest, "digest", "", "Specific provenance digest to fetch")
 	cmd.Flags().BoolVar(&all, "all", false, "Show all provenance documents")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")

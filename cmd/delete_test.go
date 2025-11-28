@@ -40,8 +40,8 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete version command: %v", err)
 	}
 
-	if deleteVersionCmd.Use != "version <image> [version-id]" {
-		t.Errorf("Expected Use 'version <image> [version-id]', got '%s'", deleteVersionCmd.Use)
+	if deleteVersionCmd.Use != "version <owner/image> [version-id]" {
+		t.Errorf("Expected Use 'version <owner/image> [version-id]', got '%s'", deleteVersionCmd.Use)
 	}
 
 	if deleteVersionCmd.Short == "" {
@@ -64,12 +64,12 @@ func TestDeleteVersionCommandArguments(t *testing.T) {
 		},
 		{
 			name:        "missing version-id argument",
-			args:        []string{"delete", "version", "myimage"},
+			args:        []string{"delete", "version", "mkoepf/myimage"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"delete", "version", "myimage", "12345", "extra"},
+			args:        []string{"delete", "version", "mkoepf/myimage", "12345", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -129,8 +129,8 @@ func TestDeleteGraphCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete graph command: %v", err)
 	}
 
-	if deleteGraphCmd.Use != "graph <image> <tag>" {
-		t.Errorf("Expected Use 'graph <image> <tag>', got '%s'", deleteGraphCmd.Use)
+	if deleteGraphCmd.Use != "graph <owner/image[:tag]>" {
+		t.Errorf("Expected Use 'graph <owner/image[:tag]>', got '%s'", deleteGraphCmd.Use)
 	}
 
 	if deleteGraphCmd.Short == "" {
@@ -152,13 +152,8 @@ func TestDeleteGraphCommandArguments(t *testing.T) {
 			expectUsage: true,
 		},
 		{
-			name:        "missing tag argument",
-			args:        []string{"delete", "graph", "myimage"},
-			expectUsage: true,
-		},
-		{
 			name:        "too many arguments",
-			args:        []string{"delete", "graph", "myimage", "v1.0.0", "extra"},
+			args:        []string{"delete", "graph", "mkoepf/myimage:v1.0.0", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -222,18 +217,8 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "tag and digest flags both set",
-			args:      []string{"delete", "graph", "myimage", "v1.0.0", "--digest", "sha256:abc"},
-			expectErr: true,
-		},
-		{
-			name:      "tag and version flags both set",
-			args:      []string{"delete", "graph", "myimage", "v1.0.0", "--version", "12345"},
-			expectErr: true,
-		},
-		{
 			name:      "digest and version flags both set",
-			args:      []string{"delete", "graph", "myimage", "--digest", "sha256:abc", "--version", "12345"},
+			args:      []string{"delete", "graph", "mkoepf/myimage", "--digest", "sha256:abc", "--version", "12345"},
 			expectErr: true,
 		},
 	}
@@ -392,17 +377,17 @@ func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
 	}{
 		{
 			name:      "bulk mode with untagged flag - correct args",
-			args:      []string{"delete", "version", "myimage", "--untagged"},
+			args:      []string{"delete", "version", "mkoepf/myimage", "--untagged"},
 			expectErr: false,
 		},
 		{
 			name:      "bulk mode with untagged flag - too many args",
-			args:      []string{"delete", "version", "myimage", "12345", "--untagged"},
+			args:      []string{"delete", "version", "mkoepf/myimage", "12345", "--untagged"},
 			expectErr: true,
 		},
 		{
 			name:      "bulk mode with tag pattern - correct args",
-			args:      []string{"delete", "version", "myimage", "--tag-pattern", ".*-rc.*"},
+			args:      []string{"delete", "version", "mkoepf/myimage", "--tag-pattern", ".*-rc.*"},
 			expectErr: false,
 		},
 	}

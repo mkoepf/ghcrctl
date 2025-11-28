@@ -20,7 +20,7 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"images"})
+	cmd.SetArgs([]string{"images", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -91,7 +91,7 @@ func TestImagesCommandErrorFormat(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"images"})
+	cmd.SetArgs([]string{"images", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

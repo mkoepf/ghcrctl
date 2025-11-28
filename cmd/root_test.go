@@ -29,7 +29,6 @@ func TestRootCommand(t *testing.T) {
 		"OCI",
 		"metadata",
 		"deletion",
-		"Configuration",
 	}
 
 	for _, keyword := range expectedKeywords {
@@ -39,20 +38,20 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestRootCommandHasConfigSubcommand(t *testing.T) {
+func TestRootCommandHasImagesSubcommand(t *testing.T) {
 	t.Parallel()
-	// Verify config subcommand is registered
+	// Verify images subcommand is registered
 	cmd := NewRootCmd()
 	found := false
 	for _, c := range cmd.Commands() {
-		if strings.HasPrefix(c.Use, "config") {
+		if strings.HasPrefix(c.Use, "images") {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Error("Expected config subcommand to be registered with root command")
+		t.Error("Expected images subcommand to be registered with root command")
 	}
 }
 

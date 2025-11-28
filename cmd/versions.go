@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/discovery"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/filter"
@@ -35,7 +34,7 @@ func newVersionsCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "versions <image>",
+		Use:   "versions <owner/image>",
 		Short: "List all versions of a package",
 		Long: `List all versions of a container image package with graph relationships.
 
@@ -47,43 +46,48 @@ The version ID can be used with the delete command.
 
 Examples:
   # List all versions with graph relationships
-  ghcrctl versions myimage
+  ghcrctl versions mkoepf/myimage
 
   # List versions for a specific tag
-  ghcrctl versions myimage --tag v1.0
+  ghcrctl versions mkoepf/myimage --tag v1.0
 
   # List only tagged versions
-  ghcrctl versions myimage --tagged
+  ghcrctl versions mkoepf/myimage --tagged
 
   # List only untagged versions
-  ghcrctl versions myimage --untagged
+  ghcrctl versions mkoepf/myimage --untagged
 
   # List versions matching a tag pattern (regex)
-  ghcrctl versions myimage --tag-pattern "^v1\\..*"
+  ghcrctl versions mkoepf/myimage --tag-pattern "^v1\\..*"
 
   # List versions older than a specific date
-  ghcrctl versions myimage --older-than 2025-01-01
+  ghcrctl versions mkoepf/myimage --older-than 2025-01-01
 
   # List versions newer than a specific date
-  ghcrctl versions myimage --newer-than 2025-11-01
+  ghcrctl versions mkoepf/myimage --newer-than 2025-11-01
 
   # List versions older than 30 days
-  ghcrctl versions myimage --older-than-days 30
+  ghcrctl versions mkoepf/myimage --older-than-days 30
 
   # Combine filters: untagged versions older than 7 days
-  ghcrctl versions myimage --untagged --older-than-days 7
+  ghcrctl versions mkoepf/myimage --untagged --older-than-days 7
 
   # Filter by specific version ID
-  ghcrctl versions myimage --version 12345678
+  ghcrctl versions mkoepf/myimage --version 12345678
 
   # Filter by digest (supports prefix matching)
-  ghcrctl versions myimage --digest sha256:abc123
+  ghcrctl versions mkoepf/myimage --digest sha256:abc123
 
   # List versions in JSON format
-  ghcrctl versions myimage --json`,
+  ghcrctl versions mkoepf/myimage --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
+			// Parse owner/image reference
+			owner, imageName, _, err := parseImageRef(args[0])
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
 			// Handle output format flag (-o)
 			if outputFormat != "" {
@@ -96,19 +100,6 @@ Examples:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
 				}
-			}
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
-			}
-
-			if owner == "" || ownerType == "" {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
 
 			// Get GitHub token
@@ -126,6 +117,13 @@ Examples:
 			}
 
 			ctx := cmd.Context()
+
+			// Auto-detect owner type
+			ownerType, err := client.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
 
 			// List package versions
 			allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)

@@ -23,7 +23,7 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -81,7 +81,7 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--tag", "v1.0"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -119,7 +119,7 @@ func TestVersionsCommandJSON(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom", "--json"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -172,7 +172,7 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-no-sbom"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-no-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -211,7 +211,7 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-with-sbom-no-provenance"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom-no-provenance"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -264,7 +264,7 @@ func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
 
 	// Test with cosign-vuln image that has vuln-scan and vex attestations
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "ghcrctl-test-cosign-vuln"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-cosign-vuln"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

@@ -14,8 +14,8 @@ func TestLabelsCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find labels command: %v", err)
 	}
 
-	if labelsCmd.Use != "labels <image>" {
-		t.Errorf("Expected Use 'labels <image>', got '%s'", labelsCmd.Use)
+	if labelsCmd.Use != "labels <owner/image[:tag]>" {
+		t.Errorf("Expected Use 'labels <owner/image[:tag]>', got '%s'", labelsCmd.Use)
 	}
 
 	if labelsCmd.Short == "" {
@@ -75,11 +75,7 @@ func TestLabelsCommandHasFlags(t *testing.T) {
 		t.Fatalf("Failed to find labels command: %v", err)
 	}
 
-	// Check for --tag flag
-	tagFlag := labelsCmd.Flags().Lookup("tag")
-	if tagFlag == nil {
-		t.Error("Expected --tag flag to exist")
-	}
+	// Tag is now part of the image reference, not a separate flag
 
 	// Check for --key flag
 	keyFlag := labelsCmd.Flags().Lookup("key")

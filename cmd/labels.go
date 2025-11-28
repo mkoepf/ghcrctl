@@ -6,7 +6,6 @@ import (
 	"io"
 	"sort"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
@@ -15,14 +14,13 @@ import (
 // newLabelsCmd creates the labels command with isolated flag state.
 func newLabelsCmd() *cobra.Command {
 	var (
-		tag          string
 		key          string
 		jsonOutput   bool
 		outputFormat string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "labels <image>",
+		Use:   "labels <owner/image[:tag]>",
 		Short: "Display OCI labels from a container image",
 		Long: `Display OCI labels (annotations/metadata) from a container image.
 
@@ -35,19 +33,29 @@ Docker LABEL instructions or equivalent mechanisms. Common labels include:
 
 Examples:
   # Show all labels from latest tag
-  ghcrctl labels myimage
+  ghcrctl labels mkoepf/myimage
 
   # Show labels from specific tag
-  ghcrctl labels myimage --tag v1.0.0
+  ghcrctl labels mkoepf/myimage:v1.0.0
 
   # Show specific label key
-  ghcrctl labels myimage --key org.opencontainers.image.source
+  ghcrctl labels mkoepf/myimage --key org.opencontainers.image.source
 
   # JSON output
-  ghcrctl labels myimage --json`,
+  ghcrctl labels mkoepf/myimage --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
+			// Parse owner/image[:tag] reference
+			owner, imageName, tag, err := parseImageRef(args[0])
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Default to latest if no tag specified
+			if tag == "" {
+				tag = "latest"
+			}
 
 			// Handle output format flag (-o)
 			if outputFormat != "" {
@@ -60,19 +68,6 @@ Examples:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("invalid output format %q. Supported formats: json, table", outputFormat)
 				}
-			}
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
-			}
-
-			if owner == "" || ownerType == "" {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
 			}
 
 			// Construct full image reference
@@ -103,7 +98,6 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&tag, "tag", "latest", "Tag to resolve (default: latest)")
 	cmd.Flags().StringVar(&key, "key", "", "Show only specific label key")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")

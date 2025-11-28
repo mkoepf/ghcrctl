@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mkoepf/ghcrctl/internal/config"
 	"github.com/mkoepf/ghcrctl/internal/discovery"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/filter"
@@ -57,7 +56,7 @@ func newDeleteVersionCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "version <image> [version-id]",
+		Use:   "version <owner/image> [version-id]",
 		Short: "Delete package version(s)",
 		Long: `Delete package version(s) from GitHub Container Registry.
 
@@ -69,32 +68,32 @@ via the GitHub web UI if the package namespace is available).
 
 Examples:
   # Delete by version ID
-  ghcrctl delete version myimage 12345678
+  ghcrctl delete version mkoepf/myimage 12345678
 
   # Delete by digest
-  ghcrctl delete version myimage --digest sha256:abc123...
+  ghcrctl delete version mkoepf/myimage --digest sha256:abc123...
 
   # Delete all untagged versions (bulk deletion)
-  ghcrctl delete version myimage --untagged
+  ghcrctl delete version mkoepf/myimage --untagged
 
   # Delete untagged versions older than 30 days
-  ghcrctl delete version myimage --untagged --older-than-days 30
+  ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
 
   # Delete versions matching tag pattern older than a date
-  ghcrctl delete version myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
+  ghcrctl delete version mkoepf/myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
 
   # Preview what would be deleted (dry-run)
-  ghcrctl delete version myimage --untagged --dry-run
+  ghcrctl delete version mkoepf/myimage --untagged --dry-run
 
   # Skip confirmation for bulk deletion
-  ghcrctl delete version myimage --untagged --older-than-days 30 --force`,
+  ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			// Check if any filter flags are set (indicates bulk deletion)
 			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
 				olderThan != "" || newerThan != "" ||
 				olderThanDays > 0 || newerThanDays > 0
 
-			// If --digest is provided, we need exactly 1 arg (image name)
+			// If --digest is provided, we need exactly 1 arg (owner/image)
 			if digest != "" {
 				if len(args) != 1 {
 					return fmt.Errorf("accepts 1 arg(s) when using --digest, received %d", len(args))
@@ -102,31 +101,23 @@ Examples:
 				return nil
 			}
 
-			// If filter flags are set (bulk deletion), we need exactly 1 arg (image name)
+			// If filter flags are set (bulk deletion), we need exactly 1 arg (owner/image)
 			if filterFlagsSet {
 				if len(args) != 1 {
-					return fmt.Errorf("accepts 1 arg (image name) when using filters, received %d", len(args))
+					return fmt.Errorf("accepts 1 arg (owner/image) when using filters, received %d", len(args))
 				}
 				return nil
 			}
 
-			// Otherwise, we need exactly 2 args (image name and version-id)
+			// Otherwise, we need exactly 2 args (owner/image and version-id)
 			return cobra.ExactArgs(2)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
+			// Parse owner/image reference
+			owner, imageName, _, err := parseImageRef(args[0])
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
-			}
-
-			if owner == "" || ownerType == "" {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+				return err
 			}
 
 			// Get GitHub token
@@ -144,6 +135,13 @@ Examples:
 			}
 
 			ctx := cmd.Context()
+
+			// Auto-detect owner type
+			ownerType, err := client.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
 
 			// Check if this is bulk deletion mode
 			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
@@ -190,7 +188,7 @@ func newDeleteGraphCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "graph <image> <tag>",
+		Use:   "graph <owner/image[:tag]>",
 		Short: "Delete an entire OCI artifact graph",
 		Long: `Delete an entire OCI artifact graph from GitHub Container Registry.
 
@@ -198,7 +196,7 @@ This command discovers and deletes all versions that make up an OCI artifact gra
 including the root image/index, platform manifests, and attestations (SBOM, provenance).
 
 The graph can be identified by:
-  - Tag (positional argument) - most common
+  - Tag (in the image reference) - most common
   - Digest (--digest flag)
   - Version ID (--version flag) - finds the graph containing this version
 
@@ -207,57 +205,40 @@ via the GitHub web UI if the package namespace is available).
 
 Examples:
   # Delete graph by tag (most common)
-  ghcrctl delete graph myimage v1.0.0
+  ghcrctl delete graph mkoepf/myimage:v1.0.0
 
   # Delete graph by digest
-  ghcrctl delete graph myimage --digest sha256:abc123...
+  ghcrctl delete graph mkoepf/myimage --digest sha256:abc123...
 
   # Delete graph containing a specific version
-  ghcrctl delete graph myimage --version 12345678
+  ghcrctl delete graph mkoepf/myimage --version 12345678
 
   # Skip confirmation
-  ghcrctl delete graph myimage v1.0.0 --force
+  ghcrctl delete graph mkoepf/myimage:v1.0.0 --force
 
   # Preview what would be deleted
-  ghcrctl delete graph myimage v1.0.0 --dry-run`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			// Count how many lookup methods are provided
-			flagsSet := 0
-			if cmd.Flags().Changed("digest") {
-				flagsSet++
-			}
-			if cmd.Flags().Changed("version") {
-				flagsSet++
-			}
-
-			// If flags are provided, we need exactly 1 arg (image name)
-			if flagsSet > 0 {
-				if flagsSet > 1 {
-					return fmt.Errorf("flags --digest and --version are mutually exclusive")
-				}
-				if len(args) != 1 {
-					return fmt.Errorf("accepts 1 arg when using --digest or --version, received %d", len(args))
-				}
-				return nil
-			}
-
-			// Otherwise, we need exactly 2 args (image name and tag)
-			return cobra.ExactArgs(2)(cmd, args)
-		},
+  ghcrctl delete graph mkoepf/myimage:v1.0.0 --dry-run`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			imageName := args[0]
-
-			// Load configuration
-			cfg := config.New()
-			owner, ownerType, err := cfg.GetOwner()
+			// Parse owner/image[:tag] reference
+			owner, imageName, tag, err := parseImageRef(args[0])
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to read configuration: %w", err)
+				return err
 			}
 
-			if owner == "" || ownerType == "" {
+			// Validate: need either tag in reference, or --digest, or --version
+			hasDigestFlag := cmd.Flags().Changed("digest")
+			hasVersionFlag := cmd.Flags().Changed("version")
+
+			if hasDigestFlag && hasVersionFlag {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("owner not configured. Use 'ghcrctl config org <name>' or 'ghcrctl config user <name>' to set owner")
+				return fmt.Errorf("flags --digest and --version are mutually exclusive")
+			}
+
+			if tag == "" && !hasDigestFlag && !hasVersionFlag {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("tag required: use format owner/image:tag, or use --digest or --version flag")
 			}
 
 			// Get GitHub token
@@ -275,11 +256,18 @@ Examples:
 			}
 
 			ctx := cmd.Context()
+
+			// Auto-detect owner type
+			ownerType, err := ghClient.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
+
 			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
 			// Determine the root digest based on which flag/argument was used
 			var rootDigest string
-			var tag string
 
 			if digest != "" {
 				// Lookup by digest - support both full and short (prefix) format
@@ -334,8 +322,7 @@ Examples:
 					return fmt.Errorf("version ID %d not found", versionID)
 				}
 			} else {
-				// Lookup by tag (positional argument)
-				tag = args[1]
+				// Lookup by tag (from image reference)
 				rootDigest, err = oras.ResolveTag(ctx, fullImage, tag)
 				if err != nil {
 					cmd.SilenceUsage = true

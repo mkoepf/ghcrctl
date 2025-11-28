@@ -17,8 +17,8 @@ func TestTagCommandStructure(t *testing.T) {
 		t.Fatal("tagCmd should not be nil")
 	}
 
-	if tagCmd.Use != "tag <image> <existing-tag> <new-tag>" {
-		t.Errorf("Expected Use to be 'tag <image> <existing-tag> <new-tag>', got '%s'", tagCmd.Use)
+	if tagCmd.Use != "tag <owner/image:existing-tag> <new-tag>" {
+		t.Errorf("Expected Use to be 'tag <owner/image:existing-tag> <new-tag>', got '%s'", tagCmd.Use)
 	}
 
 	if tagCmd.RunE == nil {
@@ -42,19 +42,19 @@ func TestTagCommandArguments(t *testing.T) {
 			name:      "missing all arguments",
 			args:      []string{"tag"},
 			wantError: true,
-			errorMsg:  "accepts 3 arg",
+			errorMsg:  "accepts 2 arg",
 		},
 		{
 			name:      "missing new-tag argument",
-			args:      []string{"tag", "myimage", "v1.0"},
+			args:      []string{"tag", "mkoepf/myimage:v1.0"},
 			wantError: true,
-			errorMsg:  "accepts 3 arg",
+			errorMsg:  "accepts 2 arg",
 		},
 		{
 			name:      "too many arguments",
-			args:      []string{"tag", "myimage", "v1.0", "v2.0", "extra"},
+			args:      []string{"tag", "mkoepf/myimage:v1.0", "v2.0", "extra"},
 			wantError: true,
-			errorMsg:  "accepts 3 arg",
+			errorMsg:  "accepts 2 arg",
 		},
 	}
 

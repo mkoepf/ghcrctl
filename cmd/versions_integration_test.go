@@ -324,3 +324,60 @@ func TestVersionsCommandWithSBOMOnly(t *testing.T) {
 	versionsJSON = false
 	versionsTag = ""
 }
+
+// TestVersionsCommandCosignAttestationsGrouped tests that cosign attestations are grouped under parent
+func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	// Reset flags to prevent state leakage
+	versionsJSON = false
+	versionsTag = ""
+
+	// Set up config
+	cfg := config.New()
+	err := cfg.SetOwner("mkoepf", "user")
+	if err != nil {
+		t.Fatalf("Failed to set owner: %v", err)
+	}
+
+	// Test with cosign-vuln image that has vuln-scan and vex attestations
+	rootCmd.SetArgs([]string{"versions", "ghcrctl-test-cosign-vuln"})
+
+	// Capture output
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+
+	// Execute command
+	err = rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	t.Logf("Versions output (cosign attestations):\n%s", output)
+
+	// Verify the cosign attestation (.att) is grouped under the parent image
+	// The .att tag should appear as a child of the parent image, not as a separate graph
+	if !strings.Contains(output, "vex") && !strings.Contains(output, "vuln-scan") {
+		t.Error("Expected vuln-scan or vex attestation type in output")
+	}
+
+	// Verify tree structure exists (indicating grouping)
+	if !strings.Contains(output, "┌") || !strings.Contains(output, "└") {
+		t.Error("Expected tree indicators showing attestations grouped under parent")
+	}
+
+	// Count the number of graphs - should be 1 or 2 (parent + orphan), not 3 separate graphs
+	graphCount := strings.Count(output, "┌")
+	t.Logf("Number of graphs with children: %d", graphCount)
+
+	// Reset args and flags
+	rootCmd.SetArgs([]string{})
+	versionsJSON = false
+	versionsTag = ""
+}

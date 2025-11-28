@@ -285,8 +285,14 @@ func TestResolveTypeCosignSignature(t *testing.T) {
 	ctx := context.Background()
 	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-signed"
 
-	// Get the cosign signature digest via tag
-	sigTag := "sha256-f683151837ef93048ffa68193f438b19bf5b42c183981301bbad169960bd10af.sig"
+	// First resolve the image digest, then construct the cosign tag
+	imageDigest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve image tag: %v", err)
+	}
+
+	// Construct cosign signature tag from image digest
+	sigTag := "sha256-" + strings.TrimPrefix(imageDigest, "sha256:") + ".sig"
 	sigDigest, err := ResolveTag(ctx, testImage, sigTag)
 	if err != nil {
 		t.Fatalf("Failed to resolve signature tag: %v", err)
@@ -312,8 +318,14 @@ func TestResolveTypeCosignAttestation(t *testing.T) {
 	ctx := context.Background()
 	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-signed"
 
-	// Get the cosign attestation digest via tag
-	attTag := "sha256-f683151837ef93048ffa68193f438b19bf5b42c183981301bbad169960bd10af.att"
+	// First resolve the image digest, then construct the cosign tag
+	imageDigest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve image tag: %v", err)
+	}
+
+	// Construct cosign attestation tag from image digest
+	attTag := "sha256-" + strings.TrimPrefix(imageDigest, "sha256:") + ".att"
 	attDigest, err := ResolveTag(ctx, testImage, attTag)
 	if err != nil {
 		t.Fatalf("Failed to resolve attestation tag: %v", err)

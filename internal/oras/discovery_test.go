@@ -176,6 +176,103 @@ func TestFindCosignTags(t *testing.T) {
 	}
 }
 
+func TestExtractParentDigestFromCosignTag(t *testing.T) {
+	tests := []struct {
+		name       string
+		tag        string
+		wantDigest string
+		wantOk     bool
+	}{
+		{
+			name:       "signature tag",
+			tag:        "sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.sig",
+			wantDigest: "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			wantOk:     true,
+		},
+		{
+			name:       "attestation tag",
+			tag:        "sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890.att",
+			wantDigest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			wantOk:     true,
+		},
+		{
+			name:       "regular tag",
+			tag:        "latest",
+			wantDigest: "",
+			wantOk:     false,
+		},
+		{
+			name:       "semver tag",
+			tag:        "v1.0.0",
+			wantDigest: "",
+			wantOk:     false,
+		},
+		{
+			name:       "tag with sha256 but not cosign format",
+			tag:        "sha256-something-else",
+			wantDigest: "",
+			wantOk:     false,
+		},
+		{
+			name:       "empty tag",
+			tag:        "",
+			wantDigest: "",
+			wantOk:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			digest, ok := ExtractParentDigestFromCosignTag(tt.tag)
+			if ok != tt.wantOk {
+				t.Errorf("ExtractParentDigestFromCosignTag(%q) ok = %v, want %v", tt.tag, ok, tt.wantOk)
+			}
+			if digest != tt.wantDigest {
+				t.Errorf("ExtractParentDigestFromCosignTag(%q) = %q, want %q", tt.tag, digest, tt.wantDigest)
+			}
+		})
+	}
+}
+
+// TestExtractSubjectDigest verifies extraction of parent digest from in-toto subject
+func TestExtractSubjectDigest(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-vuln"
+
+	// First, get the parent image digest
+	parentDigest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve parent tag: %v", err)
+	}
+
+	// Construct the orphan attestation digest - we need to find an untagged attestation
+	// The orphan is the one that only has vuln-scan (not both vex and vuln-scan)
+	// For this test, we'll use the tagged attestation first to verify the function works
+	attTag := digestToTagPrefix(parentDigest) + ".att"
+	attDigest, err := ResolveTag(ctx, testImage, attTag)
+	if err != nil {
+		t.Fatalf("Failed to resolve attestation tag: %v", err)
+	}
+
+	// Extract subject digest from the attestation
+	subjectDigest, err := ExtractSubjectDigest(ctx, testImage, attDigest)
+	if err != nil {
+		t.Fatalf("ExtractSubjectDigest() error = %v", err)
+	}
+
+	// The subject should match the parent image digest
+	if subjectDigest != parentDigest {
+		t.Errorf("Expected subject digest %q, got %q", parentDigest, subjectDigest)
+	}
+
+	t.Logf("✓ Extracted subject digest: %s", subjectDigest[:20]+"...")
+}
+
 // TestDetermineAttestationRolesFromDescriptor verifies that cosign attestations have their type resolved
 func TestDetermineAttestationRolesFromDescriptor(t *testing.T) {
 	t.Parallel()

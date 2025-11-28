@@ -191,6 +191,37 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	// Track reference counts for each version ID (how many graphs reference it)
 	refCounts := make(map[int64]int)
 
+	// Identify cosign children: versions whose tags indicate they are .sig or .att artifacts
+	// Map from parent digest -> list of cosign child versions
+	cosignChildrenByParent := make(map[string][]gh.PackageVersionInfo)
+	isCosignChild := make(map[int64]bool)
+	for _, ver := range allVersions {
+		for _, tag := range ver.Tags {
+			if parentDigest, ok := oras.ExtractParentDigestFromCosignTag(tag); ok {
+				cosignChildrenByParent[parentDigest] = append(cosignChildrenByParent[parentDigest], ver)
+				isCosignChild[ver.ID] = true
+				break // Only need to check one cosign tag per version
+			}
+		}
+	}
+
+	// Identify orphan attestations: untagged versions that might be attestations
+	// Try to detect their parent by extracting the subject digest from their content
+	for _, ver := range allVersions {
+		// Skip if already identified as a child or if it has tags
+		if isCosignChild[ver.ID] || len(ver.Tags) > 0 {
+			continue
+		}
+
+		// Check if this might be an attestation by trying to extract its subject
+		parentDigest, err := oras.ExtractSubjectDigest(ctx, fullImage, ver.Name)
+		if err == nil && parentDigest != "" {
+			// Found parent - add as a child
+			cosignChildrenByParent[parentDigest] = append(cosignChildrenByParent[parentDigest], ver)
+			isCosignChild[ver.ID] = true
+		}
+	}
+
 	var graphs []VersionGraph
 
 	// Helper to build a graph for a version
@@ -237,12 +268,33 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 			graph.Children = append(graph.Children, *child)
 		}
 
+		// Add cosign children (versions with .sig or .att tags referencing this digest)
+		if cosignChildren, found := cosignChildrenByParent[ver.Name]; found {
+			for _, cosignVer := range cosignChildren {
+				if _, exists := childMap[cosignVer.ID]; exists {
+					continue // Already added via ORAS discovery
+				}
+				// Resolve type for the cosign artifact
+				childType := oras.ArtifactType{Role: "attestation"} // default
+				if artType, err := oras.ResolveType(ctx, fullImage, cosignVer.Name); err == nil {
+					childType = artType
+				}
+				refCounts[cosignVer.ID]++
+				graph.Children = append(graph.Children, VersionChild{
+					Version: cosignVer,
+					Type:    childType,
+					Size:    0, // Size not easily available from version info
+				})
+			}
+		}
+
 		return graph
 	}
 
 	// Process tagged versions first (potential graph roots)
+	// Skip versions that are cosign children - they'll be added to their parent's graph
 	for _, ver := range versionsToGraph {
-		if len(ver.Tags) > 0 && !isGraphRoot[ver.ID] {
+		if len(ver.Tags) > 0 && !isGraphRoot[ver.ID] && !isCosignChild[ver.ID] {
 			isGraphRoot[ver.ID] = true
 			if graph := buildGraph(ver); graph != nil {
 				graphs = append(graphs, *graph)
@@ -252,7 +304,7 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 
 	// Process untagged versions as potential graph roots
 	for _, ver := range versionsToGraph {
-		if len(ver.Tags) == 0 && !isGraphRoot[ver.ID] {
+		if len(ver.Tags) == 0 && !isGraphRoot[ver.ID] && !isCosignChild[ver.ID] {
 			if graph := buildGraph(ver); graph != nil {
 				isGraphRoot[ver.ID] = true
 				graphs = append(graphs, *graph)
@@ -261,8 +313,9 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	}
 
 	// Add remaining unassigned versions as standalone (not a root and not a child of any graph)
+	// This includes orphan attestations (untagged versions with attestation types)
 	for _, ver := range versionsToGraph {
-		if !isGraphRoot[ver.ID] && refCounts[ver.ID] == 0 {
+		if !isGraphRoot[ver.ID] && refCounts[ver.ID] == 0 && !isCosignChild[ver.ID] {
 			// Use ResolveType for consistent type determination
 			graphType := "manifest" // default
 			if artType, err := oras.ResolveType(ctx, fullImage, ver.Name); err == nil {

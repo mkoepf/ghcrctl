@@ -2,7 +2,10 @@ package oras
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -281,6 +284,35 @@ func digestToTagPrefix(digest string) string {
 	return strings.Replace(digest, ":", "-", 1)
 }
 
+// ExtractParentDigestFromCosignTag extracts the parent digest from a cosign tag.
+// Cosign tags have the format "sha256-<hex>.sig" or "sha256-<hex>.att".
+// Returns the parent digest in standard format "sha256:<hex>" and true if valid.
+func ExtractParentDigestFromCosignTag(tag string) (string, bool) {
+	// Check for .sig or .att suffix
+	var prefix string
+	if strings.HasSuffix(tag, ".sig") {
+		prefix = strings.TrimSuffix(tag, ".sig")
+	} else if strings.HasSuffix(tag, ".att") {
+		prefix = strings.TrimSuffix(tag, ".att")
+	} else {
+		return "", false
+	}
+
+	// Must start with "sha256-"
+	if !strings.HasPrefix(prefix, "sha256-") {
+		return "", false
+	}
+
+	// Extract the hex part and validate length (64 chars for sha256)
+	hex := strings.TrimPrefix(prefix, "sha256-")
+	if len(hex) != 64 {
+		return "", false
+	}
+
+	// Convert back to standard digest format
+	return "sha256:" + hex, true
+}
+
 // findCosignTags finds cosign signature and attestation tags for a given digest.
 func findCosignTags(parentDigest string, allTags []string) (sigTag, attTag string) {
 	prefix := digestToTagPrefix(parentDigest)
@@ -297,4 +329,137 @@ func findCosignTags(parentDigest string, allTags []string) (sigTag, attTag strin
 	}
 
 	return sigTag, attTag
+}
+
+// ExtractSubjectDigest extracts the parent (subject) digest from an in-toto attestation.
+// This is useful for orphan attestations that have no tag linking them to their parent.
+func ExtractSubjectDigest(ctx context.Context, image, attestationDigest string) (string, error) {
+	// Validate inputs
+	if image == "" {
+		return "", fmt.Errorf("image cannot be empty")
+	}
+	if attestationDigest == "" {
+		return "", fmt.Errorf("attestation digest cannot be empty")
+	}
+	if !validateDigestFormat(attestationDigest) {
+		return "", fmt.Errorf("invalid digest format: %s", attestationDigest)
+	}
+
+	// Parse image reference
+	registry, path, err := parseImageReference(image)
+	if err != nil {
+		return "", err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return "", fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(ctx, repo); err != nil {
+		return "", fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the attestation digest
+	desc, err := cachedResolve(ctx, repo, attestationDigest)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve attestation digest: %w", err)
+	}
+
+	// Fetch the manifest
+	manifestBytes, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch attestation manifest: %w", err)
+	}
+	defer manifestBytes.Close()
+
+	var manifest ocispec.Manifest
+	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
+		return "", fmt.Errorf("failed to decode attestation manifest: %w", err)
+	}
+
+	// Check each layer for in-toto statement with subject
+	for _, layer := range manifest.Layers {
+		// Fetch the layer content
+		layerBytes, err := repo.Fetch(ctx, layer)
+		if err != nil {
+			continue
+		}
+
+		// Try to extract subject from layer content
+		subjectDigest, err := extractSubjectFromLayer(layerBytes)
+		layerBytes.Close()
+		if err == nil && subjectDigest != "" {
+			return subjectDigest, nil
+		}
+	}
+
+	return "", fmt.Errorf("no subject digest found in attestation")
+}
+
+// extractSubjectFromLayer attempts to extract subject digest from a layer.
+// Handles both direct in-toto statements and DSSE envelopes (used by cosign).
+func extractSubjectFromLayer(r io.Reader) (string, error) {
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+
+	// First try: parse as DSSE envelope (cosign format)
+	var envelope dsseEnvelope
+	if err := json.Unmarshal(content, &envelope); err == nil && envelope.Payload != "" {
+		// Decode base64 payload
+		payload, err := base64.StdEncoding.DecodeString(envelope.Payload)
+		if err != nil {
+			return "", err
+		}
+
+		// Parse the in-toto statement from payload
+		var statement inTotoStatement
+		if err := json.Unmarshal(payload, &statement); err == nil {
+			if digest := extractDigestFromSubjects(statement.Subject); digest != "" {
+				return digest, nil
+			}
+		}
+	}
+
+	// Second try: parse as direct in-toto statement
+	var statement inTotoStatement
+	if err := json.Unmarshal(content, &statement); err == nil {
+		if digest := extractDigestFromSubjects(statement.Subject); digest != "" {
+			return digest, nil
+		}
+	}
+
+	return "", fmt.Errorf("no subject found in layer")
+}
+
+// extractDigestFromSubjects extracts sha256 digest from in-toto subjects.
+func extractDigestFromSubjects(subjects []inTotoSubject) string {
+	if len(subjects) > 0 {
+		if digest, ok := subjects[0].Digest["sha256"]; ok {
+			return "sha256:" + digest
+		}
+	}
+	return ""
+}
+
+// inTotoStatement represents the structure of an in-toto attestation statement.
+type inTotoStatement struct {
+	Subject []inTotoSubject `json:"subject"`
+}
+
+// inTotoSubject represents a subject in an in-toto statement.
+type inTotoSubject struct {
+	Name   string            `json:"name"`
+	Digest map[string]string `json:"digest"`
+}
+
+// dsseEnvelope represents a DSSE (Dead Simple Signing Envelope) structure.
+// Used by cosign for attestations.
+type dsseEnvelope struct {
+	PayloadType string `json:"payloadType"`
+	Payload     string `json:"payload"` // base64 encoded
 }

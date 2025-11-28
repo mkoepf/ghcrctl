@@ -543,14 +543,14 @@ func init() {
 // deleteVersionParams holds the parameters for single version deletion.
 // This struct allows for dependency injection and testing.
 type deleteVersionParams struct {
-	owner       string
-	ownerType   string
-	imageName   string
-	versionID   int64
-	tags        []string
-	graphCount  int
-	force       bool
-	dryRun      bool
+	owner      string
+	ownerType  string
+	imageName  string
+	versionID  int64
+	tags       []string
+	graphCount int
+	force      bool
+	dryRun     bool
 }
 
 // executeSingleDelete performs the actual deletion after all parameters are resolved.
@@ -602,12 +602,12 @@ func executeSingleDelete(ctx context.Context, deleter gh.PackageDeleter, params 
 
 // bulkDeleteParams holds the parameters for bulk deletion.
 type bulkDeleteParams struct {
-	owner      string
-	ownerType  string
-	imageName  string
-	versions   []gh.PackageVersionInfo
-	force      bool
-	dryRun     bool
+	owner     string
+	ownerType string
+	imageName string
+	versions  []gh.PackageVersionInfo
+	force     bool
+	dryRun    bool
 }
 
 // executeBulkDelete performs bulk deletion of versions.

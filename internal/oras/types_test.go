@@ -395,12 +395,58 @@ func TestResolveTypeIntegration(t *testing.T) {
 					t.Fatalf("Failed to resolve type: %v", err)
 				}
 
-				// Role should be sbom, provenance, or attestation
-				if artType.Role != "sbom" && artType.Role != "provenance" && artType.Role != "attestation" {
-					t.Errorf("Expected attestation Role, got %q", artType.Role)
+				// Role should contain sbom, provenance, or attestation
+				// (may be combined for multi-predicate attestations like "provenance, sbom")
+				role := artType.Role
+				hasValidRole := strings.Contains(role, "sbom") ||
+					strings.Contains(role, "provenance") ||
+					role == "attestation"
+				if !hasValidRole {
+					t.Errorf("Expected attestation Role containing sbom/provenance/attestation, got %q", role)
 				}
 			})
 			break
 		}
 	}
+}
+
+// TestResolveTypeCosignMultiPredicateAttestation verifies that multi-predicate cosign attestations
+// return combined roles (e.g., "vuln-scan, vex" instead of just "vuln-scan")
+func TestResolveTypeCosignMultiPredicateAttestation(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	testImage := "ghcr.io/mkoepf/ghcrctl-test-cosign-vuln"
+
+	// Resolve the image digest first
+	imageDigest, err := ResolveTag(ctx, testImage, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve image tag: %v", err)
+	}
+
+	// Get the cosign attestation tag
+	attTag := "sha256-" + strings.TrimPrefix(imageDigest, "sha256:") + ".att"
+	attDigest, err := ResolveTag(ctx, testImage, attTag)
+	if err != nil {
+		t.Fatalf("Failed to resolve attestation tag: %v", err)
+	}
+
+	artType, err := ResolveType(ctx, testImage, attDigest)
+	if err != nil {
+		t.Fatalf("ResolveType() error = %v", err)
+	}
+
+	// Should contain both vuln-scan and vex since the image has both attestations
+	role := artType.Role
+	if !strings.Contains(role, "vuln-scan") {
+		t.Errorf("Expected Role to contain 'vuln-scan', got %q", role)
+	}
+	if !strings.Contains(role, "vex") {
+		t.Errorf("Expected Role to contain 'vex', got %q", role)
+	}
+
+	t.Logf("✓ Multi-predicate attestation role: %s", role)
 }

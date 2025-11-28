@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -192,53 +193,74 @@ func checkAttestationIndicators(manifest *ocispec.Manifest) bool {
 	return false
 }
 
-// determineAttestationRole determines the specific role of an attestation manifest.
+// determineAttestationRole determines the specific role(s) of an attestation manifest.
+// For multi-predicate attestations (e.g., cosign with multiple layers), returns combined roles.
 func determineAttestationRole(manifest *ocispec.Manifest) string {
-	// Check annotations for predicate type
-	predicateType := ""
+	// Collect all unique roles from layers
+	roleSet := make(map[string]bool)
 
-	if manifest.Annotations != nil {
-		if pt, ok := manifest.Annotations["in-toto.io/predicate-type"]; ok {
-			predicateType = pt
-		}
-	}
-
-	// Check config annotations
-	if predicateType == "" && manifest.Config.Annotations != nil {
-		if pt, ok := manifest.Config.Annotations["in-toto.io/predicate-type"]; ok {
-			predicateType = pt
-		}
-	}
-
-	// Check layer annotations (buildx uses "in-toto.io/predicate-type", cosign uses "predicateType")
-	if predicateType == "" {
-		for _, layer := range manifest.Layers {
-			if layer.Annotations != nil {
-				if pt, ok := layer.Annotations["in-toto.io/predicate-type"]; ok {
-					predicateType = pt
-					break
-				}
-				if pt, ok := layer.Annotations["predicateType"]; ok {
-					predicateType = pt
-					break
-				}
+	// Check layer annotations for predicate type
+	// buildx uses "in-toto.io/predicate-type", cosign uses "predicateType"
+	for _, layer := range manifest.Layers {
+		if layer.Annotations != nil {
+			// Check buildx annotation key
+			if predType, ok := layer.Annotations["in-toto.io/predicate-type"]; ok {
+				role := predicateToRole(predType)
+				roleSet[role] = true
+			}
+			// Check cosign annotation key
+			if predType, ok := layer.Annotations["predicateType"]; ok {
+				role := predicateToRole(predType)
+				roleSet[role] = true
 			}
 		}
 	}
 
-	// Map predicate type to role
-	if predicateType != "" {
-		if strings.Contains(predicateType, "spdx") || strings.Contains(predicateType, "cyclonedx") {
-			return "sbom"
+	// If no roles found in layers, check manifest and config annotations
+	if len(roleSet) == 0 {
+		if manifest.Annotations != nil {
+			if predType, ok := manifest.Annotations["in-toto.io/predicate-type"]; ok {
+				roleSet[predicateToRole(predType)] = true
+			}
 		}
-		if strings.Contains(predicateType, "slsa") || strings.Contains(predicateType, "provenance") {
-			return "provenance"
-		}
-		if strings.Contains(predicateType, "vuln") {
-			return "vuln-scan"
+		if manifest.Config.Annotations != nil {
+			if predType, ok := manifest.Config.Annotations["in-toto.io/predicate-type"]; ok {
+				roleSet[predicateToRole(predType)] = true
+			}
 		}
 	}
 
-	// Default to generic attestation
+	// If no roles found, default to generic attestation
+	if len(roleSet) == 0 {
+		return "attestation"
+	}
+
+	// Convert set to sorted slice and join
+	var roles []string
+	for role := range roleSet {
+		roles = append(roles, role)
+	}
+	// Sort for consistent output
+	sort.Strings(roles)
+	return strings.Join(roles, ", ")
+}
+
+// predicateToRole maps in-toto predicate types to roles.
+func predicateToRole(predicateType string) string {
+	lower := strings.ToLower(predicateType)
+
+	if strings.Contains(lower, "spdx") || strings.Contains(lower, "cyclonedx") {
+		return "sbom"
+	}
+	if strings.Contains(lower, "slsa") || strings.Contains(lower, "provenance") {
+		return "provenance"
+	}
+	if strings.Contains(lower, "vuln") {
+		return "vuln-scan"
+	}
+	if strings.Contains(lower, "openvex") || strings.Contains(lower, "vex") {
+		return "vex"
+	}
+
 	return "attestation"
 }

@@ -52,6 +52,7 @@ It provides functionality for:
 	root.AddCommand(newSBOMCmd())
 	root.AddCommand(newProvenanceCmd())
 	root.AddCommand(newTagCmd())
+	root.AddCommand(newCompletionCmd())
 
 	return root
 }

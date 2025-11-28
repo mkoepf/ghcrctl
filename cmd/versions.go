@@ -190,6 +190,9 @@ Examples:
 	cmd.Flags().Int64Var(&versionID, "version", 0, "Filter by exact version ID")
 	cmd.Flags().StringVar(&digest, "digest", "", "Filter by digest (supports prefix matching)")
 
+	// Enable dynamic completion for image reference
+	cmd.ValidArgsFunction = imageRefValidArgsFunc
+
 	return cmd
 }
 

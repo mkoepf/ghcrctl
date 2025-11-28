@@ -137,6 +137,9 @@ Examples:
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
 
+	// Enable dynamic completion for image reference
+	cmd.ValidArgsFunction = imageRefValidArgsFunc
+
 	return cmd
 }
 

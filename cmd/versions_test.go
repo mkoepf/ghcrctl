@@ -299,7 +299,9 @@ func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
 }
 
 // TestDetermineVersionType verifies that version types are determined correctly
-// regardless of whether the version is tagged or untagged
+// regardless of whether the version is tagged or untagged.
+// With unified type determination, graphType now contains the resolved type
+// from ResolveType().DisplayType() (e.g., "linux/amd64", "sbom", etc.)
 func TestDetermineVersionType(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -320,22 +322,34 @@ func TestDetermineVersionType(t *testing.T) {
 			want:      "manifest",
 		},
 		{
-			name:      "untagged index should show as index not untagged",
+			name:      "untagged index should show as index",
 			ver:       gh.PackageVersionInfo{Tags: []string{}},
 			graphType: "index",
 			want:      "index",
 		},
 		{
-			name:      "untagged manifest should show as manifest not untagged",
+			name:      "untagged manifest should show as manifest",
 			ver:       gh.PackageVersionInfo{Tags: []string{}},
 			graphType: "manifest",
 			want:      "manifest",
 		},
 		{
-			name:      "untagged standalone should show as manifest not untagged",
+			name:      "resolved platform type passes through",
 			ver:       gh.PackageVersionInfo{Tags: []string{}},
-			graphType: "standalone",
-			want:      "manifest",
+			graphType: "linux/amd64",
+			want:      "linux/amd64",
+		},
+		{
+			name:      "resolved sbom type passes through",
+			ver:       gh.PackageVersionInfo{Tags: []string{}},
+			graphType: "sbom",
+			want:      "sbom",
+		},
+		{
+			name:      "resolved provenance type passes through",
+			ver:       gh.PackageVersionInfo{Tags: []string{}},
+			graphType: "provenance",
+			want:      "provenance",
 		},
 	}
 

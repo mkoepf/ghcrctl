@@ -259,10 +259,17 @@ func buildVersionGraphs(ctx context.Context, fullImage string, versionsToGraph [
 	// Add remaining unassigned versions as standalone (not a root and not a child of any graph)
 	for _, ver := range versionsToGraph {
 		if !isGraphRoot[ver.ID] && refCounts[ver.ID] == 0 {
+			// Use ResolveType to determine the actual type of standalone manifests
+			graphType := "manifest" // default
+			artType, err := oras.ResolveType(ctx, fullImage, ver.Name)
+			if err == nil {
+				graphType = artType.DisplayType()
+			}
+
 			graph := VersionGraph{
 				RootVersion: ver,
 				Children:    []VersionChild{},
-				Type:        "standalone",
+				Type:        graphType,
 			}
 			graphs = append(graphs, graph)
 		}
@@ -692,15 +699,17 @@ func formatSize(bytes int64) string {
 }
 
 func determineVersionType(ver gh.PackageVersionInfo, graphType string) string {
-	// Check graphType first - it tells us what the version actually is
-	// regardless of whether it has tags
+	// graphType now contains the actual resolved type from ResolveType()
+	// This can be "index", "manifest", or a platform string like "linux/amd64"
+	// For index types discovered via discoverRelatedVersionsByDigest, return "index"
 	if graphType == "index" {
 		return "index"
 	}
 
-	// For all other cases (manifest, standalone), return "manifest"
-	// This is more accurate than "untagged" which describes tag status, not type
-	return "manifest"
+	// For standalone manifests, graphType already contains the display type
+	// from ResolveType().DisplayType() (e.g., "linux/amd64", "sbom", etc.)
+	// Return it directly
+	return graphType
 }
 
 // parseUserDate parses a date string in multiple user-friendly formats

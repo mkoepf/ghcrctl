@@ -44,6 +44,15 @@ type VersionCache struct {
 	ByID     map[int64]gh.PackageVersionInfo
 }
 
+// AllVersions returns all versions in the cache as a slice.
+func (c *VersionCache) AllVersions() []gh.PackageVersionInfo {
+	versions := make([]gh.PackageVersionInfo, 0, len(c.ByID))
+	for _, v := range c.ByID {
+		versions = append(versions, v)
+	}
+	return versions
+}
+
 // VersionGraph represents a group of related OCI artifact versions.
 // This is the unified structure used by both versions and delete commands.
 type VersionGraph struct {

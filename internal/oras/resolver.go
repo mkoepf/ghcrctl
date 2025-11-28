@@ -36,11 +36,18 @@ var (
 	// Value: parsed OCI index
 	manifestIndexCache   map[string]*ocispec.Index
 	manifestIndexCacheMu sync.RWMutex
+
+	// Manifest content cache for attestation manifests
+	// Key: digest string
+	// Value: parsed OCI manifest
+	manifestContentCache   map[string]*ocispec.Manifest
+	manifestContentCacheMu sync.RWMutex
 )
 
 func init() {
 	manifestDescCache = make(map[string]ocispec.Descriptor)
 	manifestIndexCache = make(map[string]*ocispec.Index)
+	manifestContentCache = make(map[string]*ocispec.Manifest)
 }
 
 // ResolveTag resolves an image tag to its digest using ORAS
@@ -518,4 +525,38 @@ func cachedFetchIndex(ctx context.Context, repo *remote.Repository, desc ocispec
 	manifestIndexCacheMu.Unlock()
 
 	return &index, nil
+}
+
+// cachedFetchManifest fetches and parses a manifest, caching the result.
+// This eliminates duplicate repo.Fetch() calls for attestation manifests
+// across determineRolesFromManifest and ResolveType operations.
+func cachedFetchManifest(ctx context.Context, repo *remote.Repository, desc ocispec.Descriptor) (*ocispec.Manifest, error) {
+	digestStr := desc.Digest.String()
+
+	// Fast path: check cache
+	manifestContentCacheMu.RLock()
+	if manifest, found := manifestContentCache[digestStr]; found {
+		manifestContentCacheMu.RUnlock()
+		return manifest, nil
+	}
+	manifestContentCacheMu.RUnlock()
+
+	// Slow path: fetch, parse, and cache
+	manifestBytes, err := repo.Fetch(ctx, desc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
+	}
+	defer manifestBytes.Close()
+
+	var manifest ocispec.Manifest
+	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
+		return nil, fmt.Errorf("failed to decode manifest: %w", err)
+	}
+
+	// Cache the result
+	manifestContentCacheMu.Lock()
+	manifestContentCache[digestStr] = &manifest
+	manifestContentCacheMu.Unlock()
+
+	return &manifest, nil
 }

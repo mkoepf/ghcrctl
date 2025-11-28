@@ -96,27 +96,21 @@ func ResolveType(ctx context.Context, image, digest string) (ArtifactType, error
 	}
 
 	// It's a manifest - need to determine if it's a platform manifest or attestation
-	// Fetch the manifest to inspect its contents
-	manifestBytes, err := repo.Fetch(ctx, desc)
+	// Fetch the manifest to inspect its contents (cached to avoid redundant fetches)
+	manifest, err := cachedFetchManifest(ctx, repo, desc)
 	if err != nil {
-		return ArtifactType{}, fmt.Errorf("failed to fetch manifest: %w", err)
-	}
-	defer manifestBytes.Close()
-
-	var manifest ocispec.Manifest
-	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
-		return ArtifactType{}, fmt.Errorf("failed to decode manifest: %w", err)
+		return ArtifactType{}, err
 	}
 
 	// Check for cosign signature first (before attestation check)
-	if isSignature := checkSignatureIndicators(&manifest); isSignature {
+	if isSignature := checkSignatureIndicators(manifest); isSignature {
 		return ArtifactType{Role: "signature"}, nil
 	}
 
 	// Check for attestation indicators
-	if isAttestation := checkAttestationIndicators(&manifest); isAttestation {
+	if isAttestation := checkAttestationIndicators(manifest); isAttestation {
 		// Determine the specific attestation type
-		role := determineAttestationRole(&manifest)
+		role := determineAttestationRole(manifest)
 		return ArtifactType{
 			Role: role,
 		}, nil

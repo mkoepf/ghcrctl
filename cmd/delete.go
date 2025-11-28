@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mhk/ghcrctl/internal/config"
@@ -783,29 +784,96 @@ func buildGraph(ctx context.Context, ghClient *gh.Client, fullImage, owner, owne
 		return targetGraph, err
 	}
 
-	// To calculate RefCount correctly, we need to check how many OTHER graphs
-	// reference the same children. Build all graphs and count references.
-	allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
-	if err != nil {
-		// If we can't list versions, return graph without RefCount (conservative: no deletion of children)
-		for i := range targetGraph.Children {
-			targetGraph.Children[i].RefCount = 2 // Assume shared to be safe
-		}
-		return targetGraph, nil
+	// Calculate RefCount directly by checking which other versions
+	// reference the same children. This is more efficient than building full graphs.
+	allVersions := cache.AllVersions()
+	calculateRefCountsDirect(ctx, fullImage, targetGraph.Children, allVersions, rootDigest)
+
+	return targetGraph, nil
+}
+
+// calculateRefCountsDirect calculates RefCount for target graph children
+// by checking which other versions reference the same children.
+// This is more efficient than building full graphs for all versions.
+//
+// Key optimizations:
+// - Doesn't call ResolveType (we don't need graph types, just parent-child relationships)
+// - Only discovers children, doesn't build full graph structures
+// - Uses parallel discovery with bounded concurrency
+func calculateRefCountsDirect(ctx context.Context, fullImage string,
+	targetChildren []discovery.VersionChild,
+	allVersions []gh.PackageVersionInfo,
+	targetRootDigest string) {
+
+	// Build set of child digests we care about
+	childDigests := make(map[string]*discovery.VersionChild)
+	for i := range targetChildren {
+		childDigests[targetChildren[i].Version.Name] = &targetChildren[i]
+		targetChildren[i].RefCount = 1 // Start with self-reference from target graph
 	}
 
-	// Build all graphs to calculate reference counts
-	allGraphs, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, ghClient, owner, ownerType, imageName)
-	if err != nil {
-		// Fallback: assume shared
-		for i := range targetGraph.Children {
-			targetGraph.Children[i].RefCount = 2
-		}
-		return targetGraph, nil
+	// Collect all versions to check (excluding target root and its children)
+	// We must check ALL versions because untagged versions can also share children
+	childDigestSet := make(map[string]bool)
+	for digest := range childDigests {
+		childDigestSet[digest] = true
 	}
 
-	// Find the target graph in allGraphs and use its RefCount values
-	return findGraphByDigest(allGraphs, rootDigest, targetGraph)
+	var versionsToCheck []gh.PackageVersionInfo
+	for _, ver := range allVersions {
+		// Skip the target root
+		if ver.Name == targetRootDigest {
+			continue
+		}
+		// Skip versions that are children of the target (they can't be graph roots)
+		if childDigestSet[ver.Name] {
+			continue
+		}
+		versionsToCheck = append(versionsToCheck, ver)
+	}
+
+	if len(versionsToCheck) == 0 {
+		return
+	}
+
+	// Discover children in parallel with bounded concurrency
+	type discoveryResult struct {
+		digest   string
+		children []oras.ChildArtifact
+	}
+
+	results := make(chan discoveryResult, len(versionsToCheck))
+	sem := make(chan struct{}, 10) // Limit to 10 concurrent requests
+	var wg sync.WaitGroup
+
+	for _, ver := range versionsToCheck {
+		wg.Add(1)
+		go func(digest string) {
+			defer wg.Done()
+			sem <- struct{}{}        // Acquire
+			defer func() { <-sem }() // Release
+
+			children, err := oras.DiscoverChildren(ctx, fullImage, digest, nil)
+			if err == nil {
+				results <- discoveryResult{digest: digest, children: children}
+			}
+		}(ver.Name)
+	}
+
+	// Close results channel when all goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Process results and update RefCount
+	for result := range results {
+		for _, c := range result.children {
+			if child, found := childDigests[c.Digest]; found {
+				child.RefCount++
+			}
+		}
+	}
 }
 
 // findGraphByDigest finds a graph by its root digest from a list of graphs.

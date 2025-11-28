@@ -2,7 +2,6 @@ package oras
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -165,16 +164,9 @@ func manifestToChildArtifacts(ctx context.Context, repo *remote.Repository, mani
 // determineRolesFromManifest fetches an attestation manifest and determines all roles.
 // For multi-layer attestations, this returns multiple roles (one per layer type).
 func determineRolesFromManifest(ctx context.Context, repo *remote.Repository, desc ocispec.Descriptor) []string {
-	// Fetch the attestation manifest
-	manifestBytes, err := repo.Fetch(ctx, desc)
+	// Fetch the attestation manifest (cached to avoid redundant fetches)
+	manifest, err := cachedFetchManifest(ctx, repo, desc)
 	if err != nil {
-		return nil
-	}
-	defer manifestBytes.Close()
-
-	// Read and parse the manifest
-	var manifest ocispec.Manifest
-	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
 		return nil
 	}
 

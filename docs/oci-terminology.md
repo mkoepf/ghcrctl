@@ -53,12 +53,30 @@ Children discovered within an index have different **roles**:
 
 ### Attestations
 
-Docker buildx stores attestations as manifests within the image index:
+Docker buildx stores attestations **both ways** - as references AND with referrer-like annotations:
 
+1. **As References**: Listed in the index's `manifests` array (like platform manifests)
+2. **With Referrer Annotations**: Each attestation has annotations linking it back to the platform manifest it describes
+
+```
+Index (manifests array contains all of these)
+├── Platform Manifest (linux/amd64)
+├── Platform Manifest (linux/arm64)
+├── Attestation (sbom) ──annotation──► linux/amd64
+├── Attestation (sbom) ──annotation──► linux/arm64
+├── Attestation (provenance) ──annotation──► linux/amd64
+└── Attestation (provenance) ──annotation──► linux/arm64
+```
+
+Attestation manifest properties:
 - Media type: `application/vnd.oci.image.manifest.v1+json` (same as regular images)
 - Platform: Set to `unknown/unknown` to prevent execution
-- Annotations: `vnd.docker.reference.type: attestation-manifest`
+- Annotations:
+  - `vnd.docker.reference.type: attestation-manifest`
+  - `vnd.docker.reference.digest: <digest of platform manifest>`
 - Content: Layers contain `application/vnd.in-toto+json` blobs
+
+This hybrid approach means attestations are discoverable both by parsing the index (forward reference) and by checking which attestations point to a given platform manifest (backward annotation).
 
 Common attestation types:
 - **sbom** - Software Bill of Materials (SPDX format)

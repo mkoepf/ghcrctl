@@ -139,6 +139,17 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 	// Calculate ref counts: how many roots reference each version
 	refCounts := calculateRefCounts(allVersions)
 
+	// Calculate max multiplicity indicator width (e.g., " (2*)" = 5 chars)
+	maxMultiplicityWidth := 0
+	for _, count := range refCounts {
+		if count > 1 {
+			indicatorLen := len(fmt.Sprintf(" (%d*)", count))
+			if indicatorLen > maxMultiplicityWidth {
+				maxMultiplicityWidth = indicatorLen
+			}
+		}
+	}
+
 	// Calculate dynamic column widths
 	idWidth := 10 // minimum width
 	typeWidth := 4
@@ -157,7 +168,7 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth)
+		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth, maxMultiplicityWidth)
 	}
 }
 
@@ -176,7 +187,7 @@ func calculateRefCounts(allVersions map[string]VersionInfo) map[string]int {
 	return refCounts
 }
 
-func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth int) {
+func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth, maxMultiplicityWidth int) {
 	typeStr := formatTypes(v.Types)
 	tagsStr := ""
 	if len(v.Tags) > 0 {
@@ -219,12 +230,14 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 	// Pad raw strings first, then apply color to preserve alignment
 	if isRoot {
 		paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, typeStr))
+		// Roots don't have multiplicity indicator, so pad with spaces to align with children
+		multiPadding := strings.Repeat(" ", maxMultiplicityWidth)
 		if len(children) > 0 {
-			fmt.Fprintf(w, "%s┌      %-*d  %s  %s%s\n",
-				prefix, idWidth, v.ID, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s┌      %-*d%s  %s  %s%s\n",
+				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
 		} else {
-			fmt.Fprintf(w, "%s       %-*d  %s  %s%s\n",
-				prefix, idWidth, v.ID, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s       %-*d%s  %s  %s%s\n",
+				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
 		}
 	}
 
@@ -245,18 +258,24 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 				childTagsStr = "  " + formatTags(childVer.Tags)
 			}
 			// Add multiplicity indicator if version is referenced by multiple roots
-			multiplicityStr := ""
+			// Pad to maxMultiplicityWidth for alignment
+			var multiplicityStr string
 			if count := refCounts[childVer.Digest]; count > 1 {
-				multiplicityStr = display.ColorShared(fmt.Sprintf(" (%d*)", count))
+				rawIndicator := fmt.Sprintf(" (%d*)", count)
+				padding := maxMultiplicityWidth - len(rawIndicator)
+				multiplicityStr = display.ColorShared(rawIndicator) + strings.Repeat(" ", padding)
+			} else {
+				multiplicityStr = strings.Repeat(" ", maxMultiplicityWidth)
 			}
 			paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, childTypeStr))
 			fmt.Fprintf(w, "%s%s %s %-*d%s  %s  %s%s\n",
 				prefix, connector, indicator, idWidth, childVer.ID, multiplicityStr, paddedType,
 				display.ColorDigest(shortDigest(childVer.Digest)), childTagsStr)
 		} else {
+			multiPadding := strings.Repeat(" ", maxMultiplicityWidth)
 			paddedType := fmt.Sprintf("%-*s", typeWidth, "???")
-			fmt.Fprintf(w, "%s%s %s %-*s  %s  %s  (not found)\n",
-				prefix, connector, indicator, idWidth, "-", paddedType, display.ColorDigest(shortDigest(child.ref)))
+			fmt.Fprintf(w, "%s%s %s %-*s%s  %s  %s  (not found)\n",
+				prefix, connector, indicator, idWidth, "-", multiPadding, paddedType, display.ColorDigest(shortDigest(child.ref)))
 		}
 	}
 }

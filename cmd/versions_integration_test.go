@@ -13,17 +13,17 @@ import (
 // Integration tests for the versions command
 // These tests require GITHUB_TOKEN and will skip if not set
 
-// TestVersionsCommandWithMultiarch tests versions command with multiarch image
-func TestVersionsCommandWithMultiarch(t *testing.T) {
+// TestVersionsCommandFlat tests versions command flat table output
+func TestVersionsCommandFlat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Create fresh command instance - use --tree for hierarchical view
+	// Create fresh command instance - flat table output is default
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tree"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -45,24 +45,18 @@ func TestVersionsCommandWithMultiarch(t *testing.T) {
 		t.Error("Expected output to contain 'Versions for ghcrctl-test-with-sbom'")
 	}
 
-	// Verify graph structure with tree indicators
-	if !strings.Contains(output, "┌") || !strings.Contains(output, "└") {
-		t.Error("Expected output to contain tree indicators (┌ └)")
+	// Verify flat table format has headers
+	if !strings.Contains(output, "VERSION ID") {
+		t.Error("Expected output to contain 'VERSION ID' header")
 	}
-
-	// Verify type column shows "index" for multiarch root
-	if !strings.Contains(output, "index") {
-		t.Error("Expected 'index' type for multiarch image")
+	if !strings.Contains(output, "DIGEST") {
+		t.Error("Expected output to contain 'DIGEST' header")
 	}
-
-	// Verify platform manifests are shown (expecting linux/amd64 and linux/arm64)
-	if !strings.Contains(output, "linux/amd64") && !strings.Contains(output, "linux/arm64") {
-		t.Error("Expected platform manifests (linux/amd64 or linux/arm64) in output")
+	if !strings.Contains(output, "TAGS") {
+		t.Error("Expected output to contain 'TAGS' header")
 	}
-
-	// Verify attestations (sbom, provenance) are shown
-	if !strings.Contains(output, "sbom") && !strings.Contains(output, "provenance") {
-		t.Error("Expected sbom or provenance in output")
+	if !strings.Contains(output, "CREATED") {
+		t.Error("Expected output to contain 'CREATED' header")
 	}
 
 	// Verify total count
@@ -79,9 +73,9 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// Create fresh command instance - use --tree for hierarchical view
+	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0", "--tree"})
+	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -97,11 +91,6 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 
 	output := stdout.String()
 	t.Logf("Versions output with --tag:\n%s", output)
-
-	// Verify the output still shows the full graph (root + children)
-	if !strings.Contains(output, "┌") {
-		t.Error("Expected output to contain tree structure even with --tag filter")
-	}
 
 	// Verify the tag "v1.0" is in the output
 	if !strings.Contains(output, "v1.0") {
@@ -143,9 +132,9 @@ func TestVersionsCommandJSON(t *testing.T) {
 		t.Errorf("Failed to parse JSON output: %v", err)
 	}
 
-	// Verify we got multiple versions (should include root + children)
+	// Verify we got multiple versions
 	if len(versions) < 2 {
-		t.Errorf("Expected at least 2 versions (root + children), got %d", len(versions))
+		t.Errorf("Expected at least 2 versions, got %d", len(versions))
 	}
 
 	// Verify structure of version objects
@@ -194,105 +183,12 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 		t.Error("Expected output to contain 'Versions for ghcrctl-test-no-sbom'")
 	}
 
-	// Single platform images may not have tree indicators if no children
-	// Just verify we get some version output
+	// Verify we get version output with headers
 	if !strings.Contains(output, "VERSION ID") {
 		t.Error("Expected output to contain 'VERSION ID' header")
 	}
 }
 
-// TestVersionsCommandWithSBOMOnly tests image with SBOM but no provenance
-func TestVersionsCommandWithSBOMOnly(t *testing.T) {
-	t.Parallel()
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
-
-	// Create fresh command instance - use --tree for hierarchical view
-	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom-no-provenance", "--tree"})
-
-	// Capture output
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-
-	// Execute command
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
-
-	output := stdout.String()
-	t.Logf("Versions output (with SBOM, no provenance):\n%s", output)
-
-	// Verify SBOM is shown in the artifact list
-	lines := strings.Split(output, "\n")
-	foundSBOM := false
-	foundProvenance := false
-	for _, line := range lines {
-		// Skip header and separator lines
-		if strings.Contains(line, "VERSION ID") || strings.Contains(line, "---") {
-			continue
-		}
-		// Check if line contains artifact types
-		if strings.Contains(line, "sbom") && !strings.Contains(line, "ghcrctl-test") {
-			foundSBOM = true
-		}
-		if strings.Contains(line, "provenance") && !strings.Contains(line, "ghcrctl-test") {
-			foundProvenance = true
-		}
-	}
-
-	if !foundSBOM {
-		t.Error("Expected 'sbom' artifact in output")
-	}
-	if foundProvenance {
-		t.Error("Expected provenance artifact to NOT be in output for SBOM-only image")
-	}
-}
-
-// TestVersionsCommandCosignAttestationsGrouped tests that cosign attestations are grouped under parent
-func TestVersionsCommandCosignAttestationsGrouped(t *testing.T) {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
-	t.Parallel()
-
-	// Test with cosign-vuln image that has vuln-scan and vex attestations - use --tree for hierarchical view
-	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-cosign-vuln", "--tree"})
-
-	// Capture output
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-
-	// Execute command
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
-
-	output := stdout.String()
-	t.Logf("Versions output (cosign attestations):\n%s", output)
-
-	// Verify the cosign attestation (.att) is grouped under the parent image
-	// The .att tag should appear as a child of the parent image, not as a separate graph
-	if !strings.Contains(output, "vex") && !strings.Contains(output, "vuln-scan") {
-		t.Error("Expected vuln-scan or vex attestation type in output")
-	}
-
-	// Verify tree structure exists (indicating grouping)
-	if !strings.Contains(output, "┌") || !strings.Contains(output, "└") {
-		t.Error("Expected tree indicators showing attestations grouped under parent")
-	}
-
-	// Count the number of graphs - should be 1 or 2 (parent + orphan), not 3 separate graphs
-	graphCount := strings.Count(output, "┌")
-	t.Logf("Number of graphs with children: %d", graphCount)
-}
+// Note: Hierarchical tree view tests are now in images_integration_test.go
+// The versions command only shows flat table output.
+// Use 'ghcrctl images' for tree view with artifact relationships.

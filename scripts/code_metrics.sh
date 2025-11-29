@@ -61,6 +61,7 @@ declare -a COMPONENTS=(
     "internal/gh:internal/gh"
     "internal/oras:internal/oras"
     "internal/discovery:internal/discovery"
+    "internal/discover:internal/discover"
     "internal/display:internal/display"
     "internal/filter:internal/filter"
     "internal/logging:internal/logging"

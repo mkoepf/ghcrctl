@@ -1,68 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"testing"
-
-	"github.com/mkoepf/ghcrctl/internal/gh"
-	"github.com/mkoepf/ghcrctl/internal/oras"
 )
-
-// TestDiscoverRelatedVersionsByDigest verifies that we can discover relationships
-// using a digest directly without needing to call ResolveTag
-func TestDiscoverRelatedVersionsByDigest(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	// Test with a simple digest
-	digest := "sha256:abc123"
-	fullImage := "ghcr.io/test/image"
-
-	// This should work without making any ORAS ResolveTag calls
-	// The function should accept the digest directly
-	artifacts := discoverRelatedVersionsByDigest(ctx, fullImage, digest, digest)
-
-	// artifacts may be empty if no relationships found, which is OK for this test
-	_ = artifacts
-}
-
-// TestBuildVersionGraphsUsesDigestDirectly verifies optimization:
-// buildVersionGraphs should use ver.Name (digest) directly instead of calling ResolveTag
-func TestBuildVersionGraphsUsesDigestDirectly(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-
-	// Create test versions with digests already set
-	versions := []gh.PackageVersionInfo{
-		{
-			ID:   12345,
-			Name: "sha256:abc123def456",
-			Tags: []string{"v1.0", "latest"},
-		},
-		{
-			ID:   12346,
-			Name: "sha256:def456abc123",
-			Tags: []string{},
-		},
-	}
-
-	fullImage := "ghcr.io/test/image"
-
-	// This should use digests directly from ver.Name
-	// and NOT call oras.ResolveTag for each tag
-	graphs, err := buildVersionGraphs(ctx, fullImage, versions, versions, nil, "", "", "")
-
-	if err != nil {
-		// Error is expected since we're not providing real ORAS connectivity
-		// The key is that it should attempt to use digests, not tags
-		t.Logf("Expected error in test environment: %v", err)
-	}
-
-	// Basic validation - should attempt to create graphs
-	if graphs == nil {
-		t.Error("Expected non-nil graphs result")
-	}
-}
 
 // TestBuildVersionFilter verifies that the filter is built correctly from flags
 func TestBuildVersionFilter(t *testing.T) {
@@ -245,54 +185,15 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 	}
 }
 
-// TestSharedChildrenAppearInMultipleGraphs verifies that when multiple indexes
-// reference the same platform manifest, it appears in all graphs with a reference count
-func TestSharedChildrenAppearInMultipleGraphs(t *testing.T) {
-	t.Parallel()
-	// This test verifies the fix for the bug where shared platform manifests
-	// were only shown in the first graph that claimed them.
-	//
-	// Scenario: Two indexes (A and B) both reference the same platform manifests
-	// Expected: Both graphs should show the shared children with RefCount > 1
-
-	// We need to mock the ORAS discovery, so we'll test the data structure behavior
-	// The actual ORAS calls are tested in integration tests
-
-	// Create a VersionChild with RefCount
-	child := VersionChild{
-		Version: gh.PackageVersionInfo{
-			ID:   101,
-			Name: "sha256:shared",
-		},
-		Type: oras.ArtifactType{
-			Role:     "platform",
-			Platform: "linux/amd64",
-		},
-		RefCount: 2, // Shared by 2 graphs
-	}
-
-	if child.RefCount != 2 {
-		t.Errorf("Expected RefCount=2, got %d", child.RefCount)
-	}
-
-	// Verify that RefCount > 1 indicates sharing
-	if child.RefCount <= 1 {
-		t.Error("Shared children should have RefCount > 1")
-	}
-}
-
-// Note: determineVersionType() was removed as it became a simple pass-through
-// after the type unification refactoring. The VersionGraph.Type field now
-// directly contains the resolved type from oras.ResolveType().DisplayType().
-
-// TestVersionsCommandHasTreeFlag verifies --tree flag exists
-func TestVersionsCommandHasTreeFlag(t *testing.T) {
+// TestVersionsCommandNoTreeFlag verifies --tree flag was removed
+// (use 'ghcrctl images' for tree view instead)
+func TestVersionsCommandNoTreeFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	versionsCmd, _, _ := cmd.Find([]string{"versions"})
 
 	flag := versionsCmd.Flags().Lookup("tree")
-	if flag == nil {
-		t.Error("versions command should have --tree flag")
+	if flag != nil {
+		t.Error("versions command should NOT have --tree flag (use 'ghcrctl images' instead)")
 	}
 }

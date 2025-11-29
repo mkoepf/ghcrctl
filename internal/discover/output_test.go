@@ -161,6 +161,44 @@ func TestFormatTable_MultipleTagsAsRows(t *testing.T) {
 	}
 }
 
+func TestFormatTree_MultiplicityIndicator(t *testing.T) {
+	// Create versions where one child is referenced by multiple roots
+	versions := []VersionInfo{
+		{
+			ID:           100,
+			Digest:       "sha256:root1",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared"},
+		},
+		{
+			ID:           200,
+			Digest:       "sha256:root2",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared"},
+		},
+		{
+			ID:           300,
+			Digest:       "sha256:shared",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:root1", "sha256:root2"},
+		},
+	}
+
+	allVersions := make(map[string]VersionInfo)
+	for _, v := range versions {
+		allVersions[v.Digest] = v
+	}
+
+	var buf bytes.Buffer
+	FormatTree(&buf, versions, allVersions)
+
+	output := buf.String()
+	// Should contain "(2*)" indicator for shared version
+	if !strings.Contains(output, "(2*)") {
+		t.Errorf("expected multiplicity indicator (2*) for shared version\noutput:\n%s", output)
+	}
+}
+
 func TestFormatTree_AlignedVersionIDs(t *testing.T) {
 	versions := []VersionInfo{
 		{

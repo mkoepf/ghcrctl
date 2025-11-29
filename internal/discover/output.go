@@ -136,6 +136,9 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		return roots[i].ID > roots[j].ID
 	})
 
+	// Calculate ref counts: how many roots reference each version
+	refCounts := calculateRefCounts(allVersions)
+
 	// Calculate dynamic column widths
 	idWidth := 10 // minimum width
 	typeWidth := 4
@@ -154,11 +157,26 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		printTree(w, root, allVersions, "", true, idWidth, typeWidth)
+		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth)
 	}
 }
 
-func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, prefix string, isRoot bool, idWidth, typeWidth int) {
+// calculateRefCounts counts how many existing versions reference each version.
+// This is used to show multiplicity indicators like (2*) for shared versions.
+func calculateRefCounts(allVersions map[string]VersionInfo) map[string]int {
+	refCounts := make(map[string]int)
+	for _, v := range allVersions {
+		// Count incoming refs from versions that exist in allVersions
+		for _, inRef := range v.IncomingRefs {
+			if _, exists := allVersions[inRef]; exists {
+				refCounts[v.Digest]++
+			}
+		}
+	}
+	return refCounts
+}
+
+func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth int) {
 	typeStr := formatTypes(v.Types)
 	tagsStr := ""
 	if len(v.Tags) > 0 {
@@ -226,9 +244,14 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, p
 			if len(childVer.Tags) > 0 {
 				childTagsStr = "  " + formatTags(childVer.Tags)
 			}
+			// Add multiplicity indicator if version is referenced by multiple roots
+			multiplicityStr := ""
+			if count := refCounts[childVer.Digest]; count > 1 {
+				multiplicityStr = display.ColorShared(fmt.Sprintf(" (%d*)", count))
+			}
 			paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, childTypeStr))
-			fmt.Fprintf(w, "%s%s %s %-*d  %s  %s%s\n",
-				prefix, connector, indicator, idWidth, childVer.ID, paddedType,
+			fmt.Fprintf(w, "%s%s %s %-*d%s  %s  %s%s\n",
+				prefix, connector, indicator, idWidth, childVer.ID, multiplicityStr, paddedType,
 				display.ColorDigest(shortDigest(childVer.Digest)), childTagsStr)
 		} else {
 			paddedType := fmt.Sprintf("%-*s", typeWidth, "???")

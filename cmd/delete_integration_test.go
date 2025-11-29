@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/gh"
-	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
 // Integration tests for delete command functionality
@@ -36,7 +36,7 @@ func TestCountImageMembershipRootVersion(t *testing.T) {
 	}
 
 	// Resolve tag to get root digest
-	rootDigest, err := oras.ResolveTag(ctx, fullImage, tag)
+	rootDigest, err := discover.ResolveTag(ctx, fullImage, tag)
 	if err != nil {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 	}
 
 	// Resolve tag to get a real version ID
-	rootDigest, err := oras.ResolveTag(ctx, fullImage, tag)
+	rootDigest, err := discover.ResolveTag(ctx, fullImage, tag)
 	if err != nil {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}

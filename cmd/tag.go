@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mkoepf/ghcrctl/internal/oras"
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +47,7 @@ Examples:
 
 			// Use ORAS to copy the tag (creates new tag pointing to same digest)
 			ctx := cmd.Context()
-			err = oras.CopyTag(ctx, fullImage, existingTag, newTag)
+			err = discover.CopyTag(ctx, fullImage, existingTag, newTag)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to add tag: %w", err)

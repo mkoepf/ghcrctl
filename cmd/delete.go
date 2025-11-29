@@ -13,7 +13,6 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/filter"
 	"github.com/mkoepf/ghcrctl/internal/gh"
-	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/mkoepf/ghcrctl/internal/prompts"
 	"github.com/spf13/cobra"
 )
@@ -322,7 +321,7 @@ Examples:
 				}
 			} else {
 				// Lookup by tag (from image reference)
-				rootDigest, err = oras.ResolveTag(ctx, fullImage, tag)
+				rootDigest, err = discover.ResolveTag(ctx, fullImage, tag)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)

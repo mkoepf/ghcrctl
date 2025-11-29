@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/gh"
-	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +67,8 @@ func newArtifactCmd(cfg artifactConfig) *cobra.Command {
 			}
 
 			// Verify GitHub token is available
-			if _, err := gh.GetToken(); err != nil {
+			token, err := gh.GetToken()
+			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -75,26 +76,60 @@ func newArtifactCmd(cfg artifactConfig) *cobra.Command {
 			// Construct full image reference
 			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-			// Resolve tag to digest
 			ctx := cmd.Context()
-			resolvedDigest, err := oras.ResolveTag(ctx, fullImage, tag)
+
+			// Resolve tag to digest
+			resolvedDigest, err := discover.ResolveTag(ctx, fullImage, tag)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
 			}
 
-			// Discover children
-			children, err := oras.DiscoverChildren(ctx, fullImage, resolvedDigest, nil)
+			// Create GitHub client to get owner type
+			ghClient, err := gh.NewClient(token)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to discover children: %w", err)
+				return fmt.Errorf("failed to create GitHub client: %w", err)
 			}
 
+			ownerType, err := ghClient.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
+
+			// Get all versions for this package
+			allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to list package versions: %w", err)
+			}
+
+			// Use discover to get version info with relationships
+			discoverer := discover.NewPackageDiscoverer()
+			versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to discover package: %w", err)
+			}
+
+			// Find children of the resolved digest and filter by role
+			versionMap := discover.ToMap(versions)
+			imageVersions := discover.FindImageByDigest(versionMap, resolvedDigest)
+
 			// Filter for artifacts of the specified role
-			var artifacts []oras.ChildArtifact
-			for _, child := range children {
-				if child.Type.Role == cfg.Role {
-					artifacts = append(artifacts, child)
+			var artifacts []discover.VersionInfo
+			for _, v := range imageVersions {
+				// Skip the root itself
+				if v.Digest == resolvedDigest {
+					continue
+				}
+				// Check if any of the types match the requested role
+				for _, t := range v.Types {
+					if t == cfg.Role {
+						artifacts = append(artifacts, v)
+						break
+					}
 				}
 			}
 
@@ -142,7 +177,7 @@ func newArtifactCmd(cfg artifactConfig) *cobra.Command {
 // fetchAndDisplayArtifact fetches and displays a single artifact
 func fetchAndDisplayArtifact(w io.Writer, ctx context.Context, image, digest string, jsonOutput bool, artifactType string) error {
 	// Fetch the artifact content
-	content, err := oras.FetchArtifactContent(ctx, image, digest)
+	content, err := discover.FetchArtifactContent(ctx, image, digest)
 	if err != nil {
 		return fmt.Errorf("failed to fetch %s: %w", artifactType, err)
 	}
@@ -155,11 +190,11 @@ func fetchAndDisplayArtifact(w io.Writer, ctx context.Context, image, digest str
 }
 
 // fetchAndDisplayAllArtifacts fetches and displays all artifacts
-func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string, artifacts []oras.ChildArtifact, jsonOutput bool, artifactType string) error {
+func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string, artifacts []discover.VersionInfo, jsonOutput bool, artifactType string) error {
 	allContent := make([]interface{}, 0, len(artifacts))
 
 	for _, artifact := range artifacts {
-		content, err := oras.FetchArtifactContent(ctx, image, artifact.Digest)
+		content, err := discover.FetchArtifactContent(ctx, image, artifact.Digest)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to fetch %s %s: %v\n", artifactType, artifact.Digest, err)
 			continue
@@ -190,7 +225,7 @@ func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string,
 }
 
 // listArtifacts lists available artifacts without fetching their content
-func listArtifacts(w io.Writer, artifacts []oras.ChildArtifact, imageName, artifactType string) error {
+func listArtifacts(w io.Writer, artifacts []discover.VersionInfo, imageName, artifactType string) error {
 	fmt.Fprintf(w, "Multiple %s documents found for %s\n\n", artifactType, imageName)
 	fmt.Fprintf(w, "Use --digest <digest> to select one, or --all to show all:\n\n")
 

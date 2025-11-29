@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/display"
-	"github.com/mkoepf/ghcrctl/internal/oras"
 	"github.com/spf13/cobra"
 )
 
@@ -110,13 +110,13 @@ Examples:
 
 func getImageLabels(ctx context.Context, image, tag string) (map[string]string, error) {
 	// Resolve tag to digest
-	digest, err := oras.ResolveTag(ctx, image, tag)
+	digest, err := discover.ResolveTag(ctx, image, tag)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve tag: %w", err)
 	}
 
 	// Fetch image config to get labels
-	config, err := oras.FetchImageConfig(ctx, image, digest)
+	config, err := discover.FetchImageConfig(ctx, image, digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image config: %w", err)
 	}

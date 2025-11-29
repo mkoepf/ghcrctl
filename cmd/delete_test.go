@@ -120,26 +120,26 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 	}
 }
 
-// TestDeleteGraphCommandStructure verifies the delete graph subcommand
-func TestDeleteGraphCommandStructure(t *testing.T) {
+// TestDeleteImageCommandStructure verifies the delete image subcommand
+func TestDeleteImageCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
+	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
 	if err != nil {
-		t.Fatalf("Failed to find delete graph command: %v", err)
+		t.Fatalf("Failed to find delete image command: %v", err)
 	}
 
-	if deleteGraphCmd.Use != "graph <owner/package[:tag]>" {
-		t.Errorf("Expected Use 'graph <owner/package[:tag]>', got '%s'", deleteGraphCmd.Use)
+	if deleteImageCmd.Use != "image <owner/package[:tag]>" {
+		t.Errorf("Expected Use 'image <owner/package[:tag]>', got '%s'", deleteImageCmd.Use)
 	}
 
-	if deleteGraphCmd.Short == "" {
+	if deleteImageCmd.Short == "" {
 		t.Error("Short description should not be empty")
 	}
 }
 
-// TestDeleteGraphCommandArguments verifies argument validation
-func TestDeleteGraphCommandArguments(t *testing.T) {
+// TestDeleteImageCommandArguments verifies argument validation
+func TestDeleteImageCommandArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -148,12 +148,12 @@ func TestDeleteGraphCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "missing all arguments",
-			args:        []string{"delete", "graph"},
+			args:        []string{"delete", "image"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"delete", "graph", "mkoepf/myimage:v1.0.0", "extra"},
+			args:        []string{"delete", "image", "mkoepf/myimage:v1.0.0", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -174,42 +174,42 @@ func TestDeleteGraphCommandArguments(t *testing.T) {
 	}
 }
 
-// TestDeleteGraphCommandHasFlags verifies required flags exist
-func TestDeleteGraphCommandHasFlags(t *testing.T) {
+// TestDeleteImageCommandHasFlags verifies required flags exist
+func TestDeleteImageCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
+	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
 	if err != nil {
-		t.Fatalf("Failed to find delete graph command: %v", err)
+		t.Fatalf("Failed to find delete image command: %v", err)
 	}
 
 	// Check for --force flag
-	forceFlag := deleteGraphCmd.Flags().Lookup("force")
+	forceFlag := deleteImageCmd.Flags().Lookup("force")
 	if forceFlag == nil {
 		t.Error("Expected --force flag to exist")
 	}
 
 	// Check for --dry-run flag
-	dryRunFlag := deleteGraphCmd.Flags().Lookup("dry-run")
+	dryRunFlag := deleteImageCmd.Flags().Lookup("dry-run")
 	if dryRunFlag == nil {
 		t.Error("Expected --dry-run flag to exist")
 	}
 
 	// Check for --digest flag
-	digestFlag := deleteGraphCmd.Flags().Lookup("digest")
+	digestFlag := deleteImageCmd.Flags().Lookup("digest")
 	if digestFlag == nil {
 		t.Error("Expected --digest flag to exist")
 	}
 
 	// Check for --version flag
-	versionFlag := deleteGraphCmd.Flags().Lookup("version")
+	versionFlag := deleteImageCmd.Flags().Lookup("version")
 	if versionFlag == nil {
 		t.Error("Expected --version flag to exist")
 	}
 }
 
-// TestDeleteGraphCommandFlagExclusivity verifies mutually exclusive flags
-func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
+// TestDeleteImageCommandFlagExclusivity verifies mutually exclusive flags
+func TestDeleteImageCommandFlagExclusivity(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -218,7 +218,7 @@ func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 	}{
 		{
 			name:      "digest and version flags both set",
-			args:      []string{"delete", "graph", "mkoepf/myimage", "--digest", "sha256:abc", "--version", "12345"},
+			args:      []string{"delete", "image", "mkoepf/myimage", "--digest", "sha256:abc", "--version", "12345"},
 			expectErr: true,
 		},
 	}
@@ -534,8 +534,8 @@ func TestDisplayGraphSummary(t *testing.T) {
 			wantContains: []string{
 				"Platforms to delete (1)",
 				"linux/amd64 (version 301)",
-				"Shared artifacts (preserved, used by other graphs)",
-				"linux/arm64 (version 302, shared by 3 graphs)",
+				"Shared artifacts (preserved, used by other images)",
+				"linux/arm64 (version 302, shared by 3 images)",
 			},
 		},
 		{
@@ -563,8 +563,8 @@ func TestDisplayGraphSummary(t *testing.T) {
 			wantContains: []string{
 				"Attestations to delete (1)",
 				"sbom (version 401)",
-				"Shared artifacts (preserved, used by other graphs)",
-				"provenance (version 402, shared by 2 graphs)",
+				"Shared artifacts (preserved, used by other images)",
+				"provenance (version 402, shared by 2 images)",
 			},
 		},
 		{
@@ -610,9 +610,9 @@ func TestDisplayGraphSummary(t *testing.T) {
 				"linux/amd64 (version 501)",
 				"Attestations to delete (1)",
 				"sbom (version 503)",
-				"Shared artifacts (preserved, used by other graphs)",
-				"linux/arm64 (version 502, shared by 2 graphs)",
-				"provenance (version 504, shared by 4 graphs)",
+				"Shared artifacts (preserved, used by other images)",
+				"linux/arm64 (version 502, shared by 2 images)",
+				"provenance (version 504, shared by 4 images)",
 			},
 		},
 		{
@@ -831,27 +831,27 @@ func TestCollectVersionIDsRefCountBoundary(t *testing.T) {
 	}
 }
 
-// TestCountVersionInGraphs tests the graph membership counting logic
-func TestCountVersionInGraphs(t *testing.T) {
+// TestCountVersionInImages tests the image membership counting logic
+func TestCountVersionInImages(t *testing.T) {
 	t.Parallel()
-	// Create test graphs
-	graphs := []discovery.VersionGraph{
+	// Create test images
+	images := []discovery.VersionGraph{
 		{
-			RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:graph1root"},
+			RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:image1root"},
 			Children: []discovery.VersionChild{
 				{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:child1"}},
 				{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:child2"}},
 			},
 		},
 		{
-			RootVersion: gh.PackageVersionInfo{ID: 200, Name: "sha256:graph2root"},
+			RootVersion: gh.PackageVersionInfo{ID: 200, Name: "sha256:image2root"},
 			Children: []discovery.VersionChild{
-				{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:child2"}}, // shared with graph1
+				{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:child2"}}, // shared with image1
 				{Version: gh.PackageVersionInfo{ID: 201, Name: "sha256:child3"}},
 			},
 		},
 		{
-			RootVersion: gh.PackageVersionInfo{ID: 300, Name: "sha256:graph3root"},
+			RootVersion: gh.PackageVersionInfo{ID: 300, Name: "sha256:image3root"},
 			Children:    []discovery.VersionChild{}, // standalone with no children
 		},
 	}
@@ -862,22 +862,22 @@ func TestCountVersionInGraphs(t *testing.T) {
 		wantCount int
 	}{
 		{
-			name:      "version is root of one graph",
+			name:      "version is root of one image",
 			versionID: 100,
 			wantCount: 1,
 		},
 		{
-			name:      "version is exclusive child (in one graph)",
+			name:      "version is exclusive child (in one image)",
 			versionID: 101,
 			wantCount: 1,
 		},
 		{
-			name:      "version is shared child (in two graphs)",
+			name:      "version is shared child (in two images)",
 			versionID: 102,
 			wantCount: 2,
 		},
 		{
-			name:      "version not in any graph",
+			name:      "version not in any image",
 			versionID: 999,
 			wantCount: 0,
 		},
@@ -887,7 +887,7 @@ func TestCountVersionInGraphs(t *testing.T) {
 			wantCount: 1,
 		},
 		{
-			name:      "version ID 0 (unresolved) not in any graph",
+			name:      "version ID 0 (unresolved) not in any image",
 			versionID: 0,
 			wantCount: 0,
 		},
@@ -895,25 +895,25 @@ func TestCountVersionInGraphs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := countVersionInGraphs(graphs, tt.versionID)
+			got := countVersionInImages(images, tt.versionID)
 			if got != tt.wantCount {
-				t.Errorf("countVersionInGraphs() = %d, want %d", got, tt.wantCount)
+				t.Errorf("countVersionInImages() = %d, want %d", got, tt.wantCount)
 			}
 		})
 	}
 }
 
-// TestCountVersionInGraphsEmptyGraphs tests edge case of empty graphs slice
-func TestCountVersionInGraphsEmptyGraphs(t *testing.T) {
+// TestCountVersionInImagesEmptyImages tests edge case of empty images slice
+func TestCountVersionInImagesEmptyImages(t *testing.T) {
 	t.Parallel()
-	count := countVersionInGraphs([]discovery.VersionGraph{}, 100)
+	count := countVersionInImages([]discovery.VersionGraph{}, 100)
 	if count != 0 {
-		t.Errorf("Expected 0 for empty graphs, got %d", count)
+		t.Errorf("Expected 0 for empty images, got %d", count)
 	}
 
-	count = countVersionInGraphs(nil, 100)
+	count = countVersionInImages(nil, 100)
 	if count != 0 {
-		t.Errorf("Expected 0 for nil graphs, got %d", count)
+		t.Errorf("Expected 0 for nil images, got %d", count)
 	}
 }
 
@@ -1234,7 +1234,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 				imageName:  "testimage",
 				versionID:  12345,
 				tags:       []string{"v1.0", "latest"},
-				graphCount: 0,
+				imageCount: 0,
 				force:      true,
 				dryRun:     false,
 			},
@@ -1334,36 +1334,36 @@ func TestExecuteSingleDelete(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name: "shows graph count when present",
+			name: "shows image count when present",
 			params: deleteVersionParams{
 				owner:      "testowner",
 				ownerType:  "user",
 				imageName:  "testimage",
 				versionID:  55555,
 				tags:       []string{},
-				graphCount: 2,
+				imageCount: 2,
 				force:      true,
 				dryRun:     false,
 			},
 			wantDeleted: true,
 			wantErr:     false,
-			wantOutput:  []string{"Graphs:", "2 graphs"},
+			wantOutput:  []string{"Images:", "2 images"},
 		},
 		{
-			name: "shows singular graph when count is 1",
+			name: "shows singular image when count is 1",
 			params: deleteVersionParams{
 				owner:      "testowner",
 				ownerType:  "user",
 				imageName:  "testimage",
 				versionID:  66666,
 				tags:       []string{},
-				graphCount: 1,
+				imageCount: 1,
 				force:      true,
 				dryRun:     false,
 			},
 			wantDeleted: true,
 			wantErr:     false,
-			wantOutput:  []string{"1 graph"},
+			wantOutput:  []string{"1 image"},
 		},
 	}
 

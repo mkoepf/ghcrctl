@@ -10,7 +10,7 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/oras"
 )
 
-// Integration tests for buildGraph and countGraphMembership
+// Integration tests for buildGraph and countImageMembership
 // These tests require GITHUB_TOKEN and will skip if not set
 
 // TestBuildGraphMultiarchWithSBOMAndProvenance tests graph building with a complex image
@@ -335,7 +335,7 @@ func TestCountGraphMembershipRootVersion(t *testing.T) {
 	t.Logf("Root version ID: %d, digest: %s", rootVersionID, rootDigest)
 
 	// Count membership
-	count := countGraphMembership(ctx, client, owner, ownerType, imageName, rootVersionID)
+	count := countImageMembership(ctx, client, owner, ownerType, imageName, rootVersionID)
 
 	t.Logf("Root version membership count: %d", count)
 
@@ -397,7 +397,7 @@ func TestCountGraphMembershipChildVersion(t *testing.T) {
 	}
 
 	// Count membership
-	count := countGraphMembership(ctx, client, owner, ownerType, imageName, childVersionID)
+	count := countImageMembership(ctx, client, owner, ownerType, imageName, childVersionID)
 
 	t.Logf("Child version membership count: %d", count)
 
@@ -431,7 +431,7 @@ func TestCountGraphMembershipNonexistentVersion(t *testing.T) {
 	nonexistentVersionID := int64(999999999)
 
 	// Count membership
-	count := countGraphMembership(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
+	count := countImageMembership(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
 
 	t.Logf("Nonexistent version membership count: %d", count)
 
@@ -566,9 +566,9 @@ func TestCollectVersionIDsIntegration(t *testing.T) {
 // These tests verify the delete workflow against real images without deleting
 // =============================================================================
 
-// TestDeleteGraphDryRunIntegration tests that dry-run correctly identifies
+// TestDeleteImageDryRunIntegration tests that dry-run correctly identifies
 // all versions that would be deleted without actually deleting them
-func TestDeleteGraphDryRunIntegration(t *testing.T) {
+func TestDeleteImageDryRunIntegration(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -595,32 +595,32 @@ func TestDeleteGraphDryRunIntegration(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	// Build graph (this is what delete graph --dry-run does internally)
-	graph, err := buildGraph(ctx, client, fullImage, owner, ownerType, imageName, rootDigest, tag)
+	// Build image graph (this is what delete image --dry-run does internally)
+	image, err := buildGraph(ctx, client, fullImage, owner, ownerType, imageName, rootDigest, tag)
 	if err != nil {
 		t.Fatalf("buildGraph failed: %v", err)
 	}
 
-	if graph == nil {
-		t.Fatal("Expected non-nil graph")
+	if image == nil {
+		t.Fatal("Expected non-nil image")
 	}
 
 	// Simulate dry-run: collect what WOULD be deleted
-	idsToDelete := collectVersionIDs(graph)
+	idsToDelete := collectVersionIDs(image)
 
 	t.Logf("Dry-run would delete %d versions:", len(idsToDelete))
 
 	// Verify deletion order (children before root)
 	if len(idsToDelete) > 0 {
 		lastID := idsToDelete[len(idsToDelete)-1]
-		if lastID != graph.RootVersion.ID {
-			t.Errorf("Root should be deleted last, got %d, want %d", lastID, graph.RootVersion.ID)
+		if lastID != image.RootVersion.ID {
+			t.Errorf("Root should be deleted last, got %d, want %d", lastID, image.RootVersion.ID)
 		}
 	}
 
 	// Verify shared children are NOT in the list
 	sharedCount := 0
-	for _, child := range graph.Children {
+	for _, child := range image.Children {
 		if child.RefCount > 1 {
 			sharedCount++
 			for _, id := range idsToDelete {
@@ -704,7 +704,7 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 		imageName:  imageName,
 		versionID:  versionID,
 		tags:       tags,
-		graphCount: 1, // It's a root, so count is 1
+		imageCount: 1, // It's a root, so count is 1
 		force:      true,
 		dryRun:     true, // DRY RUN
 	}

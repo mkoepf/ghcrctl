@@ -22,7 +22,7 @@ func TestCommandExamples(t *testing.T) {
 		{"tag command", "tag", true},
 		{"versions command", "versions", true},
 		{"delete version command", "delete version", true},
-		{"delete graph command", "delete graph", true},
+		{"delete image command", "delete image", true},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +53,7 @@ func TestExampleFormat(t *testing.T) {
 		{"tag command", "tag"},
 		{"versions command", "versions"},
 		{"delete version command", "delete version"},
-		{"delete graph command", "delete graph"},
+		{"delete image command", "delete image"},
 	}
 
 	for _, tt := range tests {

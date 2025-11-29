@@ -164,8 +164,9 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 	}
 
 	// Calculate dynamic column widths
-	idWidth := 10 // minimum width
+	idWidth := 10 // minimum width for VERSION ID
 	typeWidth := 4
+	digestWidth := 12
 	sizeWidth := len("SIZE")
 	for _, v := range versions {
 		idLen := len(fmt.Sprintf("%d", v.ID))
@@ -181,6 +182,26 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 			sizeWidth = sizeLen
 		}
 	}
+
+	// Print header (tree prefix takes 7 chars: "┌      " or "└ [⬇✓] ")
+	treePrefix := "       " // 7 spaces to align with tree connectors
+	multiPadding := strings.Repeat(" ", maxMultiplicityWidth)
+	fmt.Fprintf(w, "%s%s%s  %s  %s  %s  %s\n",
+		treePrefix,
+		display.ColorHeader(fmt.Sprintf("%-*s", idWidth, "VERSION ID")),
+		multiPadding,
+		display.ColorHeader(fmt.Sprintf("%-*s", typeWidth, "TYPE")),
+		display.ColorHeader(fmt.Sprintf("%-*s", digestWidth, "DIGEST")),
+		display.ColorHeader(fmt.Sprintf("%-*s", sizeWidth, "SIZE")),
+		display.ColorHeader("TAGS"))
+	fmt.Fprintf(w, "%s%s%s  %s  %s  %s  %s\n",
+		treePrefix,
+		display.ColorSeparator(strings.Repeat("-", idWidth)),
+		multiPadding,
+		display.ColorSeparator(strings.Repeat("-", typeWidth)),
+		display.ColorSeparator(strings.Repeat("-", digestWidth)),
+		display.ColorSeparator(strings.Repeat("-", sizeWidth)),
+		display.ColorSeparator("----"))
 
 	for i, root := range roots {
 		if i > 0 {

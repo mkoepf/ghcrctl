@@ -206,6 +206,48 @@ func TestFormatTree_MultiplicityIndicator(t *testing.T) {
 	}
 }
 
+func TestFormatTree_Header(t *testing.T) {
+	versions := []VersionInfo{
+		{
+			ID:           100,
+			Digest:       "sha256:root1",
+			Types:        []string{"index"},
+			Size:         1536,
+			OutgoingRefs: []string{"sha256:child1"},
+		},
+		{
+			ID:           200,
+			Digest:       "sha256:child1",
+			Types:        []string{"linux/amd64"},
+			Size:         1024,
+			IncomingRefs: []string{"sha256:root1"},
+		},
+	}
+
+	allVersions := make(map[string]VersionInfo)
+	for _, v := range versions {
+		allVersions[v.Digest] = v
+	}
+
+	var buf bytes.Buffer
+	FormatTree(&buf, versions, allVersions)
+
+	output := buf.String()
+	// Tree view should have column headers like table view
+	if !strings.Contains(output, "VERSION ID") {
+		t.Errorf("expected header with VERSION ID\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "TYPE") {
+		t.Errorf("expected header with TYPE\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "DIGEST") {
+		t.Errorf("expected header with DIGEST\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "SIZE") {
+		t.Errorf("expected header with SIZE\noutput:\n%s", output)
+	}
+}
+
 func TestFormatTree_Size(t *testing.T) {
 	versions := []VersionInfo{
 		{

@@ -21,6 +21,7 @@ import (
 // TypeResolver resolves OCI artifact types.
 type TypeResolver interface {
 	ResolveVersionType(ctx context.Context, image, digest string) ([]string, error)
+	ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error)
 }
 
 // OrasResolver implements TypeResolver using ORAS library.
@@ -36,82 +37,90 @@ func NewOrasResolver() *OrasResolver {
 
 // ResolveVersionType resolves the type(s) of an OCI artifact by digest.
 func (r *OrasResolver) ResolveVersionType(ctx context.Context, image, digest string) ([]string, error) {
+	types, _, err := r.ResolveVersionInfo(ctx, image, digest)
+	return types, err
+}
+
+// ResolveVersionInfo resolves the type(s) and size of an OCI artifact by digest.
+func (r *OrasResolver) ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
 	if image == "" {
-		return nil, fmt.Errorf("image cannot be empty")
+		return nil, 0, fmt.Errorf("image cannot be empty")
 	}
 	if digest == "" {
-		return nil, fmt.Errorf("digest cannot be empty")
+		return nil, 0, fmt.Errorf("digest cannot be empty")
 	}
 	if !validateDigestFormat(digest) {
-		return nil, fmt.Errorf("invalid digest format: %s", digest)
+		return nil, 0, fmt.Errorf("invalid digest format: %s", digest)
 	}
 
 	registry, path, err := parseImageReference(image)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create repository: %w", err)
+		return nil, 0, fmt.Errorf("failed to create repository: %w", err)
 	}
 
 	r.configureAuth(ctx, repo)
 
 	desc, err := repo.Resolve(ctx, digest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve digest: %w", err)
+		return nil, 0, fmt.Errorf("failed to resolve digest: %w", err)
 	}
+
+	size := desc.Size
 
 	// Check if index
 	if desc.MediaType == ocispec.MediaTypeImageIndex ||
 		desc.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
-		return []string{"index"}, nil
+		return []string{"index"}, size, nil
 	}
 
 	// Fetch manifest to determine type
 	manifestBytes, err := repo.Fetch(ctx, desc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch manifest: %w", err)
+		return nil, size, fmt.Errorf("failed to fetch manifest: %w", err)
 	}
 	defer manifestBytes.Close()
 
 	var manifest ocispec.Manifest
 	if err := json.NewDecoder(manifestBytes).Decode(&manifest); err != nil {
-		return nil, fmt.Errorf("failed to decode manifest: %w", err)
+		return nil, size, fmt.Errorf("failed to decode manifest: %w", err)
 	}
 
 	// Check for signature
 	if isSignature(&manifest) {
-		return []string{"signature"}, nil
+		return []string{"signature"}, size, nil
 	}
 
 	// Check for attestation
 	if isAttestation(&manifest) {
 		roles := determineAttestationRoles(&manifest)
 		if len(roles) == 0 {
-			return []string{"attestation"}, nil
+			return []string{"attestation"}, size, nil
 		}
-		return roles, nil
+		return roles, size, nil
 	}
 
 	// It's a platform manifest - get os/arch from config
 	configBytes, err := repo.Fetch(ctx, manifest.Config)
 	if err != nil {
-		return []string{"manifest"}, nil
+		return []string{"manifest"}, size, nil
 	}
 	defer configBytes.Close()
 
 	var imageConfig ocispec.Image
 	if err := json.NewDecoder(configBytes).Decode(&imageConfig); err != nil {
-		return []string{"manifest"}, nil
+		return []string{"manifest"}, size, nil
 	}
 
 	platform := imageConfig.OS + "/" + imageConfig.Architecture
 	if imageConfig.Variant != "" {
 		platform += "/" + imageConfig.Variant
 	}
-	return []string{platform}, nil
+	return []string{platform}, size, nil
 }
 
 func (r *OrasResolver) configureAuth(ctx context.Context, repo *remote.Repository) {

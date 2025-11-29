@@ -14,6 +14,11 @@ func (m *MockResolver) ResolveVersionType(ctx context.Context, image, digest str
 	return m.resolveFunc(ctx, image, digest)
 }
 
+func (m *MockResolver) ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
+	types, err := m.resolveFunc(ctx, image, digest)
+	return types, 1024, err // Return a default size of 1024 for testing
+}
+
 func TestResolveVersionType_Index(t *testing.T) {
 	resolver := &MockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {

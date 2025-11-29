@@ -48,18 +48,19 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 		versionMap[v.Name] = info
 	}
 
-	// Resolve types and discover children for each version in parallel
+	// Resolve types, size, and discover children for each version in parallel
 	var wg sync.WaitGroup
 	for digest, info := range versionMap {
 		wg.Add(1)
 		go func(digest string, info *VersionInfo) {
 			defer wg.Done()
 
-			types, err := d.Resolver.ResolveVersionType(ctx, image, digest)
+			types, size, err := d.Resolver.ResolveVersionInfo(ctx, image, digest)
 			if err != nil {
 				info.Types = []string{"unknown"}
 			} else {
 				info.Types = types
+				info.Size = size
 			}
 
 			children, err := d.ChildDiscoverer.DiscoverChildren(ctx, image, digest, allTags)

@@ -13,6 +13,7 @@ func TestFormatTable_Basic(t *testing.T) {
 			Digest:       "sha256:abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
 			Tags:         []string{"v1.0.0"},
 			Types:        []string{"index"},
+			Size:         1258291, // ~1.2 MB
 			OutgoingRefs: []string{"sha256:def456"},
 			CreatedAt:    "2025-01-15 10:30:45",
 		},
@@ -28,11 +29,17 @@ func TestFormatTable_Basic(t *testing.T) {
 	if !strings.Contains(output, "VERSION ID") {
 		t.Error("expected header with VERSION ID")
 	}
+	if !strings.Contains(output, "SIZE") {
+		t.Error("expected header with SIZE")
+	}
 	if !strings.Contains(output, "123") {
 		t.Error("expected version ID 123")
 	}
 	if !strings.Contains(output, "index") {
 		t.Error("expected type index")
+	}
+	if !strings.Contains(output, "1.2 MB") {
+		t.Error("expected size 1.2 MB in output")
 	}
 }
 
@@ -196,6 +203,43 @@ func TestFormatTree_MultiplicityIndicator(t *testing.T) {
 	// Should contain "(2*)" indicator for shared version
 	if !strings.Contains(output, "(2*)") {
 		t.Errorf("expected multiplicity indicator (2*) for shared version\noutput:\n%s", output)
+	}
+}
+
+func TestFormatTree_Size(t *testing.T) {
+	versions := []VersionInfo{
+		{
+			ID:           100,
+			Digest:       "sha256:root1",
+			Types:        []string{"index"},
+			Size:         1536, // 1.5 KB
+			OutgoingRefs: []string{"sha256:child1"},
+		},
+		{
+			ID:           200,
+			Digest:       "sha256:child1",
+			Types:        []string{"linux/amd64"},
+			Size:         52428800, // 50 MB
+			IncomingRefs: []string{"sha256:root1"},
+		},
+	}
+
+	allVersions := make(map[string]VersionInfo)
+	for _, v := range versions {
+		allVersions[v.Digest] = v
+	}
+
+	var buf bytes.Buffer
+	FormatTree(&buf, versions, allVersions)
+
+	output := buf.String()
+	// Root should show 1.5 KB
+	if !strings.Contains(output, "1.5 KB") {
+		t.Errorf("expected root size 1.5 KB in output\noutput:\n%s", output)
+	}
+	// Child should show 50.0 MB
+	if !strings.Contains(output, "50.0 MB") {
+		t.Errorf("expected child size 50.0 MB in output\noutput:\n%s", output)
 	}
 }
 

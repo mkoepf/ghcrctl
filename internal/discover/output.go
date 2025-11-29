@@ -22,6 +22,7 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 	idWidth := len("VERSION ID")
 	typeWidth := len("TYPE")
 	digestWidth := 12
+	sizeWidth := len("SIZE")
 	tagWidth := 20
 	refWidth := 20
 	for _, v := range sortedVersions {
@@ -33,6 +34,10 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 		if typeLen > typeWidth {
 			typeWidth = typeLen
 		}
+		sizeLen := len(formatSize(v.Size))
+		if sizeLen > sizeWidth {
+			sizeWidth = sizeLen
+		}
 		// Check tag widths
 		for _, tag := range v.Tags {
 			if len(tag) > tagWidth {
@@ -42,17 +47,19 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 	}
 
 	// Print header (pad first, then color to avoid ANSI length issues)
-	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
+	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s  %s\n",
 		display.ColorHeader(fmt.Sprintf("%-*s", idWidth, "VERSION ID")),
 		display.ColorHeader(fmt.Sprintf("%-*s", typeWidth, "TYPE")),
 		display.ColorHeader(fmt.Sprintf("%-*s", digestWidth, "DIGEST")),
+		display.ColorHeader(fmt.Sprintf("%-*s", sizeWidth, "SIZE")),
 		display.ColorHeader(fmt.Sprintf("%-*s", tagWidth, "TAGS")),
 		display.ColorHeader(fmt.Sprintf("%-*s", refWidth, "REFS")),
 		display.ColorHeader("CREATED"))
-	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
+	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s  %s\n",
 		display.ColorSeparator(strings.Repeat("-", idWidth)),
 		display.ColorSeparator(strings.Repeat("-", typeWidth)),
 		display.ColorSeparator(strings.Repeat("-", digestWidth)),
+		display.ColorSeparator(strings.Repeat("-", sizeWidth)),
 		display.ColorSeparator(strings.Repeat("-", tagWidth)),
 		display.ColorSeparator(strings.Repeat("-", refWidth)),
 		display.ColorSeparator("-------------------"))
@@ -67,19 +74,21 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 		maxRows := max(max(len(v.Tags), len(refs)), 1)
 
 		for row := 0; row < maxRows; row++ {
-			var idStr, typeOut, digestOut, tagOut, refOut, createdOut string
+			var idStr, typeOut, digestOut, sizeOut, tagOut, refOut, createdOut string
 
 			if row == 0 {
 				// Pad raw strings first, then apply color to preserve alignment
 				idStr = fmt.Sprintf("%-*d", idWidth, v.ID)
 				typeOut = display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, typeStr))
 				digestOut = display.ColorDigest(fmt.Sprintf("%-*s", digestWidth, shortDigest(v.Digest)))
+				sizeOut = fmt.Sprintf("%-*s", sizeWidth, formatSize(v.Size))
 				createdOut = v.CreatedAt
 			} else {
 				// Empty cells need proper padding
 				idStr = strings.Repeat(" ", idWidth)
 				typeOut = strings.Repeat(" ", typeWidth)
 				digestOut = strings.Repeat(" ", digestWidth)
+				sizeOut = strings.Repeat(" ", sizeWidth)
 			}
 
 			if row < len(v.Tags) {
@@ -94,10 +103,11 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 				refOut = strings.Repeat(" ", refWidth)
 			}
 
-			fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
+			fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s  %s\n",
 				idStr,
 				typeOut,
 				digestOut,
+				sizeOut,
 				tagOut,
 				refOut,
 				createdOut)
@@ -156,6 +166,7 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 	// Calculate dynamic column widths
 	idWidth := 10 // minimum width
 	typeWidth := 4
+	sizeWidth := len("SIZE")
 	for _, v := range versions {
 		idLen := len(fmt.Sprintf("%d", v.ID))
 		if idLen > idWidth {
@@ -165,13 +176,17 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		if typeLen > typeWidth {
 			typeWidth = typeLen
 		}
+		sizeLen := len(formatSize(v.Size))
+		if sizeLen > sizeWidth {
+			sizeWidth = sizeLen
+		}
 	}
 
 	for i, root := range roots {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth, maxMultiplicityWidth)
+		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth)
 	}
 
 	// Print summary
@@ -193,8 +208,9 @@ func calculateRefCounts(allVersions map[string]VersionInfo) map[string]int {
 	return refCounts
 }
 
-func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth, maxMultiplicityWidth int) {
+func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth int) {
 	typeStr := formatTypes(v.Types)
+	sizeStr := formatSize(v.Size)
 	tagsStr := ""
 	if len(v.Tags) > 0 {
 		tagsStr = "  " + formatTags(v.Tags)
@@ -236,14 +252,15 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 	// Pad raw strings first, then apply color to preserve alignment
 	if isRoot {
 		paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, typeStr))
+		paddedSize := fmt.Sprintf("%-*s", sizeWidth, sizeStr)
 		// Roots don't have multiplicity indicator, so pad with spaces to align with children
 		multiPadding := strings.Repeat(" ", maxMultiplicityWidth)
 		if len(children) > 0 {
-			fmt.Fprintf(w, "%s┌      %-*d%s  %s  %s%s\n",
-				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s┌      %-*d%s  %s  %s  %s%s\n",
+				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), paddedSize, tagsStr)
 		} else {
-			fmt.Fprintf(w, "%s       %-*d%s  %s  %s%s\n",
-				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s       %-*d%s  %s  %s  %s%s\n",
+				prefix, idWidth, v.ID, multiPadding, paddedType, display.ColorDigest(shortDigest(v.Digest)), paddedSize, tagsStr)
 		}
 	}
 
@@ -259,6 +276,7 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 		if child.found {
 			childVer := allVersions[child.ref]
 			childTypeStr := formatTypes(childVer.Types)
+			childSizeStr := formatSize(childVer.Size)
 			childTagsStr := ""
 			if len(childVer.Tags) > 0 {
 				childTagsStr = "  " + formatTags(childVer.Tags)
@@ -274,14 +292,16 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 				multiplicityStr = strings.Repeat(" ", maxMultiplicityWidth)
 			}
 			paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, childTypeStr))
-			fmt.Fprintf(w, "%s%s %s %-*d%s  %s  %s%s\n",
+			paddedSize := fmt.Sprintf("%-*s", sizeWidth, childSizeStr)
+			fmt.Fprintf(w, "%s%s %s %-*d%s  %s  %s  %s%s\n",
 				prefix, connector, indicator, idWidth, childVer.ID, multiplicityStr, paddedType,
-				display.ColorDigest(shortDigest(childVer.Digest)), childTagsStr)
+				display.ColorDigest(shortDigest(childVer.Digest)), paddedSize, childTagsStr)
 		} else {
 			multiPadding := strings.Repeat(" ", maxMultiplicityWidth)
 			paddedType := fmt.Sprintf("%-*s", typeWidth, "???")
-			fmt.Fprintf(w, "%s%s %s %-*s%s  %s  %s  (not found)\n",
-				prefix, connector, indicator, idWidth, "-", multiPadding, paddedType, display.ColorDigest(shortDigest(child.ref)))
+			paddedSize := fmt.Sprintf("%-*s", sizeWidth, "-")
+			fmt.Fprintf(w, "%s%s %s %-*s%s  %s  %s  %s  (not found)\n",
+				prefix, connector, indicator, idWidth, "-", multiPadding, paddedType, display.ColorDigest(shortDigest(child.ref)), paddedSize)
 		}
 	}
 }
@@ -386,5 +406,26 @@ func printSummary(w io.Writer, versions []VersionInfo, allVersions map[string]Ve
 		fmt.Fprintf(w, "\nTotal: %s %s in %s %s.\n",
 			display.ColorCount(totalVersions), versionWord,
 			display.ColorCount(rootCount), graphWord)
+	}
+}
+
+// formatSize formats a size in bytes as a human-readable string.
+func formatSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.1f GB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/float64(KB))
+	case bytes > 0:
+		return fmt.Sprintf("%d B", bytes)
+	default:
+		return "-"
 	}
 }

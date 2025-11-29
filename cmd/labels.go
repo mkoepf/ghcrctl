@@ -20,7 +20,7 @@ func newLabelsCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "labels <owner/image[:tag]>",
+		Use:   "labels <owner/package[:tag]>",
 		Short: "Display OCI labels from a container image",
 		Long: `Display OCI labels (annotations/metadata) from a container image.
 

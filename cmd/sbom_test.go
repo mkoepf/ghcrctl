@@ -14,8 +14,8 @@ func TestSBOMCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find sbom command: %v", err)
 	}
 
-	if sbomCmd.Use != "sbom <owner/image[:tag]>" {
-		t.Errorf("Expected Use 'sbom <owner/image[:tag]>', got '%s'", sbomCmd.Use)
+	if sbomCmd.Use != "sbom <owner/package[:tag]>" {
+		t.Errorf("Expected Use 'sbom <owner/package[:tag]>', got '%s'", sbomCmd.Use)
 	}
 
 	if sbomCmd.Short == "" {
@@ -40,7 +40,7 @@ func TestSBOMCommandArguments(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "valid single argument with owner/image",
+			name:      "valid single argument with owner/package",
 			args:      []string{"mkoepf/test-image"},
 			wantError: false,
 		},

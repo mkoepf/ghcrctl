@@ -6,6 +6,7 @@ type VersionInfo struct {
 	Digest       string   `json:"digest"`
 	Tags         []string `json:"tags"`
 	Types        []string `json:"types"`
+	Size         int64    `json:"size"`
 	OutgoingRefs []string `json:"outgoing_refs"`
 	IncomingRefs []string `json:"incoming_refs"`
 	CreatedAt    string   `json:"created_at"`

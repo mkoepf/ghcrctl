@@ -175,8 +175,8 @@ func TestVersionsCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find versions command: %v", err)
 	}
 
-	if versionsCmd.Use != "versions <owner/image>" {
-		t.Errorf("Expected Use 'versions <owner/image>', got '%s'", versionsCmd.Use)
+	if versionsCmd.Use != "versions <owner/package>" {
+		t.Errorf("Expected Use 'versions <owner/package>', got '%s'", versionsCmd.Use)
 	}
 
 	if versionsCmd.Short == "" {

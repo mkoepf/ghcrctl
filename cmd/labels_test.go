@@ -14,8 +14,8 @@ func TestLabelsCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find labels command: %v", err)
 	}
 
-	if labelsCmd.Use != "labels <owner/image[:tag]>" {
-		t.Errorf("Expected Use 'labels <owner/image[:tag]>', got '%s'", labelsCmd.Use)
+	if labelsCmd.Use != "labels <owner/package[:tag]>" {
+		t.Errorf("Expected Use 'labels <owner/package[:tag]>', got '%s'", labelsCmd.Use)
 	}
 
 	if labelsCmd.Short == "" {

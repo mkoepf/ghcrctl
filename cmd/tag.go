@@ -10,7 +10,7 @@ import (
 // newTagCmd creates the tag command.
 func newTagCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "tag <owner/image:existing-tag> <new-tag>",
+		Use:   "tag <owner/package:existing-tag> <new-tag>",
 		Short: "Add a new tag to an existing image version",
 		Long: `Add a new tag to an existing GHCR package version.
 

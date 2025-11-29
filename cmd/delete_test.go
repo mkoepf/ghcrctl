@@ -40,8 +40,8 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete version command: %v", err)
 	}
 
-	if deleteVersionCmd.Use != "version <owner/image> [version-id]" {
-		t.Errorf("Expected Use 'version <owner/image> [version-id]', got '%s'", deleteVersionCmd.Use)
+	if deleteVersionCmd.Use != "version <owner/package> [version-id]" {
+		t.Errorf("Expected Use 'version <owner/package> [version-id]', got '%s'", deleteVersionCmd.Use)
 	}
 
 	if deleteVersionCmd.Short == "" {
@@ -129,8 +129,8 @@ func TestDeleteGraphCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete graph command: %v", err)
 	}
 
-	if deleteGraphCmd.Use != "graph <owner/image[:tag]>" {
-		t.Errorf("Expected Use 'graph <owner/image[:tag]>', got '%s'", deleteGraphCmd.Use)
+	if deleteGraphCmd.Use != "graph <owner/package[:tag]>" {
+		t.Errorf("Expected Use 'graph <owner/package[:tag]>', got '%s'", deleteGraphCmd.Use)
 	}
 
 	if deleteGraphCmd.Short == "" {

@@ -12,8 +12,8 @@ func TestProvenanceCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find provenance command: %v", err)
 	}
 
-	if provenanceCmd.Use != "provenance <owner/image[:tag]>" {
-		t.Errorf("Expected Use 'provenance <owner/image[:tag]>', got '%s'", provenanceCmd.Use)
+	if provenanceCmd.Use != "provenance <owner/package[:tag]>" {
+		t.Errorf("Expected Use 'provenance <owner/package[:tag]>', got '%s'", provenanceCmd.Use)
 	}
 
 	if provenanceCmd.Short == "" {
@@ -38,7 +38,7 @@ func TestProvenanceCommandArguments(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "valid single argument with owner/image",
+			name:      "valid single argument with owner/package",
 			args:      []string{"mkoepf/test-image"},
 			wantError: false,
 		},

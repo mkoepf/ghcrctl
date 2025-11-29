@@ -35,9 +35,9 @@ func newVersionsCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "versions <owner/image>",
+		Use:   "versions <owner/package>",
 		Short: "List all versions of a package",
-		Long: `List all versions of a container image package with graph relationships.
+		Long: `List all versions of a container package with graph relationships.
 
 This command displays all versions of a package, showing how they relate to each
 other in OCI artifact graphs. Versions belonging to the same graph (image index,

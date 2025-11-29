@@ -9,27 +9,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newDiscoverCmd() *cobra.Command {
+func newImagesCmd() *cobra.Command {
 	var (
 		jsonOutput   bool
-		treeOutput   bool
+		flatOutput   bool
 		outputFormat string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "discover <owner/image>",
-		Short: "Discover package versions and their relationships",
-		Long: `Discover all versions of a package, resolve their types, and show relationships.
+		Use:   "images <owner/package>",
+		Short: "Show all images in a package with their related artifacts",
+		Long: `Show all images (OCI artifacts) in a package, grouped by their relationships.
+
+Each image includes its platform manifests, attestations (SBOM, provenance, etc.),
+and signatures. By default, images are displayed in a tree format showing these
+relationships. Use --flat for a simple table view.
 
 Examples:
-  # Discover versions of a package
-  ghcrctl discover mkoepf/my-image
+  # Show images with relationships (tree view, default)
+  ghcrctl images mkoepf/my-package
 
-  # Show in tree format
-  ghcrctl discover mkoepf/my-image --tree
+  # Show images in flat table format
+  ghcrctl images mkoepf/my-package --flat
 
   # Output in JSON format
-  ghcrctl discover mkoepf/my-image --json`,
+  ghcrctl images mkoepf/my-package --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/image reference
@@ -44,10 +48,10 @@ Examples:
 				switch outputFormat {
 				case "json":
 					jsonOutput = true
-				case "table":
-					jsonOutput = false
+				case "table", "flat":
+					flatOutput = true
 				case "tree":
-					treeOutput = true
+					flatOutput = false
 				default:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("invalid output format %q. Supported formats: json, table, tree", outputFormat)
@@ -85,7 +89,7 @@ Examples:
 			}
 
 			if len(versions) == 0 {
-				fmt.Fprintf(cmd.OutOrStdout(), "No versions found for %s\n", packageName)
+				fmt.Fprintf(cmd.OutOrStdout(), "No images found for %s\n", packageName)
 				return nil
 			}
 
@@ -103,7 +107,7 @@ Examples:
 			results, err := discoverer.DiscoverPackage(ctx, image, versions, allTags)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to discover package: %w", err)
+				return fmt.Errorf("failed to discover images: %w", err)
 			}
 
 			// Build version map for output
@@ -122,10 +126,11 @@ Examples:
 				return nil
 			}
 
-			if treeOutput {
-				discover.FormatTree(cmd.OutOrStdout(), results, allVersions)
-			} else {
+			// Default is tree output; --flat switches to table
+			if flatOutput {
 				discover.FormatTable(cmd.OutOrStdout(), results, allVersions)
+			} else {
+				discover.FormatTree(cmd.OutOrStdout(), results, allVersions)
 			}
 
 			return nil
@@ -133,7 +138,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
-	cmd.Flags().BoolVar(&treeOutput, "tree", false, "Output in tree format")
+	cmd.Flags().BoolVar(&flatOutput, "flat", false, "Output in flat table format (default is tree)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table, tree)")
 
 	return cmd

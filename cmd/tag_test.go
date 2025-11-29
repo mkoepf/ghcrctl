@@ -17,8 +17,8 @@ func TestTagCommandStructure(t *testing.T) {
 		t.Fatal("tagCmd should not be nil")
 	}
 
-	if tagCmd.Use != "tag <owner/image:existing-tag> <new-tag>" {
-		t.Errorf("Expected Use to be 'tag <owner/image:existing-tag> <new-tag>', got '%s'", tagCmd.Use)
+	if tagCmd.Use != "tag <owner/package:existing-tag> <new-tag>" {
+		t.Errorf("Expected Use to be 'tag <owner/package:existing-tag> <new-tag>', got '%s'", tagCmd.Use)
 	}
 
 	if tagCmd.RunE == nil {

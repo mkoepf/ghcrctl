@@ -11,6 +11,7 @@ func TestVersionInfo_JSONSerialization(t *testing.T) {
 		Digest:       "sha256:abc123",
 		Tags:         []string{"v1.0.0", "latest"},
 		Types:        []string{"index"},
+		Size:         1048576, // 1 MB
 		OutgoingRefs: []string{"sha256:def456"},
 		IncomingRefs: []string{"sha256:ghi789"},
 		CreatedAt:    "2025-01-15 10:30:45",
@@ -34,6 +35,9 @@ func TestVersionInfo_JSONSerialization(t *testing.T) {
 	}
 	if len(decoded.Tags) != len(v.Tags) {
 		t.Errorf("Tags length mismatch: got %d, want %d", len(decoded.Tags), len(v.Tags))
+	}
+	if decoded.Size != v.Size {
+		t.Errorf("Size mismatch: got %d, want %d", decoded.Size, v.Size)
 	}
 }
 

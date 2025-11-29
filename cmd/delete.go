@@ -56,7 +56,7 @@ func newDeleteVersionCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "version <owner/image> [version-id]",
+		Use:   "version <owner/package> [version-id]",
 		Short: "Delete package version(s)",
 		Long: `Delete package version(s) from GitHub Container Registry.
 
@@ -101,10 +101,10 @@ Examples:
 				return nil
 			}
 
-			// If filter flags are set (bulk deletion), we need exactly 1 arg (owner/image)
+			// If filter flags are set (bulk deletion), we need exactly 1 arg (owner/package)
 			if filterFlagsSet {
 				if len(args) != 1 {
-					return fmt.Errorf("accepts 1 arg (owner/image) when using filters, received %d", len(args))
+					return fmt.Errorf("accepts 1 arg (owner/package) when using filters, received %d", len(args))
 				}
 				return nil
 			}
@@ -188,7 +188,7 @@ func newDeleteGraphCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "graph <owner/image[:tag]>",
+		Use:   "graph <owner/package[:tag]>",
 		Short: "Delete an entire OCI artifact graph",
 		Long: `Delete an entire OCI artifact graph from GitHub Container Registry.
 

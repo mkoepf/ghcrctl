@@ -16,9 +16,9 @@ import (
 // artifactConfig defines the configuration for a specific artifact type command.
 type artifactConfig struct {
 	// Command metadata
-	Name      string // "sbom" or "provenance"
-	Short     string // Short description
-	Long      string // Long description with examples
+	Name       string // "sbom" or "provenance"
+	Short      string // Short description
+	Long       string // Long description with examples
 	NoFoundMsg string // Message when no artifacts found
 
 	// Artifact filtering
@@ -36,7 +36,7 @@ func newArtifactCmd(cfg artifactConfig) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   cfg.Name + " <owner/image[:tag]>",
+		Use:   cfg.Name + " <owner/package[:tag]>",
 		Short: cfg.Short,
 		Long:  cfg.Long,
 		Args:  cobra.ExactArgs(1),

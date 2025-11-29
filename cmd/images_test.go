@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestDiscoverCmd_RequiresPackageName(t *testing.T) {
-	cmd := newDiscoverCmd()
+func TestImagesCmd_RequiresPackageName(t *testing.T) {
+	cmd := newImagesCmd()
 	cmd.SetArgs([]string{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -17,8 +17,8 @@ func TestDiscoverCmd_RequiresPackageName(t *testing.T) {
 	}
 }
 
-func TestDiscoverCmd_HasFlags(t *testing.T) {
-	cmd := newDiscoverCmd()
+func TestImagesCmd_HasFlags(t *testing.T) {
+	cmd := newImagesCmd()
 
 	// Check --json flag exists
 	jsonFlag := cmd.Flags().Lookup("json")
@@ -26,10 +26,10 @@ func TestDiscoverCmd_HasFlags(t *testing.T) {
 		t.Error("expected --json flag")
 	}
 
-	// Check --tree flag exists
-	treeFlag := cmd.Flags().Lookup("tree")
-	if treeFlag == nil {
-		t.Error("expected --tree flag")
+	// Check --flat flag exists (replaced --tree, default is now tree)
+	flatFlag := cmd.Flags().Lookup("flat")
+	if flatFlag == nil {
+		t.Error("expected --flat flag")
 	}
 
 	// Check -o flag exists
@@ -39,8 +39,8 @@ func TestDiscoverCmd_HasFlags(t *testing.T) {
 	}
 }
 
-func TestDiscoverCmd_InvalidOutputFormat(t *testing.T) {
-	cmd := newDiscoverCmd()
+func TestImagesCmd_InvalidOutputFormat(t *testing.T) {
+	cmd := newImagesCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 	cmd.SetOut(&out)

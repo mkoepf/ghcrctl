@@ -53,7 +53,7 @@ It provides functionality for:
 	root.AddCommand(newProvenanceCmd())
 	root.AddCommand(newTagCmd())
 	root.AddCommand(newCompletionCmd())
-	root.AddCommand(newDiscoverCmd())
+	root.AddCommand(newImagesCmd())
 
 	return root
 }

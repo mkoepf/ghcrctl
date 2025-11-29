@@ -103,6 +103,9 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 				createdOut)
 		}
 	}
+
+	// Print summary
+	printSummary(w, versions, allVersions)
 }
 
 // padRefString pads a ref string (which contains ANSI codes) to the target width.
@@ -170,6 +173,9 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		}
 		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth, maxMultiplicityWidth)
 	}
+
+	// Print summary
+	printSummary(w, versions, allVersions)
 }
 
 // calculateRefCounts counts how many existing versions reference each version.
@@ -334,4 +340,51 @@ func formatTypes(types []string) string {
 		return "unknown"
 	}
 	return strings.Join(types, ", ")
+}
+
+// printSummary prints a summary line with version and graph counts.
+func printSummary(w io.Writer, versions []VersionInfo, allVersions map[string]VersionInfo) {
+	totalVersions := len(versions)
+
+	// Count roots (graphs)
+	var rootCount int
+	for _, v := range versions {
+		if v.IsRoot(allVersions) {
+			rootCount++
+		}
+	}
+
+	// Count shared versions (appear in multiple graphs)
+	refCounts := calculateRefCounts(allVersions)
+	var sharedCount int
+	for _, count := range refCounts {
+		if count > 1 {
+			sharedCount++
+		}
+	}
+
+	// Build summary
+	versionWord := "versions"
+	if totalVersions == 1 {
+		versionWord = "version"
+	}
+	graphWord := "graphs"
+	if rootCount == 1 {
+		graphWord = "graph"
+	}
+
+	if sharedCount > 0 {
+		sharedWord := "versions appear"
+		if sharedCount == 1 {
+			sharedWord = "version appears"
+		}
+		fmt.Fprintf(w, "\nTotal: %s %s in %s %s. %s %s in multiple graphs.\n",
+			display.ColorCount(totalVersions), versionWord,
+			display.ColorCount(rootCount), graphWord,
+			display.ColorShared(fmt.Sprintf("%d", sharedCount)), sharedWord)
+	} else {
+		fmt.Fprintf(w, "\nTotal: %s %s in %s %s.\n",
+			display.ColorCount(totalVersions), versionWord,
+			display.ColorCount(rootCount), graphWord)
+	}
 }

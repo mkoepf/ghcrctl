@@ -199,6 +199,82 @@ func TestFormatTree_MultiplicityIndicator(t *testing.T) {
 	}
 }
 
+func TestFormatTree_Summary(t *testing.T) {
+	versions := []VersionInfo{
+		{
+			ID:           100,
+			Digest:       "sha256:root1",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared"},
+		},
+		{
+			ID:           200,
+			Digest:       "sha256:root2",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared"},
+		},
+		{
+			ID:           300,
+			Digest:       "sha256:shared",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:root1", "sha256:root2"},
+		},
+	}
+
+	allVersions := make(map[string]VersionInfo)
+	for _, v := range versions {
+		allVersions[v.Digest] = v
+	}
+
+	var buf bytes.Buffer
+	FormatTree(&buf, versions, allVersions)
+
+	output := buf.String()
+
+	// Should contain summary with version count
+	if !strings.Contains(output, "Total:") {
+		t.Errorf("expected summary with 'Total:'\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "3 versions") {
+		t.Errorf("expected '3 versions' in summary\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "2 graphs") {
+		t.Errorf("expected '2 graphs' in summary\noutput:\n%s", output)
+	}
+	// Should mention shared versions
+	if !strings.Contains(output, "1 version appears in multiple graphs") {
+		t.Errorf("expected shared version count in summary\noutput:\n%s", output)
+	}
+}
+
+func TestFormatTable_Summary(t *testing.T) {
+	versions := []VersionInfo{
+		{
+			ID:        123,
+			Digest:    "sha256:abc123",
+			Tags:      []string{"v1.0.0"},
+			Types:     []string{"index"},
+			CreatedAt: "2025-01-15 10:30:45",
+		},
+	}
+
+	allVersions := make(map[string]VersionInfo)
+	allVersions["sha256:abc123"] = versions[0]
+
+	var buf bytes.Buffer
+	FormatTable(&buf, versions, allVersions)
+
+	output := buf.String()
+
+	// Should contain summary
+	if !strings.Contains(output, "Total:") {
+		t.Errorf("expected summary with 'Total:'\noutput:\n%s", output)
+	}
+	if !strings.Contains(output, "1 version") {
+		t.Errorf("expected '1 version' in summary\noutput:\n%s", output)
+	}
+}
+
 func TestFormatTree_AlignedVersionIDs(t *testing.T) {
 	versions := []VersionInfo{
 		{

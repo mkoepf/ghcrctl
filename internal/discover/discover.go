@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
@@ -47,20 +48,27 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 		versionMap[v.Name] = info
 	}
 
-	// Resolve types and discover children for each version
+	// Resolve types and discover children for each version in parallel
+	var wg sync.WaitGroup
 	for digest, info := range versionMap {
-		types, err := d.Resolver.ResolveVersionType(ctx, image, digest)
-		if err != nil {
-			info.Types = []string{"unknown"}
-		} else {
-			info.Types = types
-		}
+		wg.Add(1)
+		go func(digest string, info *VersionInfo) {
+			defer wg.Done()
 
-		children, err := d.ChildDiscoverer.DiscoverChildren(ctx, image, digest, allTags)
-		if err == nil {
-			info.OutgoingRefs = children
-		}
+			types, err := d.Resolver.ResolveVersionType(ctx, image, digest)
+			if err != nil {
+				info.Types = []string{"unknown"}
+			} else {
+				info.Types = types
+			}
+
+			children, err := d.ChildDiscoverer.DiscoverChildren(ctx, image, digest, allTags)
+			if err == nil {
+				info.OutgoingRefs = children
+			}
+		}(digest, info)
 	}
+	wg.Wait()
 
 	// Infer incoming refs from outgoing refs
 	for digest, info := range versionMap {

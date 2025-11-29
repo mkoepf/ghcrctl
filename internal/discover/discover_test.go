@@ -2,7 +2,10 @@ package discover
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
 )
@@ -73,6 +76,63 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 
 	if len(indexVersion.OutgoingRefs) != 1 {
 		t.Errorf("expected 1 outgoing ref, got %d", len(indexVersion.OutgoingRefs))
+	}
+}
+
+func TestDiscoverPackage_Parallel(t *testing.T) {
+	// Track concurrent calls to verify parallelism
+	var concurrentCalls int32
+	var maxConcurrent int32
+	var mu sync.Mutex
+
+	mockResolver := &MockResolver{
+		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
+			mu.Lock()
+			concurrentCalls++
+			if concurrentCalls > maxConcurrent {
+				maxConcurrent = concurrentCalls
+			}
+			mu.Unlock()
+
+			time.Sleep(50 * time.Millisecond) // Simulate slow API call
+
+			mu.Lock()
+			concurrentCalls--
+			mu.Unlock()
+
+			return []string{"manifest"}, nil
+		},
+	}
+
+	mockDiscoverer := &MockChildDiscoverer{
+		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
+			return nil, nil
+		},
+	}
+
+	// Create 10 versions to test parallelism
+	versions := make([]gh.PackageVersionInfo, 10)
+	for i := 0; i < 10; i++ {
+		versions[i] = gh.PackageVersionInfo{
+			ID:        int64(i + 1),
+			Name:      fmt.Sprintf("sha256:digest%d", i),
+			CreatedAt: "2025-01-15",
+		}
+	}
+
+	discoverer := &PackageDiscoverer{
+		Resolver:        mockResolver,
+		ChildDiscoverer: mockDiscoverer,
+	}
+
+	_, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// With parallel execution, multiple goroutines should run concurrently
+	if maxConcurrent < 2 {
+		t.Errorf("expected parallel execution (maxConcurrent >= 2), but got %d", maxConcurrent)
 	}
 }
 

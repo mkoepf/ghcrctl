@@ -831,91 +831,9 @@ func TestCollectVersionIDsRefCountBoundary(t *testing.T) {
 	}
 }
 
-// TestCountVersionInImages tests the image membership counting logic
-func TestCountVersionInImages(t *testing.T) {
-	t.Parallel()
-	// Create test images
-	images := []discovery.VersionGraph{
-		{
-			RootVersion: gh.PackageVersionInfo{ID: 100, Name: "sha256:image1root"},
-			Children: []discovery.VersionChild{
-				{Version: gh.PackageVersionInfo{ID: 101, Name: "sha256:child1"}},
-				{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:child2"}},
-			},
-		},
-		{
-			RootVersion: gh.PackageVersionInfo{ID: 200, Name: "sha256:image2root"},
-			Children: []discovery.VersionChild{
-				{Version: gh.PackageVersionInfo{ID: 102, Name: "sha256:child2"}}, // shared with image1
-				{Version: gh.PackageVersionInfo{ID: 201, Name: "sha256:child3"}},
-			},
-		},
-		{
-			RootVersion: gh.PackageVersionInfo{ID: 300, Name: "sha256:image3root"},
-			Children:    []discovery.VersionChild{}, // standalone with no children
-		},
-	}
-
-	tests := []struct {
-		name      string
-		versionID int64
-		wantCount int
-	}{
-		{
-			name:      "version is root of one image",
-			versionID: 100,
-			wantCount: 1,
-		},
-		{
-			name:      "version is exclusive child (in one image)",
-			versionID: 101,
-			wantCount: 1,
-		},
-		{
-			name:      "version is shared child (in two images)",
-			versionID: 102,
-			wantCount: 2,
-		},
-		{
-			name:      "version not in any image",
-			versionID: 999,
-			wantCount: 0,
-		},
-		{
-			name:      "standalone root with no children",
-			versionID: 300,
-			wantCount: 1,
-		},
-		{
-			name:      "version ID 0 (unresolved) not in any image",
-			versionID: 0,
-			wantCount: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := countVersionInImages(images, tt.versionID)
-			if got != tt.wantCount {
-				t.Errorf("countVersionInImages() = %d, want %d", got, tt.wantCount)
-			}
-		})
-	}
-}
-
-// TestCountVersionInImagesEmptyImages tests edge case of empty images slice
-func TestCountVersionInImagesEmptyImages(t *testing.T) {
-	t.Parallel()
-	count := countVersionInImages([]discovery.VersionGraph{}, 100)
-	if count != 0 {
-		t.Errorf("Expected 0 for empty images, got %d", count)
-	}
-
-	count = countVersionInImages(nil, 100)
-	if count != 0 {
-		t.Errorf("Expected 0 for nil images, got %d", count)
-	}
-}
+// Note: TestCountVersionInImages was removed as the countVersionInImages function
+// was migrated to use discover.CountImageMembershipByID which has its own tests
+// in internal/discover/delete_helpers_test.go
 
 // TestFindGraphByDigest tests the graph lookup by digest
 func TestFindGraphByDigest(t *testing.T) {

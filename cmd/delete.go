@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/discovery"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/filter"
@@ -1019,33 +1020,14 @@ func countImageMembership(ctx context.Context, client *gh.Client, owner, ownerTy
 
 	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
 
-	// Build all images
-	images, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, client, owner, ownerType, imageName)
+	// Use discover package to get version relationships
+	discoverer := discover.NewPackageDiscoverer()
+	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
 	if err != nil {
 		return 0
 	}
 
-	return countVersionInImages(images, versionID)
-}
-
-// countVersionInImages counts how many images contain the given version ID
-// (either as root or as a child). This is extracted for testability.
-func countVersionInImages(images []discovery.VersionGraph, versionID int64) int {
-	count := 0
-	for _, img := range images {
-		// Check if it's the root
-		if img.RootVersion.ID == versionID {
-			count++
-			continue
-		}
-		// Check if it's a child
-		for _, child := range img.Children {
-			if child.Version.ID == versionID {
-				count++
-				break
-			}
-		}
-	}
-
-	return count
+	// Convert to map and count membership
+	versionMap := discover.ToMap(versions)
+	return discover.CountImageMembershipByID(versionMap, versionID)
 }

@@ -331,19 +331,46 @@ Examples:
 				}
 			}
 
-			// Build the graph (reuse logic from graph command)
-			g, err := buildGraph(ctx, ghClient, fullImage, owner, ownerType, imageName, rootDigest, tag)
+			// Use discover package to get all versions and their relationships
+			allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to build graph: %w", err)
+				return fmt.Errorf("failed to list package versions: %w", err)
 			}
-			if g == nil {
+
+			discoverer := discover.NewPackageDiscoverer()
+			versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to discover package: %w", err)
+			}
+
+			versionMap := discover.ToMap(versions)
+
+			// Find image by root digest
+			imageVersions := discover.FindImageByDigest(versionMap, rootDigest)
+			if len(imageVersions) == 0 {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("no image found for digest %s", rootDigest)
 			}
 
-			// Collect all version IDs to delete
-			versionIDs := collectVersionIDs(g)
+			// Get the root version
+			root, ok := versionMap[rootDigest]
+			if !ok {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("root digest %s not found in package", rootDigest)
+			}
+
+			// Collect children (all versions except root)
+			var children []discover.VersionInfo
+			for _, v := range imageVersions {
+				if v.Digest != rootDigest {
+					children = append(children, v)
+				}
+			}
+
+			// Collect all version IDs to delete (children first, skip shared)
+			versionIDs := discover.CollectDeletionOrder(versionMap, rootDigest)
 
 			// Display what will be deleted
 			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI image:\n")
@@ -352,7 +379,7 @@ Examples:
 				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			displayGraphSummary(cmd.OutOrStdout(), g)
+			displayImageSummaryWithVersionInfo(cmd.OutOrStdout(), root, children, versionMap)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -994,6 +1021,86 @@ func displayGraphSummary(w io.Writer, g *discovery.VersionGraph) {
 
 func deleteGraphVersions(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionIDs []int64, w io.Writer) error {
 	return deleteGraphWithDeleter(ctx, client, owner, ownerType, imageName, versionIDs, w)
+}
+
+// displayImageSummaryWithVersionInfo displays a summary of an image using discover.VersionInfo.
+// This is the new implementation that replaces displayGraphSummary for the discover-based approach.
+func displayImageSummaryWithVersionInfo(w io.Writer, root discover.VersionInfo, children []discover.VersionInfo, versionMap map[string]discover.VersionInfo) {
+	fmt.Fprintf(w, "Root (Image): %s\n", root.Digest)
+	if len(root.Tags) > 0 {
+		fmt.Fprintf(w, "  Tags: %v\n", root.Tags)
+	}
+	if root.ID != 0 {
+		fmt.Fprintf(w, "  Version ID: %d\n", root.ID)
+	}
+
+	// Separate children into exclusive (will delete) and shared (will preserve)
+	var exclusivePlatforms, sharedPlatforms []discover.VersionInfo
+	var exclusiveAttestations, sharedAttestations []discover.VersionInfo
+
+	for _, child := range children {
+		refCount := discover.CountImageMembership(versionMap, child.Digest)
+		isReferrer := child.IsReferrer()
+		isPlatform := !isReferrer && len(child.Types) > 0
+
+		if isPlatform {
+			if refCount > 1 {
+				sharedPlatforms = append(sharedPlatforms, child)
+			} else {
+				exclusivePlatforms = append(exclusivePlatforms, child)
+			}
+		} else if isReferrer {
+			if refCount > 1 {
+				sharedAttestations = append(sharedAttestations, child)
+			} else {
+				exclusiveAttestations = append(exclusiveAttestations, child)
+			}
+		}
+	}
+
+	// Show what will be deleted
+	if len(exclusivePlatforms) > 0 {
+		fmt.Fprintf(w, "\nPlatforms to delete (%d):\n", len(exclusivePlatforms))
+		for _, p := range exclusivePlatforms {
+			typeStr := "platform"
+			if len(p.Types) > 0 {
+				typeStr = p.Types[0]
+			}
+			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, p.ID)
+		}
+	}
+
+	if len(exclusiveAttestations) > 0 {
+		fmt.Fprintf(w, "\nAttestations to delete (%d):\n", len(exclusiveAttestations))
+		for _, att := range exclusiveAttestations {
+			typeStr := "attestation"
+			if len(att.Types) > 0 {
+				typeStr = att.Types[0]
+			}
+			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, att.ID)
+		}
+	}
+
+	// Show what will be preserved (shared with other images)
+	if len(sharedPlatforms) > 0 || len(sharedAttestations) > 0 {
+		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared artifacts (preserved, used by other images):"))
+		for _, p := range sharedPlatforms {
+			typeStr := "platform"
+			if len(p.Types) > 0 {
+				typeStr = p.Types[0]
+			}
+			refCount := discover.CountImageMembership(versionMap, p.Digest)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, p.ID, refCount)
+		}
+		for _, att := range sharedAttestations {
+			typeStr := "attestation"
+			if len(att.Types) > 0 {
+				typeStr = att.Types[0]
+			}
+			refCount := discover.CountImageMembership(versionMap, att.Digest)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, att.ID, refCount)
+		}
+	}
 }
 
 // deleteGraphWithDeleter is the internal implementation that accepts a PackageDeleter interface.

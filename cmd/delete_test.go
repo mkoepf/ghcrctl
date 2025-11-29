@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/discovery"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/mkoepf/ghcrctl/internal/oras"
@@ -996,6 +997,148 @@ func TestFormatTagsForDisplay(t *testing.T) {
 			got := FormatTagsForDisplay(tt.tags)
 			if got != tt.want {
 				t.Errorf("FormatTagsForDisplay() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Tests for displayImageSummary using discover.VersionInfo
+// =============================================================================
+
+func TestDisplayImageSummaryWithVersionInfo(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		root           discover.VersionInfo
+		children       []discover.VersionInfo
+		versionMap     map[string]discover.VersionInfo
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "simple root with no children",
+			root: discover.VersionInfo{
+				ID:     100,
+				Digest: "sha256:rootdigest123",
+				Tags:   []string{"v1.0.0"},
+				Types:  []string{"index"},
+			},
+			children:   []discover.VersionInfo{},
+			versionMap: map[string]discover.VersionInfo{},
+			wantContains: []string{
+				"Root (Image): sha256:rootdigest123",
+				"Tags: [v1.0.0]",
+				"Version ID: 100",
+			},
+			wantNotContain: []string{
+				"Platforms to delete",
+				"Attestations to delete",
+				"Shared artifacts",
+			},
+		},
+		{
+			name: "index with exclusive platforms",
+			root: discover.VersionInfo{
+				ID:           100,
+				Digest:       "sha256:indexdigest",
+				Tags:         []string{"latest"},
+				Types:        []string{"index"},
+				OutgoingRefs: []string{"sha256:amd64", "sha256:arm64"},
+			},
+			children: []discover.VersionInfo{
+				{ID: 101, Digest: "sha256:amd64", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:indexdigest"}},
+				{ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:indexdigest"}},
+			},
+			versionMap: map[string]discover.VersionInfo{
+				"sha256:indexdigest": {ID: 100, Digest: "sha256:indexdigest", Tags: []string{"latest"}, Types: []string{"index"}, OutgoingRefs: []string{"sha256:amd64", "sha256:arm64"}},
+				"sha256:amd64":       {ID: 101, Digest: "sha256:amd64", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:indexdigest"}},
+				"sha256:arm64":       {ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:indexdigest"}},
+			},
+			wantContains: []string{
+				"Root (Image): sha256:indexdigest",
+				"Platforms to delete (2)",
+				"linux/amd64 (version 101)",
+				"linux/arm64 (version 102)",
+			},
+			wantNotContain: []string{
+				"Shared artifacts",
+			},
+		},
+		{
+			name: "manifest with exclusive attestations",
+			root: discover.VersionInfo{
+				ID:           200,
+				Digest:       "sha256:manifestdigest",
+				Types:        []string{"manifest"},
+				OutgoingRefs: []string{"sha256:sbomdigest", "sha256:provdigest"},
+			},
+			children: []discover.VersionInfo{
+				{ID: 201, Digest: "sha256:sbomdigest", Types: []string{"sbom"}, IncomingRefs: []string{"sha256:manifestdigest"}},
+				{ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}, IncomingRefs: []string{"sha256:manifestdigest"}},
+			},
+			versionMap: map[string]discover.VersionInfo{
+				"sha256:manifestdigest": {ID: 200, Digest: "sha256:manifestdigest", Types: []string{"manifest"}, OutgoingRefs: []string{"sha256:sbomdigest", "sha256:provdigest"}},
+				"sha256:sbomdigest":     {ID: 201, Digest: "sha256:sbomdigest", Types: []string{"sbom"}, IncomingRefs: []string{"sha256:manifestdigest"}},
+				"sha256:provdigest":     {ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}, IncomingRefs: []string{"sha256:manifestdigest"}},
+			},
+			wantContains: []string{
+				"Root (Image): sha256:manifestdigest",
+				"Attestations to delete (2)",
+				"sbom (version 201)",
+				"provenance (version 202)",
+			},
+			wantNotContain: []string{
+				"Tags:",
+				"Shared artifacts",
+				"Platforms to delete",
+			},
+		},
+		{
+			name: "image with shared platforms (preserved)",
+			root: discover.VersionInfo{
+				ID:           300,
+				Digest:       "sha256:rootwithshared",
+				Tags:         []string{"v2.0"},
+				Types:        []string{"index"},
+				OutgoingRefs: []string{"sha256:exclusive", "sha256:shared"},
+			},
+			children: []discover.VersionInfo{
+				{ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:rootwithshared"}},
+				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
+			},
+			versionMap: map[string]discover.VersionInfo{
+				"sha256:rootwithshared": {ID: 300, Digest: "sha256:rootwithshared", Tags: []string{"v2.0"}, Types: []string{"index"}, OutgoingRefs: []string{"sha256:exclusive", "sha256:shared"}},
+				"sha256:exclusive":      {ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:rootwithshared"}},
+				"sha256:shared":         {ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
+				"sha256:otherroot1":     {ID: 400, Digest: "sha256:otherroot1", Types: []string{"index"}, OutgoingRefs: []string{"sha256:shared"}},
+				"sha256:otherroot2":     {ID: 401, Digest: "sha256:otherroot2", Types: []string{"index"}, OutgoingRefs: []string{"sha256:shared"}},
+			},
+			wantContains: []string{
+				"Platforms to delete (1)",
+				"linux/amd64 (version 301)",
+				"Shared artifacts (preserved, used by other images)",
+				"linux/arm64 (version 302, shared by 3 images)",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf strings.Builder
+			displayImageSummaryWithVersionInfo(&buf, tt.root, tt.children, tt.versionMap)
+			output := buf.String()
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(output, want) {
+					t.Errorf("Expected output to contain %q\nGot:\n%s", want, output)
+				}
+			}
+
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(output, notWant) {
+					t.Errorf("Expected output NOT to contain %q\nGot:\n%s", notWant, output)
+				}
 			}
 		})
 	}

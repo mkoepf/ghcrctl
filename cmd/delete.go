@@ -517,16 +517,16 @@ func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.
 
 	// Build all images to identify shared children that should be protected
 	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
-	allImages, err := buildVersionGraphs(ctx, fullImage, allVersions, allVersions, client, owner, ownerType, imageName)
+	discoverer := discover.NewPackageDiscoverer()
+	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
 
-	// Track which version IDs are shared children (RefCount > 1)
+	// Track which version IDs are shared children (belong to multiple images)
 	sharedChildren := make(map[int64]bool)
 	if err == nil {
-		for _, img := range allImages {
-			for _, child := range img.Children {
-				if child.RefCount > 1 {
-					sharedChildren[child.Version.ID] = true
-				}
+		versionMap := discover.ToMap(versions)
+		for _, ver := range versions {
+			if discover.CountImageMembershipByID(versionMap, ver.ID) > 1 {
+				sharedChildren[ver.ID] = true
 			}
 		}
 	}

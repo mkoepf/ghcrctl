@@ -189,3 +189,29 @@ func collectChildren(versions map[string]VersionInfo, rootDigest string) []Versi
 	}
 	return children
 }
+
+// ToMap converts a slice of VersionInfo to a map keyed by digest.
+func ToMap(versions []VersionInfo) map[string]VersionInfo {
+	m := make(map[string]VersionInfo, len(versions))
+	for _, v := range versions {
+		m[v.Digest] = v
+	}
+	return m
+}
+
+// CountImageMembershipByID returns how many images contain the given version ID.
+// This is a convenience wrapper around CountImageMembership that looks up the digest first.
+func CountImageMembershipByID(versions map[string]VersionInfo, versionID int64) int {
+	// Find the digest for this version ID
+	var digest string
+	for d, v := range versions {
+		if v.ID == versionID {
+			digest = d
+			break
+		}
+	}
+	if digest == "" {
+		return 0
+	}
+	return CountImageMembership(versions, digest)
+}

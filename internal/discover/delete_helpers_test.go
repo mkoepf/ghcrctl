@@ -4,6 +4,66 @@ import (
 	"testing"
 )
 
+func TestToMap(t *testing.T) {
+	t.Parallel()
+
+	versions := []VersionInfo{
+		{ID: 1, Digest: "sha256:abc"},
+		{ID: 2, Digest: "sha256:def"},
+		{ID: 3, Digest: "sha256:ghi"},
+	}
+
+	m := ToMap(versions)
+
+	if len(m) != 3 {
+		t.Errorf("Expected 3 entries in map, got %d", len(m))
+	}
+
+	if m["sha256:abc"].ID != 1 {
+		t.Error("Expected ID 1 for sha256:abc")
+	}
+	if m["sha256:def"].ID != 2 {
+		t.Error("Expected ID 2 for sha256:def")
+	}
+}
+
+func TestCountImageMembershipByID(t *testing.T) {
+	t.Parallel()
+
+	versions := map[string]VersionInfo{
+		"sha256:index1": {
+			ID:           1,
+			Digest:       "sha256:index1",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:platform1"},
+		},
+		"sha256:platform1": {
+			ID:           2,
+			Digest:       "sha256:platform1",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:index1"},
+		},
+	}
+
+	// Version ID 1 (index) belongs to 1 image
+	count := CountImageMembershipByID(versions, 1)
+	if count != 1 {
+		t.Errorf("Expected index to belong to 1 image, got %d", count)
+	}
+
+	// Version ID 2 (platform) belongs to 1 image
+	count = CountImageMembershipByID(versions, 2)
+	if count != 1 {
+		t.Errorf("Expected platform to belong to 1 image, got %d", count)
+	}
+
+	// Version ID 999 (nonexistent) belongs to 0 images
+	count = CountImageMembershipByID(versions, 999)
+	if count != 0 {
+		t.Errorf("Expected nonexistent version to belong to 0 images, got %d", count)
+	}
+}
+
 func TestCountImageMembership(t *testing.T) {
 	t.Parallel()
 

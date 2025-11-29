@@ -25,7 +25,7 @@ func TestRootCommand(t *testing.T) {
 
 	// Verify Long description contains expected functionality
 	expectedKeywords := []string{
-		"images",
+		"packages",
 		"OCI",
 		"metadata",
 		"deletion",
@@ -38,20 +38,20 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestRootCommandHasImagesSubcommand(t *testing.T) {
+func TestRootCommandHasPackagesSubcommand(t *testing.T) {
 	t.Parallel()
-	// Verify images subcommand is registered
+	// Verify packages subcommand is registered
 	cmd := NewRootCmd()
 	found := false
 	for _, c := range cmd.Commands() {
-		if strings.HasPrefix(c.Use, "images") {
+		if strings.HasPrefix(c.Use, "packages") {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Error("Expected images subcommand to be registered with root command")
+		t.Error("Expected packages subcommand to be registered with root command")
 	}
 }
 

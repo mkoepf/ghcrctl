@@ -10,13 +10,13 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 
 ghcrctl provides functionality for:
 
-- **Exploring images** and their versions (multi-arch platforms, SBOM, provenance, signatures)
+- **Exploring packages** and their versions (multi-arch platforms, SBOM, provenance, signatures)
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Discovering signatures** and attestations from both Docker buildx and cosign
 - **Managing GHCR version metadata** (labels, tags)
 - **Safe deletion** of package versions and complete OCI graphs
-- **Shell completion** with dynamic image name suggestions
+- **Shell completion** with dynamic package name suggestions
 
 ## Installation
 
@@ -47,19 +47,19 @@ export GITHUB_TOKEN=ghp_your_token_here
 
 **Note:** GitHub App installation tokens (`ghs_*` prefix) are not supported for write operations to GHCR via the OCI registry API.
 
-### List Container Images
+### List Packages
 
-List all container images for an owner:
+List all container packages for an owner:
 
 ```bash
-ghcrctl images mkoepf
-ghcrctl images myorg
+ghcrctl packages mkoepf
+ghcrctl packages myorg
 ```
 
 Get output in JSON format:
 
 ```bash
-ghcrctl images mkoepf --json
+ghcrctl packages mkoepf --json
 ```
 
 ### List Package Versions
@@ -548,13 +548,13 @@ ghcrctl ver<TAB>           # completes to: ghcrctl versions
 ghcrctl versions mkoepf/<TAB>  # shows: mkoepf/myimage, mkoepf/otherapp, ...
 ```
 
-Dynamic image completion requires `GITHUB_TOKEN` to be exported in your shell.
+Dynamic package completion requires `GITHUB_TOKEN` to be exported in your shell.
 
 ### Getting Help
 
 ```bash
 ghcrctl --help
-ghcrctl images --help
+ghcrctl packages --help
 ghcrctl versions --help
 ghcrctl sbom --help
 ghcrctl provenance --help
@@ -715,7 +715,7 @@ The scoped token used in the integration tests allows to test
 
 However, the following tests are **not possible**:
 
-1. **Listing all user/org packages** - `ghcrctl images` requires broader `read:packages` access
+1. **Listing all user/org packages** - `ghcrctl packages` requires broader `read:packages` access
 2. **Cross-repository operations** - Can only access packages within the ghcrctl repository
 3. **Package deletion** - Would require `write:packages` and `delete:packages` permissions
 4. **Private registry access** - Tests only work with packages in the ghcrctl repository scope

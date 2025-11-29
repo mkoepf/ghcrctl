@@ -9,30 +9,30 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/display"
 )
 
-func TestImagesCommandStructure(t *testing.T) {
+func TestPackagesCommandStructure(t *testing.T) {
 	t.Parallel()
-	// Verify images command exists and is properly structured
+	// Verify packages command exists and is properly structured
 	cmd := NewRootCmd()
-	imagesCmd, _, err := cmd.Find([]string{"images"})
+	packagesCmd, _, err := cmd.Find([]string{"packages"})
 	if err != nil {
-		t.Fatalf("Failed to find images command: %v", err)
+		t.Fatalf("Failed to find packages command: %v", err)
 	}
-	if imagesCmd == nil {
-		t.Fatal("imagesCmd should not be nil")
-	}
-
-	if imagesCmd.Use != "images <owner>" {
-		t.Errorf("Expected Use to be 'images <owner>', got '%s'", imagesCmd.Use)
+	if packagesCmd == nil {
+		t.Fatal("packagesCmd should not be nil")
 	}
 
-	if imagesCmd.RunE == nil {
-		t.Error("imagesCmd should have RunE function")
+	if packagesCmd.Use != "packages <owner>" {
+		t.Errorf("Expected Use to be 'packages <owner>', got '%s'", packagesCmd.Use)
+	}
+
+	if packagesCmd.RunE == nil {
+		t.Error("packagesCmd should have RunE function")
 	}
 }
 
-func TestImagesCommandArguments(t *testing.T) {
+func TestPackagesCommandArguments(t *testing.T) {
 	t.Parallel()
-	// Test that images command requires exactly one argument (owner)
+	// Test that packages command requires exactly one argument (owner)
 
 	tests := []struct {
 		name        string
@@ -42,19 +42,19 @@ func TestImagesCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "no arguments",
-			args:        []string{"images"},
+			args:        []string{"packages"},
 			wantError:   true,
 			errContains: "accepts 1 arg",
 		},
 		{
 			name:        "with owner argument",
-			args:        []string{"images", "mkoepf"},
+			args:        []string{"packages", "mkoepf"},
 			wantError:   false, // Will fail for other reasons (no token), but not arg validation
 			errContains: "",
 		},
 		{
 			name:        "with too many arguments",
-			args:        []string{"images", "mkoepf", "extra"},
+			args:        []string{"packages", "mkoepf", "extra"},
 			wantError:   true,
 			errContains: "accepts 1 arg",
 		},
@@ -82,18 +82,18 @@ func TestImagesCommandArguments(t *testing.T) {
 	}
 }
 
-func TestImagesCommandHasJSONFlag(t *testing.T) {
+func TestPackagesCommandHasJSONFlag(t *testing.T) {
 	t.Parallel()
-	// Verify that the images command has a --json flag
+	// Verify that the packages command has a --json flag
 	cmd := NewRootCmd()
-	imagesCmd, _, _ := cmd.Find([]string{"images"})
-	jsonFlag := imagesCmd.Flags().Lookup("json")
+	packagesCmd, _, _ := cmd.Find([]string{"packages"})
+	jsonFlag := packagesCmd.Flags().Lookup("json")
 	if jsonFlag == nil {
-		t.Error("images command should have --json flag")
+		t.Error("packages command should have --json flag")
 	}
 }
 
-func TestOutputJSON(t *testing.T) {
+func TestPackagesOutputJSON(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -156,7 +156,7 @@ func TestOutputJSON(t *testing.T) {
 	}
 }
 
-func TestOutputTable(t *testing.T) {
+func TestPackagesOutputTable(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -188,7 +188,7 @@ func TestOutputTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output in buffer
 			buf := &bytes.Buffer{}
-			err := outputImagesTable(buf, tt.packages, tt.owner)
+			err := outputPackagesTable(buf, tt.packages, tt.owner)
 
 			if tt.wantErr {
 				if err == nil {
@@ -216,8 +216,8 @@ func TestOutputTable(t *testing.T) {
 
 				// Verify correct message for empty list
 				if len(tt.packages) == 0 {
-					if !strings.Contains(output, "No container images found") {
-						t.Error("Expected 'No container images found' message for empty list")
+					if !strings.Contains(output, "No packages found") {
+						t.Error("Expected 'No packages found' message for empty list")
 					}
 				} else {
 					// Non-empty list should show count

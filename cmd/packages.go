@@ -9,27 +9,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newImagesCmd creates the images command with isolated flag state.
-func newImagesCmd() *cobra.Command {
+// newPackagesCmd creates the packages command with isolated flag state.
+func newPackagesCmd() *cobra.Command {
 	var (
 		jsonOutput   bool
 		outputFormat string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "images <owner>",
-		Short: "List container images",
-		Long: `List all container images for the specified owner from GitHub Container Registry.
+		Use:   "packages <owner>",
+		Short: "List container packages",
+		Long: `List all container packages for the specified owner from GitHub Container Registry.
 
 Examples:
-  # List all images for a user
-  ghcrctl images mkoepf
+  # List all packages for a user
+  ghcrctl packages mkoepf
 
-  # List all images for an organization
-  ghcrctl images myorg
+  # List all packages for an organization
+  ghcrctl packages myorg
 
-  # List images in JSON format
-  ghcrctl images mkoepf --json`,
+  # List packages in JSON format
+  ghcrctl packages mkoepf --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner := args[0]
@@ -81,7 +81,7 @@ Examples:
 			if jsonOutput {
 				return display.OutputJSON(cmd.OutOrStdout(), packages)
 			}
-			return outputImagesTable(cmd.OutOrStdout(), packages, owner)
+			return outputPackagesTable(cmd.OutOrStdout(), packages, owner)
 		},
 	}
 
@@ -91,17 +91,17 @@ Examples:
 	return cmd
 }
 
-func outputImagesTable(w io.Writer, packages []string, owner string) error {
+func outputPackagesTable(w io.Writer, packages []string, owner string) error {
 	if len(packages) == 0 {
-		fmt.Fprintf(w, "No container images found for %s\n", owner)
+		fmt.Fprintf(w, "No packages found for %s\n", owner)
 		return nil
 	}
 
-	fmt.Fprintf(w, "Container images for %s:\n\n", owner)
+	fmt.Fprintf(w, "Packages for %s:\n\n", owner)
 	for _, pkg := range packages {
 		fmt.Fprintf(w, "  %s\n", pkg)
 	}
-	fmt.Fprintf(w, "\nTotal: %s image(s)\n", display.ColorCount(len(packages)))
+	fmt.Fprintf(w, "\nTotal: %s package(s)\n", display.ColorCount(len(packages)))
 
 	return nil
 }

@@ -25,7 +25,7 @@ func NewRootCmd() *cobra.Command {
 		Long: `ghcrctl is a command-line tool for interacting with GitHub Container Registry (GHCR).
 
 It provides functionality for:
-- Exploring images and their OCI artifact graph (image, SBOM, provenance)
+- Exploring packages and their OCI artifact graph (image, SBOM, provenance)
 - Managing GHCR version metadata (labels, tags)
 - Safe deletion of package versions`,
 		SilenceErrors: true,
@@ -45,7 +45,7 @@ It provides functionality for:
 	root.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 
 	// Add subcommands via their factories
-	root.AddCommand(newImagesCmd())
+	root.AddCommand(newPackagesCmd())
 	root.AddCommand(newVersionsCmd())
 	root.AddCommand(newDeleteCmd())
 	root.AddCommand(newLabelsCmd())

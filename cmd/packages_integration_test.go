@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// TestImagesCommandWithRepoScopedToken tests that images command works with valid token
+// TestPackagesCommandWithRepoScopedToken tests that packages command works with valid token
 // Note: The tested path differs depending on the token's permissions. It is not
 // possible to provide the exact same token type for local development and CI
 // environments due to GitHub limitations.
-func TestImagesCommandWithRepoScopedToken(t *testing.T) {
+func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -20,7 +20,7 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"images", "mkoepf"})
+	cmd.SetArgs([]string{"packages", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -47,9 +47,9 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 		t.Logf("Command succeeded with current token (has read:packages access)")
 		stdoutStr := stdout.String()
 
-		// Should show at least the test images
+		// Should show at least the test packages
 		if !strings.Contains(stdoutStr, "ghcrctl-test") {
-			t.Error("Expected to see test images in output")
+			t.Error("Expected to see test packages in output")
 			t.Logf("Stdout: %s", stdoutStr)
 		}
 	} else {
@@ -81,8 +81,8 @@ func TestImagesCommandWithRepoScopedToken(t *testing.T) {
 	}
 }
 
-// TestImagesCommandErrorFormat verifies error handling without usage hint
-func TestImagesCommandErrorFormat(t *testing.T) {
+// TestPackagesCommandErrorFormat verifies error handling without usage hint
+func TestPackagesCommandErrorFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -91,7 +91,7 @@ func TestImagesCommandErrorFormat(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"images", "mkoepf"})
+	cmd.SetArgs([]string{"packages", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

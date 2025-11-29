@@ -8,7 +8,7 @@ import (
 // TestOutputFormatFlag ensures all commands that support --json also support -o json
 func TestOutputFormatFlag(t *testing.T) {
 	commandsWithJSON := []string{
-		"images",
+		"packages",
 		"labels",
 		"sbom",
 		"provenance",
@@ -49,10 +49,10 @@ func TestOutputFormatValues(t *testing.T) {
 		outputValue string
 		shouldError bool
 	}{
-		{"images", "json", false},
-		{"images", "table", false},
-		{"images", "yaml", true}, // not supported
-		{"images", "csv", true},  // not supported
+		{"packages", "json", false},
+		{"packages", "table", false},
+		{"packages", "yaml", true}, // not supported
+		{"packages", "csv", true},  // not supported
 		{"labels", "json", false},
 		{"labels", "table", false},
 		{"sbom", "json", false},
@@ -84,7 +84,7 @@ func TestOutputFormatValues(t *testing.T) {
 // TestBackwardCompatibility ensures --json still works after adding -o
 func TestBackwardCompatibility(t *testing.T) {
 	commandsWithJSON := []string{
-		"images",
+		"packages",
 		"labels",
 		"sbom",
 		"provenance",
@@ -110,7 +110,7 @@ func TestBackwardCompatibility(t *testing.T) {
 // TestOutputFlagDescription checks that help text is clear
 func TestOutputFlagDescription(t *testing.T) {
 	commandsWithJSON := []string{
-		"images",
+		"packages",
 		"labels",
 		"sbom",
 		"provenance",

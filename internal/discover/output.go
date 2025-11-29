@@ -21,6 +21,9 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 	// Calculate dynamic column widths
 	idWidth := len("VERSION ID")
 	typeWidth := len("TYPE")
+	digestWidth := 12
+	tagWidth := 20
+	refWidth := 20
 	for _, v := range sortedVersions {
 		idLen := len(fmt.Sprintf("%d", v.ID))
 		if idLen > idWidth {
@@ -30,22 +33,28 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 		if typeLen > typeWidth {
 			typeWidth = typeLen
 		}
+		// Check tag widths
+		for _, tag := range v.Tags {
+			if len(tag) > tagWidth {
+				tagWidth = len(tag)
+			}
+		}
 	}
 
-	// Print header
-	fmt.Fprintf(w, "  %-*s  %-*s  %-12s  %-20s  %-20s  %s\n",
-		idWidth, display.ColorHeader("VERSION ID"),
-		typeWidth, display.ColorHeader("TYPE"),
-		display.ColorHeader("DIGEST"),
-		display.ColorHeader("TAGS"),
-		display.ColorHeader("REFS"),
+	// Print header (pad first, then color to avoid ANSI length issues)
+	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
+		display.ColorHeader(fmt.Sprintf("%-*s", idWidth, "VERSION ID")),
+		display.ColorHeader(fmt.Sprintf("%-*s", typeWidth, "TYPE")),
+		display.ColorHeader(fmt.Sprintf("%-*s", digestWidth, "DIGEST")),
+		display.ColorHeader(fmt.Sprintf("%-*s", tagWidth, "TAGS")),
+		display.ColorHeader(fmt.Sprintf("%-*s", refWidth, "REFS")),
 		display.ColorHeader("CREATED"))
 	fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
 		display.ColorSeparator(strings.Repeat("-", idWidth)),
 		display.ColorSeparator(strings.Repeat("-", typeWidth)),
-		display.ColorSeparator("------------"),
-		display.ColorSeparator("--------------------"),
-		display.ColorSeparator("--------------------"),
+		display.ColorSeparator(strings.Repeat("-", digestWidth)),
+		display.ColorSeparator(strings.Repeat("-", tagWidth)),
+		display.ColorSeparator(strings.Repeat("-", refWidth)),
 		display.ColorSeparator("-------------------"))
 
 	for _, v := range sortedVersions {
@@ -61,28 +70,55 @@ func FormatTable(w io.Writer, versions []VersionInfo, allVersions map[string]Ver
 			var idStr, typeOut, digestOut, tagOut, refOut, createdOut string
 
 			if row == 0 {
-				idStr = fmt.Sprintf("%d", v.ID)
-				typeOut = display.ColorVersionType(typeStr)
-				digestOut = display.ColorDigest(shortDigest(v.Digest))
+				// Pad raw strings first, then apply color to preserve alignment
+				idStr = fmt.Sprintf("%-*d", idWidth, v.ID)
+				typeOut = display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, typeStr))
+				digestOut = display.ColorDigest(fmt.Sprintf("%-*s", digestWidth, shortDigest(v.Digest)))
 				createdOut = v.CreatedAt
+			} else {
+				// Empty cells need proper padding
+				idStr = strings.Repeat(" ", idWidth)
+				typeOut = strings.Repeat(" ", typeWidth)
+				digestOut = strings.Repeat(" ", digestWidth)
 			}
 
 			if row < len(v.Tags) {
-				tagOut = v.Tags[row]
-			}
-			if row < len(refs) {
-				refOut = refs[row]
+				tagOut = fmt.Sprintf("%-*s", tagWidth, v.Tags[row])
+			} else {
+				tagOut = strings.Repeat(" ", tagWidth)
 			}
 
-			fmt.Fprintf(w, "  %-*s  %-*s  %-12s  %-20s  %-20s  %s\n",
-				idWidth, idStr,
-				typeWidth, typeOut,
+			if row < len(refs) {
+				refOut = padRefString(refs[row], refWidth)
+			} else {
+				refOut = strings.Repeat(" ", refWidth)
+			}
+
+			fmt.Fprintf(w, "  %s  %s  %s  %s  %s  %s\n",
+				idStr,
+				typeOut,
 				digestOut,
 				tagOut,
 				refOut,
 				createdOut)
 		}
 	}
+}
+
+// padRefString pads a ref string (which contains ANSI codes) to the target width.
+// The ref format is "[⬇✓] digest" where [⬇✓] is 4 visible chars but more bytes.
+func padRefString(ref string, width int) string {
+	// The ref indicator "[⬇✓] " is 5 visible chars (including space after)
+	// Plus 12 chars for digest = 17 visible chars total
+	visibleLen := 5 + 12 // indicator + space + digest
+	if len(ref) == 0 {
+		return strings.Repeat(" ", width)
+	}
+	padding := width - visibleLen
+	if padding < 0 {
+		padding = 0
+	}
+	return ref + strings.Repeat(" ", padding)
 }
 
 // FormatTree outputs versions in a tree-style grouped format.
@@ -159,17 +195,18 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, p
 	}
 
 	// Format for alignment:
-	// Root with children: "┌ " + 5 spaces = 7 visual chars before VERSION ID
-	// Root without children: 7 spaces = 7 visual chars before VERSION ID
-	// Child: "├ " + "[⬇✓] " = 2 + 5 visible = 7 visual chars before VERSION ID
-	// The indicator "[⬇✓] " is 5 visible chars but 9 bytes due to Unicode arrows
+	// Root with children: "┌      " = 7 visual chars before VERSION ID
+	// Root without children: "       " = 7 visual chars before VERSION ID
+	// Child: "├ [⬇✓] " = 2 + 5 visible = 7 visual chars before VERSION ID
+	// Pad raw strings first, then apply color to preserve alignment
 	if isRoot {
+		paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, typeStr))
 		if len(children) > 0 {
-			fmt.Fprintf(w, "%s┌      %-*d  %-*s  %-12s%s\n",
-				prefix, idWidth, v.ID, typeWidth, display.ColorVersionType(typeStr), display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s┌      %-*d  %s  %s%s\n",
+				prefix, idWidth, v.ID, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
 		} else {
-			fmt.Fprintf(w, "%s       %-*d  %-*s  %-12s%s\n",
-				prefix, idWidth, v.ID, typeWidth, display.ColorVersionType(typeStr), display.ColorDigest(shortDigest(v.Digest)), tagsStr)
+			fmt.Fprintf(w, "%s       %-*d  %s  %s%s\n",
+				prefix, idWidth, v.ID, paddedType, display.ColorDigest(shortDigest(v.Digest)), tagsStr)
 		}
 	}
 
@@ -189,12 +226,14 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, p
 			if len(childVer.Tags) > 0 {
 				childTagsStr = "  " + formatTags(childVer.Tags)
 			}
-			fmt.Fprintf(w, "%s%s %s %-*d  %-*s  %-12s%s\n",
-				prefix, connector, indicator, idWidth, childVer.ID, typeWidth, display.ColorVersionType(childTypeStr),
+			paddedType := display.ColorVersionType(fmt.Sprintf("%-*s", typeWidth, childTypeStr))
+			fmt.Fprintf(w, "%s%s %s %-*d  %s  %s%s\n",
+				prefix, connector, indicator, idWidth, childVer.ID, paddedType,
 				display.ColorDigest(shortDigest(childVer.Digest)), childTagsStr)
 		} else {
-			fmt.Fprintf(w, "%s%s %s %-*s  %-*s  %-12s  (not found)\n",
-				prefix, connector, indicator, idWidth, "-", typeWidth, "???", display.ColorDigest(shortDigest(child.ref)))
+			paddedType := fmt.Sprintf("%-*s", typeWidth, "???")
+			fmt.Fprintf(w, "%s%s %s %-*s  %s  %s  (not found)\n",
+				prefix, connector, indicator, idWidth, "-", paddedType, display.ColorDigest(shortDigest(child.ref)))
 		}
 	}
 }

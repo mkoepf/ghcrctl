@@ -1,55 +1,10 @@
 # Performance / usability 
 
-Currently, `versions` does not show graph when called with --version or --digest of a child 
-
-./ghcrctl versions mkoepf/ghcrctl-test-no-sbom --verbose --tree --version 592512544
-Versions for ghcrctl-test-no-sbom:
-
-─ 592512544  linux/amd64
-   Digest:  sha256:5074a741addef13d1869220828d6e6ff2dfcd1d4eebdb8ec8cd9824db7b66ddb
-   Created: 2025-11-28 09:00:37
-
-## Clean up Discovery
-
-Whole discovery should be completely rewritten.
-
-To this end: First completely remove the whole display graph and delete graph functionality. Then rebuild it.
-
-Write functions for clear purposes:
-
-- index or manifest
-- Find parents (including multiplicity 2*, 3* and so on)
-- Find Children
-- Resolve manifest type
-
-Optimize for fewest possible API calls. Ideas:
-
-- when looking for parents, don't consider any version that's younger (inverse logic does NOT apply for children, as older images might be reused (2*) )
-- also: when looking for parents, do not consider verions that are much older. QUestions is, what is "much"?
-- do not resolve manifest type when just interested in parent/child relationships
-- do not look for children in anything but an index
-
-## Unclear terminology
-
-./ghcrctl delete graph should be ./ghcrctl delete image
-
---tree is actually not a tree (there is currently no hierarchy shown) but --image
-
 ## Is type resolution even necessary for anything but display
 
 If yes, introduce --no-types option to speed up
 
 There should also be options to suppress the whole graph resolution and just get plain package version list.
-
-## If versions within a graph arre deleted this should be visible
-
-## delete version should work without image
-
-versionid and digest are both unique 
-
-## Auo-complete missing
-
-Would be great if it would automatically auto-complete image names
 
 ## Delete package function needed
 
@@ -72,14 +27,6 @@ Preparing to delete package version:
 Are you sure you want to delete this version? [y/N]: y
 failed to delete package version: failed to delete version: DELETE https://api.github.com/users/mkoepf/packages/container/ghcrctl-test-trivial-base/versions/592195799: 400 You cannot delete the last tagged version of a package. You must delete the package instead. []
 ./ghcrctl delete version ghcrctl-test-trivial-base 592195799  0.01s user 0.02s system 1% cpu 3.397 total
-
-## config file awkwardness
-
-The config file is not very elegant because
-
-- it is one file per user and cumbersome if you want to work on several projects
-- it is a file to carry just two informatinos: owner name and type
-
 
 ## Terminology unclear, ambigous
 

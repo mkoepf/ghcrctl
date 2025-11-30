@@ -438,9 +438,8 @@ func TestDisplayImageSummaryWithVersionInfo(t *testing.T) {
 				"Version ID: 100",
 			},
 			wantNotContain: []string{
-				"Platforms to delete",
-				"Attestations to delete",
-				"Shared artifacts",
+				"Versions to delete",
+				"Shared versions",
 			},
 		},
 		{
@@ -463,12 +462,12 @@ func TestDisplayImageSummaryWithVersionInfo(t *testing.T) {
 			},
 			wantContains: []string{
 				"Root (Image): sha256:indexdigest",
-				"Platforms to delete (2)",
+				"Versions to delete (2)",
 				"linux/amd64 (version 101)",
 				"linux/arm64 (version 102)",
 			},
 			wantNotContain: []string{
-				"Shared artifacts",
+				"Shared versions",
 			},
 		},
 		{
@@ -490,14 +489,13 @@ func TestDisplayImageSummaryWithVersionInfo(t *testing.T) {
 			},
 			wantContains: []string{
 				"Root (Image): sha256:manifestdigest",
-				"Attestations to delete (2)",
+				"Versions to delete (2)",
 				"sbom (version 201)",
 				"provenance (version 202)",
 			},
 			wantNotContain: []string{
 				"Tags:",
-				"Shared artifacts",
-				"Platforms to delete",
+				"Shared versions",
 			},
 		},
 		{
@@ -521,9 +519,9 @@ func TestDisplayImageSummaryWithVersionInfo(t *testing.T) {
 				"sha256:otherroot2":     {ID: 401, Digest: "sha256:otherroot2", Types: []string{"index"}, OutgoingRefs: []string{"sha256:shared"}},
 			},
 			wantContains: []string{
-				"Platforms to delete (1)",
+				"Versions to delete (1)",
 				"linux/amd64 (version 301)",
-				"Shared artifacts (preserved, used by other images)",
+				"Shared versions (preserved, used by other images)",
 				"linux/arm64 (version 302, shared by 3 images)",
 			},
 		},

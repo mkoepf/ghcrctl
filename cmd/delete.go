@@ -804,70 +804,39 @@ func displayImageSummaryWithVersionInfo(w io.Writer, root discover.VersionInfo, 
 	}
 
 	// Separate children into exclusive (will delete) and shared (will preserve)
-	var exclusivePlatforms, sharedPlatforms []discover.VersionInfo
-	var exclusiveAttestations, sharedAttestations []discover.VersionInfo
+	var exclusive, shared []discover.VersionInfo
 
 	for _, child := range children {
 		refCount := discover.CountImageMembership(versionMap, child.Digest)
-		isReferrer := child.IsReferrer()
-		isPlatform := !isReferrer && len(child.Types) > 0
-
-		if isPlatform {
-			if refCount > 1 {
-				sharedPlatforms = append(sharedPlatforms, child)
-			} else {
-				exclusivePlatforms = append(exclusivePlatforms, child)
-			}
-		} else if isReferrer {
-			if refCount > 1 {
-				sharedAttestations = append(sharedAttestations, child)
-			} else {
-				exclusiveAttestations = append(exclusiveAttestations, child)
-			}
+		if refCount > 1 {
+			shared = append(shared, child)
+		} else {
+			exclusive = append(exclusive, child)
 		}
 	}
 
 	// Show what will be deleted
-	if len(exclusivePlatforms) > 0 {
-		fmt.Fprintf(w, "\nPlatforms to delete (%d):\n", len(exclusivePlatforms))
-		for _, p := range exclusivePlatforms {
-			typeStr := "platform"
-			if len(p.Types) > 0 {
-				typeStr = p.Types[0]
+	if len(exclusive) > 0 {
+		fmt.Fprintf(w, "\nVersions to delete (%d):\n", len(exclusive))
+		for _, v := range exclusive {
+			typeStr := "unknown"
+			if len(v.Types) > 0 {
+				typeStr = v.Types[0]
 			}
-			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, p.ID)
-		}
-	}
-
-	if len(exclusiveAttestations) > 0 {
-		fmt.Fprintf(w, "\nAttestations to delete (%d):\n", len(exclusiveAttestations))
-		for _, att := range exclusiveAttestations {
-			typeStr := "attestation"
-			if len(att.Types) > 0 {
-				typeStr = att.Types[0]
-			}
-			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, att.ID)
+			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, v.ID)
 		}
 	}
 
 	// Show what will be preserved (shared with other images)
-	if len(sharedPlatforms) > 0 || len(sharedAttestations) > 0 {
-		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared artifacts (preserved, used by other images):"))
-		for _, p := range sharedPlatforms {
-			typeStr := "platform"
-			if len(p.Types) > 0 {
-				typeStr = p.Types[0]
+	if len(shared) > 0 {
+		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared versions (preserved, used by other images):"))
+		for _, v := range shared {
+			typeStr := "unknown"
+			if len(v.Types) > 0 {
+				typeStr = v.Types[0]
 			}
-			refCount := discover.CountImageMembership(versionMap, p.Digest)
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, p.ID, refCount)
-		}
-		for _, att := range sharedAttestations {
-			typeStr := "attestation"
-			if len(att.Types) > 0 {
-				typeStr = att.Types[0]
-			}
-			refCount := discover.CountImageMembership(versionMap, att.Digest)
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, att.ID, refCount)
+			refCount := discover.CountImageMembership(versionMap, v.Digest)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, v.ID, refCount)
 		}
 	}
 }

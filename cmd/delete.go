@@ -352,7 +352,7 @@ Examples:
 			}
 
 			// Classify versions into exclusive (to delete) and shared (to preserve)
-			toDelete, shared := discover.ClassifyImageVersions(imageVersions, versionMap)
+			toDelete, shared := discover.ClassifyImageVersions(imageVersions)
 
 			// Extract version IDs from toDelete list
 			versionIDs := make([]int64, len(toDelete))
@@ -367,7 +367,7 @@ Examples:
 				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			displayImageVersions(cmd.OutOrStdout(), toDelete, shared, versionMap)
+			displayImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -508,13 +508,31 @@ func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.
 	discoverer := discover.NewPackageDiscoverer()
 	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
 
-	// Track which version IDs are shared children (belong to multiple images)
+	// Track which version IDs are shared (have incoming refs from outside deletion set)
 	sharedChildren := make(map[int64]bool)
 	if err == nil {
-		versionMap := discover.ToMap(versions)
+		// Build set of version IDs being deleted
+		deletingIDs := make(map[int64]bool)
+		for _, ver := range matchingVersions {
+			deletingIDs[ver.ID] = true
+		}
+
+		// Build digest to ID map for checking incoming refs
+		digestToID := make(map[string]int64)
 		for _, ver := range versions {
-			if discover.CountImageMembershipByID(versionMap, ver.ID) > 1 {
-				sharedChildren[ver.ID] = true
+			digestToID[ver.Digest] = ver.ID
+		}
+
+		// A version is shared if it has incoming refs from versions NOT being deleted
+		for _, ver := range versions {
+			for _, inRef := range ver.IncomingRefs {
+				if refID, ok := digestToID[inRef]; ok {
+					if !deletingIDs[refID] {
+						// This version has a ref from something not being deleted
+						sharedChildren[ver.ID] = true
+						break
+					}
+				}
 			}
 		}
 	}
@@ -784,7 +802,13 @@ func deleteGraphVersions(ctx context.Context, client *gh.Client, owner, ownerTyp
 }
 
 // displayImageVersions displays versions to delete and shared versions.
-func displayImageVersions(w io.Writer, toDelete, shared []discover.VersionInfo, versionMap map[string]discover.VersionInfo) {
+func displayImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
+	// Build set of digests in this image for counting external refs
+	imageDigests := make(map[string]bool)
+	for _, v := range imageVersions {
+		imageDigests[v.Digest] = true
+	}
+
 	// Show what will be deleted
 	if len(toDelete) > 0 {
 		fmt.Fprintf(w, "Versions to delete (%d):\n", len(toDelete))
@@ -795,10 +819,17 @@ func displayImageVersions(w io.Writer, toDelete, shared []discover.VersionInfo, 
 
 	// Show what will be preserved (shared with other images)
 	if len(shared) > 0 {
-		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared versions (preserved, used by other images):"))
+		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared versions (preserved):"))
 		for _, v := range shared {
-			refCount := discover.CountImageMembership(versionMap, v.Digest)
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)%s\n", formatType(v.Types), v.ID, refCount, formatTags(v.Tags))
+			// Count external references
+			externalRefs := 0
+			for _, inRef := range v.IncomingRefs {
+				if !imageDigests[inRef] {
+					externalRefs++
+				}
+			}
+			fmt.Fprintf(w, "  - %s (version %d, referenced by %d versions outside this delete)%s\n",
+				formatType(v.Types), v.ID, externalRefs, formatTags(v.Tags))
 		}
 	}
 }
@@ -832,8 +863,9 @@ func deleteGraphWithDeleter(ctx context.Context, deleter gh.PackageDeleter, owne
 	return nil
 }
 
-// countImageMembership returns how many images the given version ID belongs to
-// (either as root or as a child). Returns 0 if unable to determine.
+// countImageMembership returns how many images reference the given version ID.
+// This counts the number of IncomingRefs (versions that reference this one).
+// Returns 0 if unable to determine or if the version has no incoming refs.
 func countImageMembership(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionID int64) int {
 	// Get all versions for this package
 	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
@@ -850,7 +882,11 @@ func countImageMembership(ctx context.Context, client *gh.Client, owner, ownerTy
 		return 0
 	}
 
-	// Convert to map and count membership
-	versionMap := discover.ToMap(versions)
-	return discover.CountImageMembershipByID(versionMap, versionID)
+	// Find the version by ID and return its incoming ref count
+	for _, v := range versions {
+		if v.ID == versionID {
+			return len(v.IncomingRefs)
+		}
+	}
+	return 0
 }

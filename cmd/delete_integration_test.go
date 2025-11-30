@@ -13,7 +13,7 @@ import (
 // Integration tests for delete command functionality
 // These tests require GITHUB_TOKEN and will skip if not set
 
-// TestCountImageMembershipRootVersion tests counting membership for a root version
+// TestCountImageMembershipRootVersion tests counting incoming refs for a root version
 func TestCountImageMembershipRootVersion(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -49,14 +49,14 @@ func TestCountImageMembershipRootVersion(t *testing.T) {
 
 	t.Logf("Root version ID: %d, digest: %s", rootVersionID, rootDigest)
 
-	// Count membership
+	// Count incoming refs (versions that reference this version)
 	count := countImageMembership(ctx, client, owner, ownerType, imageName, rootVersionID)
 
-	t.Logf("Root version membership count: %d", count)
+	t.Logf("Root version incoming ref count: %d", count)
 
-	// Root version should be in exactly 1 image (itself)
-	if count != 1 {
-		t.Errorf("Expected root version to be in exactly 1 image, got %d", count)
+	// Root version (index) should have 0 incoming refs - nothing references the root
+	if count != 0 {
+		t.Errorf("Expected root version to have 0 incoming refs, got %d", count)
 	}
 }
 

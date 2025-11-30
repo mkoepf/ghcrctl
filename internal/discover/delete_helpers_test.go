@@ -27,119 +27,6 @@ func TestToMap(t *testing.T) {
 	}
 }
 
-func TestCountImageMembershipByID(t *testing.T) {
-	t.Parallel()
-
-	versions := map[string]VersionInfo{
-		"sha256:index1": {
-			ID:           1,
-			Digest:       "sha256:index1",
-			Types:        []string{"index"},
-			OutgoingRefs: []string{"sha256:platform1"},
-		},
-		"sha256:platform1": {
-			ID:           2,
-			Digest:       "sha256:platform1",
-			Types:        []string{"linux/amd64"},
-			IncomingRefs: []string{"sha256:index1"},
-		},
-	}
-
-	// Version ID 1 (index) belongs to 1 image
-	count := CountImageMembershipByID(versions, 1)
-	if count != 1 {
-		t.Errorf("Expected index to belong to 1 image, got %d", count)
-	}
-
-	// Version ID 2 (platform) belongs to 1 image
-	count = CountImageMembershipByID(versions, 2)
-	if count != 1 {
-		t.Errorf("Expected platform to belong to 1 image, got %d", count)
-	}
-
-	// Version ID 999 (nonexistent) belongs to 0 images
-	count = CountImageMembershipByID(versions, 999)
-	if count != 0 {
-		t.Errorf("Expected nonexistent version to belong to 0 images, got %d", count)
-	}
-}
-
-func TestCountImageMembership(t *testing.T) {
-	t.Parallel()
-
-	// Create a version map with one index and its children
-	versions := map[string]VersionInfo{
-		"sha256:index1": {
-			ID:           1,
-			Digest:       "sha256:index1",
-			Types:        []string{"index"},
-			OutgoingRefs: []string{"sha256:platform1", "sha256:sbom1"},
-		},
-		"sha256:platform1": {
-			ID:           2,
-			Digest:       "sha256:platform1",
-			Types:        []string{"linux/amd64"},
-			IncomingRefs: []string{"sha256:index1"},
-		},
-		"sha256:sbom1": {
-			ID:           3,
-			Digest:       "sha256:sbom1",
-			Types:        []string{"sbom"},
-			IncomingRefs: []string{"sha256:index1"},
-		},
-	}
-
-	// Platform belongs to one image
-	count := CountImageMembership(versions, "sha256:platform1")
-	if count != 1 {
-		t.Errorf("Expected platform to belong to 1 image, got %d", count)
-	}
-
-	// SBOM belongs to one image
-	count = CountImageMembership(versions, "sha256:sbom1")
-	if count != 1 {
-		t.Errorf("Expected sbom to belong to 1 image, got %d", count)
-	}
-
-	// Index itself is the root of one image
-	count = CountImageMembership(versions, "sha256:index1")
-	if count != 1 {
-		t.Errorf("Expected index to belong to 1 image, got %d", count)
-	}
-}
-
-func TestCountImageMembership_Shared(t *testing.T) {
-	t.Parallel()
-
-	// Create two indexes that share a platform
-	versions := map[string]VersionInfo{
-		"sha256:index1": {
-			ID:           1,
-			Digest:       "sha256:index1",
-			Types:        []string{"index"},
-			OutgoingRefs: []string{"sha256:shared-platform"},
-		},
-		"sha256:index2": {
-			ID:           2,
-			Digest:       "sha256:index2",
-			Types:        []string{"index"},
-			OutgoingRefs: []string{"sha256:shared-platform"},
-		},
-		"sha256:shared-platform": {
-			ID:           3,
-			Digest:       "sha256:shared-platform",
-			Types:        []string{"linux/amd64"},
-			IncomingRefs: []string{"sha256:index1", "sha256:index2"},
-		},
-	}
-
-	// Shared platform belongs to two images
-	count := CountImageMembership(versions, "sha256:shared-platform")
-	if count != 2 {
-		t.Errorf("Expected shared platform to belong to 2 images, got %d", count)
-	}
-}
-
 func TestFindImageByDigest(t *testing.T) {
 	t.Parallel()
 
@@ -169,7 +56,7 @@ func TestFindImageByDigest(t *testing.T) {
 		},
 	}
 
-	// Find image by index digest
+	// Find image by root digest
 	image := FindImageByDigest(versions, "sha256:index1")
 	if len(image) != 3 {
 		t.Errorf("Expected 3 versions in image, got %d", len(image))
@@ -184,37 +71,38 @@ func TestFindImageByDigest(t *testing.T) {
 		t.Errorf("Missing expected digests in image: %v", image)
 	}
 
-	// Find image by child digest should still find the full image
-	image = FindImageByDigest(versions, "sha256:platform1")
-	if len(image) != 3 {
-		t.Errorf("Expected 3 versions when finding by child digest, got %d", len(image))
-	}
-
-	// Find standalone version (not connected to any image)
+	// Find standalone version
 	image = FindImageByDigest(versions, "sha256:standalone")
 	if len(image) != 1 {
 		t.Errorf("Expected 1 version for standalone, got %d", len(image))
+	}
+
+	// Find nonexistent digest returns empty
+	image = FindImageByDigest(versions, "sha256:nonexistent")
+	if len(image) != 0 {
+		t.Errorf("Expected 0 versions for nonexistent digest, got %d", len(image))
 	}
 }
 
 func TestClassifyImageVersions(t *testing.T) {
 	t.Parallel()
 
-	versionMap := map[string]VersionInfo{
-		"sha256:index1": {
+	// All versions in one image, no external refs
+	imageVersions := []VersionInfo{
+		{
 			ID:           100,
 			Digest:       "sha256:index1",
 			Types:        []string{"index"},
 			Tags:         []string{"latest"},
 			OutgoingRefs: []string{"sha256:platform1", "sha256:sbom1"},
 		},
-		"sha256:platform1": {
+		{
 			ID:           200,
 			Digest:       "sha256:platform1",
 			Types:        []string{"linux/amd64"},
 			IncomingRefs: []string{"sha256:index1"},
 		},
-		"sha256:sbom1": {
+		{
 			ID:           300,
 			Digest:       "sha256:sbom1",
 			Types:        []string{"sbom"},
@@ -222,13 +110,7 @@ func TestClassifyImageVersions(t *testing.T) {
 		},
 	}
 
-	imageVersions := []VersionInfo{
-		versionMap["sha256:index1"],
-		versionMap["sha256:platform1"],
-		versionMap["sha256:sbom1"],
-	}
-
-	toDelete, shared := ClassifyImageVersions(imageVersions, versionMap)
+	toDelete, shared := ClassifyImageVersions(imageVersions)
 
 	// All versions should be exclusive (no sharing)
 	if len(toDelete) != 3 {
@@ -242,28 +124,22 @@ func TestClassifyImageVersions(t *testing.T) {
 func TestClassifyImageVersions_WithShared(t *testing.T) {
 	t.Parallel()
 
-	// Two indexes share a platform
-	versionMap := map[string]VersionInfo{
-		"sha256:index1": {
+	// Versions for index1's image, but shared-platform has external ref to index2
+	imageVersions := []VersionInfo{
+		{
 			ID:           1,
 			Digest:       "sha256:index1",
 			Types:        []string{"index"},
 			Tags:         []string{"v1.0"},
 			OutgoingRefs: []string{"sha256:shared-platform", "sha256:exclusive-sbom"},
 		},
-		"sha256:index2": {
-			ID:           2,
-			Digest:       "sha256:index2",
-			Types:        []string{"index"},
-			OutgoingRefs: []string{"sha256:shared-platform"},
-		},
-		"sha256:shared-platform": {
+		{
 			ID:           3,
 			Digest:       "sha256:shared-platform",
 			Types:        []string{"linux/amd64"},
-			IncomingRefs: []string{"sha256:index1", "sha256:index2"},
+			IncomingRefs: []string{"sha256:index1", "sha256:index2"}, // index2 is external
 		},
-		"sha256:exclusive-sbom": {
+		{
 			ID:           4,
 			Digest:       "sha256:exclusive-sbom",
 			Types:        []string{"sbom"},
@@ -271,14 +147,7 @@ func TestClassifyImageVersions_WithShared(t *testing.T) {
 		},
 	}
 
-	// Versions for index1's image
-	imageVersions := []VersionInfo{
-		versionMap["sha256:index1"],
-		versionMap["sha256:shared-platform"],
-		versionMap["sha256:exclusive-sbom"],
-	}
-
-	toDelete, shared := ClassifyImageVersions(imageVersions, versionMap)
+	toDelete, shared := ClassifyImageVersions(imageVersions)
 
 	// 2 exclusive (index1 + exclusive-sbom), 1 shared (shared-platform)
 	if len(toDelete) != 2 {
@@ -291,5 +160,48 @@ func TestClassifyImageVersions_WithShared(t *testing.T) {
 	// Verify shared version is the platform
 	if len(shared) > 0 && shared[0].ID != 3 {
 		t.Errorf("Expected shared version to be ID 3, got %d", shared[0].ID)
+	}
+}
+
+func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
+	t.Parallel()
+
+	// Version with multiple external refs
+	imageVersions := []VersionInfo{
+		{
+			ID:           1,
+			Digest:       "sha256:index1",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared"},
+		},
+		{
+			ID:           2,
+			Digest:       "sha256:shared",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:index1", "sha256:ext1", "sha256:ext2", "sha256:ext3"},
+		},
+	}
+
+	toDelete, shared := ClassifyImageVersions(imageVersions)
+
+	if len(toDelete) != 1 {
+		t.Errorf("Expected 1 version to delete, got %d", len(toDelete))
+	}
+	if len(shared) != 1 {
+		t.Errorf("Expected 1 shared version, got %d", len(shared))
+	}
+
+	// Verify we can count external refs from the shared version
+	if len(shared) > 0 {
+		externalCount := 0
+		imageDigests := map[string]bool{"sha256:index1": true, "sha256:shared": true}
+		for _, inRef := range shared[0].IncomingRefs {
+			if !imageDigests[inRef] {
+				externalCount++
+			}
+		}
+		if externalCount != 3 {
+			t.Errorf("Expected 3 external refs, got %d", externalCount)
+		}
 	}
 }

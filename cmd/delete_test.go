@@ -418,15 +418,17 @@ func TestDisplayImageVersions(t *testing.T) {
 		name           string
 		toDelete       []discover.VersionInfo
 		shared         []discover.VersionInfo
-		versionMap     map[string]discover.VersionInfo
+		imageVersions  []discover.VersionInfo
 		wantContains   []string
 		wantNotContain []string
 	}{
 		{
-			name:       "single version to delete",
-			toDelete:   []discover.VersionInfo{{ID: 100, Digest: "sha256:rootdigest123", Tags: []string{"v1.0.0"}, Types: []string{"index"}}},
-			shared:     nil,
-			versionMap: map[string]discover.VersionInfo{},
+			name:     "single version to delete",
+			toDelete: []discover.VersionInfo{{ID: 100, Digest: "sha256:rootdigest123", Tags: []string{"v1.0.0"}, Types: []string{"index"}}},
+			shared:   nil,
+			imageVersions: []discover.VersionInfo{
+				{ID: 100, Digest: "sha256:rootdigest123", Tags: []string{"v1.0.0"}, Types: []string{"index"}},
+			},
 			wantContains: []string{
 				"Versions to delete (1)",
 				"index (version 100) [v1.0.0]",
@@ -443,10 +445,10 @@ func TestDisplayImageVersions(t *testing.T) {
 				{ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}},
 			},
 			shared: nil,
-			versionMap: map[string]discover.VersionInfo{
-				"sha256:indexdigest": {ID: 100, Digest: "sha256:indexdigest", Tags: []string{"latest"}, Types: []string{"index"}},
-				"sha256:amd64":       {ID: 101, Digest: "sha256:amd64", Types: []string{"linux/amd64"}},
-				"sha256:arm64":       {ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}},
+			imageVersions: []discover.VersionInfo{
+				{ID: 100, Digest: "sha256:indexdigest", Tags: []string{"latest"}, Types: []string{"index"}},
+				{ID: 101, Digest: "sha256:amd64", Types: []string{"linux/amd64"}},
+				{ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}},
 			},
 			wantContains: []string{
 				"Versions to delete (3)",
@@ -466,10 +468,10 @@ func TestDisplayImageVersions(t *testing.T) {
 				{ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}},
 			},
 			shared: nil,
-			versionMap: map[string]discover.VersionInfo{
-				"sha256:manifestdigest": {ID: 200, Digest: "sha256:manifestdigest", Types: []string{"manifest"}},
-				"sha256:sbomdigest":     {ID: 201, Digest: "sha256:sbomdigest", Types: []string{"sbom"}},
-				"sha256:provdigest":     {ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}},
+			imageVersions: []discover.VersionInfo{
+				{ID: 200, Digest: "sha256:manifestdigest", Types: []string{"manifest"}},
+				{ID: 201, Digest: "sha256:sbomdigest", Types: []string{"sbom"}},
+				{ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}},
 			},
 			wantContains: []string{
 				"Versions to delete (3)",
@@ -488,21 +490,19 @@ func TestDisplayImageVersions(t *testing.T) {
 				{ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}},
 			},
 			shared: []discover.VersionInfo{
-				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}},
+				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
 			},
-			versionMap: map[string]discover.VersionInfo{
-				"sha256:rootwithshared": {ID: 300, Digest: "sha256:rootwithshared", Tags: []string{"v2.0"}, Types: []string{"index"}, OutgoingRefs: []string{"sha256:exclusive", "sha256:shared"}},
-				"sha256:exclusive":      {ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:rootwithshared"}},
-				"sha256:shared":         {ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
-				"sha256:otherroot1":     {ID: 400, Digest: "sha256:otherroot1", Types: []string{"index"}, OutgoingRefs: []string{"sha256:shared"}},
-				"sha256:otherroot2":     {ID: 401, Digest: "sha256:otherroot2", Types: []string{"index"}, OutgoingRefs: []string{"sha256:shared"}},
+			imageVersions: []discover.VersionInfo{
+				{ID: 300, Digest: "sha256:rootwithshared", Tags: []string{"v2.0"}, Types: []string{"index"}, OutgoingRefs: []string{"sha256:exclusive", "sha256:shared"}},
+				{ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:rootwithshared"}},
+				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
 			},
 			wantContains: []string{
 				"Versions to delete (2)",
 				"index (version 300) [v2.0]",
 				"linux/amd64 (version 301)",
-				"Shared versions (preserved, used by other images)",
-				"linux/arm64 (version 302, shared by 3 images)",
+				"Shared versions (preserved)",
+				"linux/arm64 (version 302, referenced by 2 versions outside this delete)",
 			},
 		},
 	}
@@ -510,7 +510,7 @@ func TestDisplayImageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			displayImageVersions(&buf, tt.toDelete, tt.shared, tt.versionMap)
+			displayImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
 			output := buf.String()
 
 			for _, want := range tt.wantContains {

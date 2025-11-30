@@ -11,9 +11,11 @@ import (
 
 func newImagesCmd() *cobra.Command {
 	var (
-		jsonOutput   bool
-		flatOutput   bool
-		outputFormat string
+		jsonOutput    bool
+		flatOutput    bool
+		outputFormat  string
+		filterVersion int64
+		filterDigest  string
 	)
 
 	cmd := &cobra.Command{
@@ -25,6 +27,9 @@ Each image includes its platform manifests, attestations (SBOM, provenance, etc.
 and signatures. By default, images are displayed in a tree format showing these
 relationships. Use --flat for a simple table view.
 
+Use --version or --digest to filter output to only images containing a specific
+version ID or digest.
+
 Examples:
   # Show images with relationships (tree view, default)
   ghcrctl images mkoepf/my-package
@@ -33,9 +38,20 @@ Examples:
   ghcrctl images mkoepf/my-package --flat
 
   # Output in JSON format
-  ghcrctl images mkoepf/my-package --json`,
+  ghcrctl images mkoepf/my-package --json
+
+  # Filter to images containing a specific version ID
+  ghcrctl images mkoepf/my-package --version 12345678
+
+  # Filter to images containing a specific digest
+  ghcrctl images mkoepf/my-package --digest sha256:abc123...`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check mutual exclusivity of --version and --digest
+			if filterVersion != 0 && filterDigest != "" {
+				return fmt.Errorf("--version and --digest are mutually exclusive")
+			}
+
 			// Parse owner/image reference
 			owner, packageName, _, err := parseImageRef(args[0])
 			if err != nil {
@@ -116,6 +132,48 @@ Examples:
 				allVersions[v.Digest] = v
 			}
 
+			// Apply version/digest filter if specified
+			if filterVersion != 0 || filterDigest != "" {
+				var targetDigest string
+
+				if filterVersion != 0 {
+					// Find digest by version ID
+					found := false
+					for _, v := range results {
+						if v.ID == filterVersion {
+							targetDigest = v.Digest
+							found = true
+							break
+						}
+					}
+					if !found {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("version ID %d not found", filterVersion)
+					}
+				} else {
+					// Find full digest from short or full input
+					var err error
+					targetDigest, err = discover.FindDigestByShortDigest(allVersions, filterDigest)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return err
+					}
+				}
+
+				// Filter to images containing this version
+				results = discover.FindImagesContainingVersion(allVersions, targetDigest)
+				if len(results) == 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "No images found containing the specified version\n")
+					return nil
+				}
+
+				// Rebuild version map with filtered results
+				allVersions = make(map[string]discover.VersionInfo)
+				for _, v := range results {
+					allVersions[v.Digest] = v
+				}
+			}
+
 			// Output results
 			if jsonOutput {
 				data, err := json.MarshalIndent(results, "", "  ")
@@ -140,6 +198,9 @@ Examples:
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	cmd.Flags().BoolVar(&flatOutput, "flat", false, "Output in flat table format (default is tree)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table, tree)")
+	cmd.Flags().Int64Var(&filterVersion, "version", 0, "Filter to images containing this version ID")
+	cmd.Flags().StringVar(&filterDigest, "digest", "", "Filter to images containing this digest")
+	cmd.MarkFlagsMutuallyExclusive("version", "digest")
 
 	return cmd
 }

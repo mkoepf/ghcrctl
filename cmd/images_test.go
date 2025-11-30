@@ -52,3 +52,33 @@ func TestImagesCmd_InvalidOutputFormat(t *testing.T) {
 		t.Error("expected error for invalid output format")
 	}
 }
+
+func TestImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
+	cmd := newImagesCmd()
+
+	// Check --version flag exists
+	versionFlag := cmd.Flags().Lookup("version")
+	if versionFlag == nil {
+		t.Error("expected --version flag")
+	}
+
+	// Check --digest flag exists
+	digestFlag := cmd.Flags().Lookup("digest")
+	if digestFlag == nil {
+		t.Error("expected --digest flag")
+	}
+}
+
+func TestImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
+	cmd := newImagesCmd()
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	cmd.SetArgs([]string{"owner/test-package", "--version", "123", "--digest", "sha256:abc"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error when both --version and --digest are specified")
+	}
+}

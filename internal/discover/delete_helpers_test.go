@@ -205,3 +205,188 @@ func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
 		}
 	}
 }
+
+func TestFindImagesContainingVersion(t *testing.T) {
+	t.Parallel()
+
+	// Two images sharing a platform
+	versions := map[string]VersionInfo{
+		"sha256:index1": {
+			ID:           1,
+			Digest:       "sha256:index1",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared-platform"},
+		},
+		"sha256:index2": {
+			ID:           2,
+			Digest:       "sha256:index2",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:shared-platform", "sha256:exclusive"},
+		},
+		"sha256:shared-platform": {
+			ID:           3,
+			Digest:       "sha256:shared-platform",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:index1", "sha256:index2"},
+		},
+		"sha256:exclusive": {
+			ID:           4,
+			Digest:       "sha256:exclusive",
+			Types:        []string{"linux/arm64"},
+			IncomingRefs: []string{"sha256:index2"},
+		},
+	}
+
+	// Find images containing shared platform - should return both images
+	result := FindImagesContainingVersion(versions, "sha256:shared-platform")
+	if len(result) != 4 {
+		t.Errorf("Expected 4 versions (both images), got %d", len(result))
+	}
+
+	// Find images containing exclusive platform - should return only index2's image
+	result = FindImagesContainingVersion(versions, "sha256:exclusive")
+	if len(result) != 3 {
+		t.Errorf("Expected 3 versions (index2 image only), got %d", len(result))
+	}
+
+	// Verify index2's image contains the right versions
+	digestSet := make(map[string]bool)
+	for _, v := range result {
+		digestSet[v.Digest] = true
+	}
+	if !digestSet["sha256:index2"] || !digestSet["sha256:shared-platform"] || !digestSet["sha256:exclusive"] {
+		t.Errorf("Missing expected digests: %v", digestSet)
+	}
+	if digestSet["sha256:index1"] {
+		t.Errorf("Should not contain index1")
+	}
+
+	// Find images containing a root - should return just that image
+	result = FindImagesContainingVersion(versions, "sha256:index1")
+	if len(result) != 2 {
+		t.Errorf("Expected 2 versions (index1 + shared-platform), got %d", len(result))
+	}
+
+	// Find nonexistent digest returns nil
+	result = FindImagesContainingVersion(versions, "sha256:nonexistent")
+	if len(result) != 0 {
+		t.Errorf("Expected 0 versions for nonexistent, got %d", len(result))
+	}
+}
+
+func TestCanReach(t *testing.T) {
+	t.Parallel()
+
+	versions := map[string]VersionInfo{
+		"sha256:root": {
+			Digest:       "sha256:root",
+			Types:        []string{"index"},
+			OutgoingRefs: []string{"sha256:child1", "sha256:child2"},
+		},
+		"sha256:child1": {
+			Digest:       "sha256:child1",
+			Types:        []string{"linux/amd64"},
+			IncomingRefs: []string{"sha256:root"},
+			OutgoingRefs: []string{"sha256:grandchild"},
+		},
+		"sha256:child2": {
+			Digest:       "sha256:child2",
+			Types:        []string{"linux/arm64"},
+			IncomingRefs: []string{"sha256:root"},
+		},
+		"sha256:grandchild": {
+			Digest:       "sha256:grandchild",
+			Types:        []string{"sbom"},
+			IncomingRefs: []string{"sha256:child1"},
+		},
+	}
+
+	// Can reach self
+	if !canReach(versions, "sha256:root", "sha256:root") {
+		t.Error("Should be able to reach self")
+	}
+
+	// Can reach direct child
+	if !canReach(versions, "sha256:root", "sha256:child1") {
+		t.Error("Should be able to reach direct child")
+	}
+
+	// Can reach grandchild
+	if !canReach(versions, "sha256:root", "sha256:grandchild") {
+		t.Error("Should be able to reach grandchild")
+	}
+
+	// Cannot reach nonexistent
+	if canReach(versions, "sha256:root", "sha256:nonexistent") {
+		t.Error("Should not be able to reach nonexistent")
+	}
+
+	// Child cannot reach sibling (no path)
+	if canReach(versions, "sha256:child1", "sha256:child2") {
+		t.Error("Child1 should not be able to reach child2")
+	}
+}
+
+func TestFindDigestByShortDigest(t *testing.T) {
+	t.Parallel()
+
+	versions := map[string]VersionInfo{
+		"sha256:abcdef123456789012345678901234567890123456789012345678901234": {
+			ID:     1,
+			Digest: "sha256:abcdef123456789012345678901234567890123456789012345678901234",
+		},
+		"sha256:123456abcdef789012345678901234567890123456789012345678901234": {
+			ID:     2,
+			Digest: "sha256:123456abcdef789012345678901234567890123456789012345678901234",
+		},
+	}
+
+	// Find by full digest
+	result, err := FindDigestByShortDigest(versions, "sha256:abcdef123456789012345678901234567890123456789012345678901234")
+	if err != nil {
+		t.Errorf("Expected no error for full digest, got %v", err)
+	}
+	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
+		t.Errorf("Expected full digest match, got %s", result)
+	}
+
+	// Find by short digest (12 chars)
+	result, err = FindDigestByShortDigest(versions, "abcdef123456")
+	if err != nil {
+		t.Errorf("Expected no error for short digest, got %v", err)
+	}
+	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
+		t.Errorf("Expected first digest, got %s", result)
+	}
+
+	// Find by short digest with sha256: prefix
+	result, err = FindDigestByShortDigest(versions, "sha256:123456ab")
+	if err != nil {
+		t.Errorf("Expected no error for short digest with prefix, got %v", err)
+	}
+	if result != "sha256:123456abcdef789012345678901234567890123456789012345678901234" {
+		t.Errorf("Expected second digest, got %s", result)
+	}
+
+	// Error for nonexistent digest
+	_, err = FindDigestByShortDigest(versions, "zzz999")
+	if err == nil {
+		t.Error("Expected error for nonexistent digest")
+	}
+
+	// Error for ambiguous short digest (both start with similar prefixes)
+	versionsAmbiguous := map[string]VersionInfo{
+		"sha256:abc123456789012345678901234567890123456789012345678901234567": {
+			ID:     1,
+			Digest: "sha256:abc123456789012345678901234567890123456789012345678901234567",
+		},
+		"sha256:abc123999999012345678901234567890123456789012345678901234567": {
+			ID:     2,
+			Digest: "sha256:abc123999999012345678901234567890123456789012345678901234567",
+		},
+	}
+	_, err = FindDigestByShortDigest(versionsAmbiguous, "abc123")
+	if err == nil {
+		t.Error("Expected error for ambiguous short digest")
+	}
+}

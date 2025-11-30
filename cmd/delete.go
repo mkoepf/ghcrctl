@@ -351,23 +351,14 @@ Examples:
 				return fmt.Errorf("no image found for digest %s", rootDigest)
 			}
 
-			// Get the root version
-			root, ok := versionMap[rootDigest]
-			if !ok {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("root digest %s not found in package", rootDigest)
-			}
+			// Classify versions into exclusive (to delete) and shared (to preserve)
+			toDelete, shared := discover.ClassifyImageVersions(imageVersions, versionMap)
 
-			// Collect children (all versions except root)
-			var children []discover.VersionInfo
-			for _, v := range imageVersions {
-				if v.Digest != rootDigest {
-					children = append(children, v)
-				}
+			// Extract version IDs from toDelete list
+			versionIDs := make([]int64, len(toDelete))
+			for i, v := range toDelete {
+				versionIDs[i] = v.ID
 			}
-
-			// Collect all version IDs to delete (children first, skip shared)
-			versionIDs := discover.CollectDeletionOrder(versionMap, rootDigest)
 
 			// Display what will be deleted
 			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI image:\n")
@@ -376,7 +367,7 @@ Examples:
 				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			displayImageSummaryWithVersionInfo(cmd.OutOrStdout(), root, children, versionMap)
+			displayImageVersions(cmd.OutOrStdout(), toDelete, shared, versionMap)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -792,38 +783,13 @@ func deleteGraphVersions(ctx context.Context, client *gh.Client, owner, ownerTyp
 	return deleteGraphWithDeleter(ctx, client, owner, ownerType, imageName, versionIDs, w)
 }
 
-// displayImageSummaryWithVersionInfo displays a summary of an image using discover.VersionInfo.
-// This is the new implementation that replaces displayGraphSummary for the discover-based approach.
-func displayImageSummaryWithVersionInfo(w io.Writer, root discover.VersionInfo, children []discover.VersionInfo, versionMap map[string]discover.VersionInfo) {
-	fmt.Fprintf(w, "Root (Image): %s\n", root.Digest)
-	if len(root.Tags) > 0 {
-		fmt.Fprintf(w, "  Tags: %v\n", root.Tags)
-	}
-	if root.ID != 0 {
-		fmt.Fprintf(w, "  Version ID: %d\n", root.ID)
-	}
-
-	// Separate children into exclusive (will delete) and shared (will preserve)
-	var exclusive, shared []discover.VersionInfo
-
-	for _, child := range children {
-		refCount := discover.CountImageMembership(versionMap, child.Digest)
-		if refCount > 1 {
-			shared = append(shared, child)
-		} else {
-			exclusive = append(exclusive, child)
-		}
-	}
-
+// displayImageVersions displays versions to delete and shared versions.
+func displayImageVersions(w io.Writer, toDelete, shared []discover.VersionInfo, versionMap map[string]discover.VersionInfo) {
 	// Show what will be deleted
-	if len(exclusive) > 0 {
-		fmt.Fprintf(w, "\nVersions to delete (%d):\n", len(exclusive))
-		for _, v := range exclusive {
-			typeStr := "unknown"
-			if len(v.Types) > 0 {
-				typeStr = v.Types[0]
-			}
-			fmt.Fprintf(w, "  - %s (version %d)\n", typeStr, v.ID)
+	if len(toDelete) > 0 {
+		fmt.Fprintf(w, "Versions to delete (%d):\n", len(toDelete))
+		for _, v := range toDelete {
+			fmt.Fprintf(w, "  - %s (version %d)%s\n", formatType(v.Types), v.ID, formatTags(v.Tags))
 		}
 	}
 
@@ -831,14 +797,26 @@ func displayImageSummaryWithVersionInfo(w io.Writer, root discover.VersionInfo, 
 	if len(shared) > 0 {
 		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared versions (preserved, used by other images):"))
 		for _, v := range shared {
-			typeStr := "unknown"
-			if len(v.Types) > 0 {
-				typeStr = v.Types[0]
-			}
 			refCount := discover.CountImageMembership(versionMap, v.Digest)
-			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)\n", typeStr, v.ID, refCount)
+			fmt.Fprintf(w, "  - %s (version %d, shared by %d images)%s\n", formatType(v.Types), v.ID, refCount, formatTags(v.Tags))
 		}
 	}
+}
+
+// formatType returns the first type or "unknown" if none.
+func formatType(types []string) string {
+	if len(types) > 0 {
+		return types[0]
+	}
+	return "unknown"
+}
+
+// formatTags returns formatted tags or empty string if none.
+func formatTags(tags []string) string {
+	if len(tags) > 0 {
+		return fmt.Sprintf(" [%s]", strings.Join(tags, ", "))
+	}
+	return ""
 }
 
 // deleteGraphWithDeleter is the internal implementation that accepts a PackageDeleter interface.

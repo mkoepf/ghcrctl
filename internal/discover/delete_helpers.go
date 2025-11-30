@@ -1,5 +1,17 @@
 package discover
 
+// ClassifyImageVersions separates image versions into exclusive (to delete) and shared (to preserve).
+func ClassifyImageVersions(imageVersions []VersionInfo, versionMap map[string]VersionInfo) (toDelete, shared []VersionInfo) {
+	for _, v := range imageVersions {
+		if CountImageMembership(versionMap, v.Digest) > 1 {
+			shared = append(shared, v)
+		} else {
+			toDelete = append(toDelete, v)
+		}
+	}
+	return
+}
+
 // CountImageMembership returns how many images (root artifacts) contain the given digest.
 // An image is defined as a root version (index, standalone manifest) plus its children.
 func CountImageMembership(versions map[string]VersionInfo, digest string) int {
@@ -38,47 +50,6 @@ func FindImageByDigest(versions map[string]VersionInfo, digest string) []Version
 
 	// Collect all versions reachable from the root
 	return collectImageVersions(versions, rootDigest)
-}
-
-// CollectDeletionOrder returns version IDs in the order they should be deleted.
-// Children are deleted before the root. Shared versions (referenced by multiple roots) are skipped.
-func CollectDeletionOrder(versions map[string]VersionInfo, rootDigest string) []int64 {
-	root, ok := versions[rootDigest]
-	if !ok {
-		return nil
-	}
-
-	// Find all children
-	children := collectChildren(versions, rootDigest)
-
-	// Identify shared children (referenced by multiple roots)
-	sharedDigests := make(map[string]bool)
-	for _, child := range children {
-		if CountImageMembership(versions, child.Digest) > 1 {
-			sharedDigests[child.Digest] = true
-		}
-	}
-
-	// Collect IDs: attestations first, then platforms, then root
-	// Skip shared versions
-	var attestationIDs, platformIDs []int64
-	for _, child := range children {
-		if sharedDigests[child.Digest] {
-			continue // Skip shared
-		}
-		if child.IsReferrer() {
-			attestationIDs = append(attestationIDs, child.ID)
-		} else {
-			platformIDs = append(platformIDs, child.ID)
-		}
-	}
-
-	ids := make([]int64, 0, len(attestationIDs)+len(platformIDs)+1)
-	ids = append(ids, attestationIDs...)
-	ids = append(ids, platformIDs...)
-	ids = append(ids, root.ID)
-
-	return ids
 }
 
 // findRoots returns all root digests in the version map.
@@ -176,18 +147,6 @@ func collectImageVersions(versions map[string]VersionInfo, rootDigest string) []
 
 	collect(rootDigest)
 	return result
-}
-
-// collectChildren collects all child versions of a root.
-func collectChildren(versions map[string]VersionInfo, rootDigest string) []VersionInfo {
-	all := collectImageVersions(versions, rootDigest)
-	var children []VersionInfo
-	for _, v := range all {
-		if v.Digest != rootDigest {
-			children = append(children, v)
-		}
-	}
-	return children
 }
 
 // ToMap converts a slice of VersionInfo to a map keyed by digest.

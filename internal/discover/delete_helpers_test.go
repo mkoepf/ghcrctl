@@ -197,14 +197,15 @@ func TestFindImageByDigest(t *testing.T) {
 	}
 }
 
-func TestCollectDeletionOrder(t *testing.T) {
+func TestClassifyImageVersions(t *testing.T) {
 	t.Parallel()
 
-	versions := map[string]VersionInfo{
+	versionMap := map[string]VersionInfo{
 		"sha256:index1": {
 			ID:           100,
 			Digest:       "sha256:index1",
 			Types:        []string{"index"},
+			Tags:         []string{"latest"},
 			OutgoingRefs: []string{"sha256:platform1", "sha256:sbom1"},
 		},
 		"sha256:platform1": {
@@ -221,37 +222,33 @@ func TestCollectDeletionOrder(t *testing.T) {
 		},
 	}
 
-	ids := CollectDeletionOrder(versions, "sha256:index1")
-
-	// Should have 3 IDs
-	if len(ids) != 3 {
-		t.Fatalf("Expected 3 version IDs, got %d", len(ids))
+	imageVersions := []VersionInfo{
+		versionMap["sha256:index1"],
+		versionMap["sha256:platform1"],
+		versionMap["sha256:sbom1"],
 	}
 
-	// Root should be last
-	if ids[len(ids)-1] != 100 {
-		t.Errorf("Expected root (ID 100) to be last, got %d", ids[len(ids)-1])
-	}
+	toDelete, shared := ClassifyImageVersions(imageVersions, versionMap)
 
-	// Children should be before root
-	childIDs := make(map[int64]bool)
-	for _, id := range ids[:len(ids)-1] {
-		childIDs[id] = true
+	// All versions should be exclusive (no sharing)
+	if len(toDelete) != 3 {
+		t.Errorf("Expected 3 versions to delete, got %d", len(toDelete))
 	}
-	if !childIDs[200] || !childIDs[300] {
-		t.Errorf("Expected child IDs 200 and 300 before root, got %v", ids)
+	if len(shared) != 0 {
+		t.Errorf("Expected 0 shared versions, got %d", len(shared))
 	}
 }
 
-func TestCollectDeletionOrder_SkipsShared(t *testing.T) {
+func TestClassifyImageVersions_WithShared(t *testing.T) {
 	t.Parallel()
 
 	// Two indexes share a platform
-	versions := map[string]VersionInfo{
+	versionMap := map[string]VersionInfo{
 		"sha256:index1": {
 			ID:           1,
 			Digest:       "sha256:index1",
 			Types:        []string{"index"},
+			Tags:         []string{"v1.0"},
 			OutgoingRefs: []string{"sha256:shared-platform", "sha256:exclusive-sbom"},
 		},
 		"sha256:index2": {
@@ -274,26 +271,25 @@ func TestCollectDeletionOrder_SkipsShared(t *testing.T) {
 		},
 	}
 
-	ids := CollectDeletionOrder(versions, "sha256:index1")
-
-	// Should have 2 IDs: exclusive-sbom + root (shared-platform skipped)
-	if len(ids) != 2 {
-		t.Fatalf("Expected 2 version IDs (shared skipped), got %d: %v", len(ids), ids)
+	// Versions for index1's image
+	imageVersions := []VersionInfo{
+		versionMap["sha256:index1"],
+		versionMap["sha256:shared-platform"],
+		versionMap["sha256:exclusive-sbom"],
 	}
 
-	// Should NOT contain the shared platform
-	for _, id := range ids {
-		if id == 3 {
-			t.Error("Shared platform (ID 3) should not be in deletion order")
-		}
+	toDelete, shared := ClassifyImageVersions(imageVersions, versionMap)
+
+	// 2 exclusive (index1 + exclusive-sbom), 1 shared (shared-platform)
+	if len(toDelete) != 2 {
+		t.Errorf("Expected 2 versions to delete, got %d", len(toDelete))
+	}
+	if len(shared) != 1 {
+		t.Errorf("Expected 1 shared version, got %d", len(shared))
 	}
 
-	// Should contain root and exclusive sbom
-	idSet := make(map[int64]bool)
-	for _, id := range ids {
-		idSet[id] = true
-	}
-	if !idSet[1] || !idSet[4] {
-		t.Errorf("Expected IDs 1 (root) and 4 (exclusive sbom), got %v", ids)
+	// Verify shared version is the platform
+	if len(shared) > 0 && shared[0].ID != 3 {
+		t.Errorf("Expected shared version to be ID 3, got %d", shared[0].ID)
 	}
 }

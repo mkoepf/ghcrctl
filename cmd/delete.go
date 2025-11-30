@@ -449,8 +449,8 @@ func runSingleDeleteWithFlags(ctx context.Context, cmd *cobra.Command, args []st
 		return fmt.Errorf("failed to get version details: %w", err)
 	}
 
-	// Count how many images this version belongs to
-	imageCount := countImageMembership(ctx, client, owner, ownerType, imageName, versionID)
+	// Count how many other versions reference this one
+	imageCount := countIncomingRefs(ctx, client, owner, ownerType, imageName, versionID)
 
 	// Build params and delegate to testable function
 	params := deleteVersionParams{
@@ -605,11 +605,11 @@ func executeSingleDelete(ctx context.Context, deleter gh.PackageDeleter, params 
 	fmt.Fprintf(w, "  Version ID: %d\n", params.versionID)
 	fmt.Fprintf(w, "  Tags:       %s\n", FormatTagsForDisplay(params.tags))
 	if params.imageCount > 0 {
-		imageWord := "image"
+		versionWord := "version"
 		if params.imageCount > 1 {
-			imageWord = "images"
+			versionWord = "versions"
 		}
-		fmt.Fprintf(w, "  Images:     %s\n", display.ColorShared(fmt.Sprintf("%d %s", params.imageCount, imageWord)))
+		fmt.Fprintf(w, "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", params.imageCount, versionWord)))
 	}
 	fmt.Fprintln(w)
 
@@ -863,10 +863,9 @@ func deleteGraphWithDeleter(ctx context.Context, deleter gh.PackageDeleter, owne
 	return nil
 }
 
-// countImageMembership returns how many images reference the given version ID.
-// This counts the number of IncomingRefs (versions that reference this one).
+// countIncomingRefs returns how many other versions reference the given version ID.
 // Returns 0 if unable to determine or if the version has no incoming refs.
-func countImageMembership(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionID int64) int {
+func countIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionID int64) int {
 	// Get all versions for this package
 	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
 	if err != nil {

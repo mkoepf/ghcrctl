@@ -150,11 +150,11 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 	})
 
 	// Calculate ref counts: how many roots reference each version
-	refCounts := calculateRefCounts(allVersions)
+	imageCounts := calculateImageCounts(allVersions)
 
 	// Calculate max multiplicity indicator width (e.g., " (2*)" = 5 chars)
 	maxMultiplicityWidth := 0
-	for _, count := range refCounts {
+	for _, count := range imageCounts {
 		if count > 1 {
 			indicatorLen := len(fmt.Sprintf(" (%d*)", count))
 			if indicatorLen > maxMultiplicityWidth {
@@ -207,29 +207,84 @@ func FormatTree(w io.Writer, versions []VersionInfo, allVersions map[string]Vers
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		printTree(w, root, allVersions, refCounts, "", true, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth)
+		printTree(w, root, allVersions, imageCounts, "", true, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth)
 	}
 
 	// Print summary
 	printSummary(w, versions, allVersions)
 }
 
-// calculateRefCounts counts how many existing versions reference each version.
-// This is used to show multiplicity indicators like (2*) for shared versions.
-func calculateRefCounts(allVersions map[string]VersionInfo) map[string]int {
-	refCounts := make(map[string]int)
+// calculateImageCounts counts how many distinct images (roots) each version belongs to.
+// This is used to show multiplicity indicators like (×2) for shared versions.
+func calculateImageCounts(allVersions map[string]VersionInfo) map[string]int {
+	imageCounts := make(map[string]int)
 	for _, v := range allVersions {
-		// Count incoming refs from versions that exist in allVersions
-		for _, inRef := range v.IncomingRefs {
-			if _, exists := allVersions[inRef]; exists {
-				refCounts[v.Digest]++
-			}
-		}
+		imageCounts[v.Digest] = CalculateImageCount(allVersions, v.Digest)
 	}
-	return refCounts
+	return imageCounts
 }
 
-func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, refCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth int) {
+// CalculateImageCount returns the number of distinct images (roots) that reference a version.
+// It traverses up from each IncomingRef to find its root, counting unique roots.
+func CalculateImageCount(allVersions map[string]VersionInfo, digest string) int {
+	v, exists := allVersions[digest]
+	if !exists {
+		return 0
+	}
+
+	// Find unique roots that reference this version
+	roots := make(map[string]bool)
+	for _, inRef := range v.IncomingRefs {
+		if _, exists := allVersions[inRef]; exists {
+			root := findRoot(allVersions, inRef)
+			roots[root] = true
+		}
+	}
+	return len(roots)
+}
+
+// findRoot traverses up IncomingRefs to find the root (a version with no incoming refs or an index).
+func findRoot(allVersions map[string]VersionInfo, digest string) string {
+	visited := make(map[string]bool)
+	current := digest
+
+	for {
+		if visited[current] {
+			return current // cycle detected, return current
+		}
+		visited[current] = true
+
+		v, exists := allVersions[current]
+		if !exists {
+			return current
+		}
+
+		// If this is an index or has no incoming refs, it's a root
+		for _, t := range v.Types {
+			if t == "index" {
+				return current
+			}
+		}
+		if len(v.IncomingRefs) == 0 {
+			return current
+		}
+
+		// Follow the first incoming ref that exists in allVersions
+		foundNext := false
+		for _, inRef := range v.IncomingRefs {
+			if _, exists := allVersions[inRef]; exists {
+				current = inRef
+				foundNext = true
+				break
+			}
+		}
+		if !foundNext {
+			return current
+		}
+	}
+}
+
+func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, imageCounts map[string]int, prefix string, isRoot bool, idWidth, typeWidth, sizeWidth, maxMultiplicityWidth int) {
 	typeStr := formatTypes(v.Types)
 	sizeStr := formatSize(v.Size)
 	tagsStr := ""
@@ -305,7 +360,7 @@ func printTree(w io.Writer, v VersionInfo, allVersions map[string]VersionInfo, r
 			// Add multiplicity indicator if version is referenced by multiple roots
 			// Pad to maxMultiplicityWidth for alignment
 			var multiplicityStr string
-			if count := refCounts[childVer.Digest]; count > 1 {
+			if count := imageCounts[childVer.Digest]; count > 1 {
 				rawIndicator := fmt.Sprintf(" (%d*)", count)
 				padding := maxMultiplicityWidth - len(rawIndicator)
 				multiplicityStr = display.ColorShared(rawIndicator) + strings.Repeat(" ", padding)
@@ -396,9 +451,9 @@ func printSummary(w io.Writer, versions []VersionInfo, allVersions map[string]Ve
 	}
 
 	// Count shared versions (appear in multiple graphs)
-	refCounts := calculateRefCounts(allVersions)
+	imageCounts := calculateImageCounts(allVersions)
 	var sharedCount int
-	for _, count := range refCounts {
+	for _, count := range imageCounts {
 		if count > 1 {
 			sharedCount++
 		}

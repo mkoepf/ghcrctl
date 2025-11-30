@@ -13,8 +13,8 @@ import (
 // Integration tests for delete command functionality
 // These tests require GITHUB_TOKEN and will skip if not set
 
-// TestCountImageMembershipRootVersion tests counting incoming refs for a root version
-func TestCountImageMembershipRootVersion(t *testing.T) {
+// TestCountIncomingRefsRootVersion tests counting incoming refs for a root version
+func TestCountIncomingRefsRootVersion(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -50,7 +50,7 @@ func TestCountImageMembershipRootVersion(t *testing.T) {
 	t.Logf("Root version ID: %d, digest: %s", rootVersionID, rootDigest)
 
 	// Count incoming refs (versions that reference this version)
-	count := countImageMembership(ctx, client, owner, ownerType, imageName, rootVersionID)
+	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, rootVersionID)
 
 	t.Logf("Root version incoming ref count: %d", count)
 
@@ -60,8 +60,8 @@ func TestCountImageMembershipRootVersion(t *testing.T) {
 	}
 }
 
-// TestCountImageMembershipNonexistentVersion tests counting membership for a nonexistent version
-func TestCountImageMembershipNonexistentVersion(t *testing.T) {
+// TestCountIncomingRefsNonexistentVersion tests counting incoming refs for a nonexistent version
+func TestCountIncomingRefsNonexistentVersion(t *testing.T) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -84,7 +84,7 @@ func TestCountImageMembershipNonexistentVersion(t *testing.T) {
 	nonexistentVersionID := int64(999999999)
 
 	// Count membership
-	count := countImageMembership(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
+	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
 
 	t.Logf("Nonexistent version membership count: %d", count)
 

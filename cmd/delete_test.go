@@ -779,7 +779,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name: "shows image count when present",
+			name: "shows ref count when present",
 			params: deleteVersionParams{
 				owner:      "testowner",
 				ownerType:  "user",
@@ -792,10 +792,10 @@ func TestExecuteSingleDelete(t *testing.T) {
 			},
 			wantDeleted: true,
 			wantErr:     false,
-			wantOutput:  []string{"Images:", "2 images"},
+			wantOutput:  []string{"Referenced:", "by 2 other versions"},
 		},
 		{
-			name: "shows singular image when count is 1",
+			name: "shows singular version when count is 1",
 			params: deleteVersionParams{
 				owner:      "testowner",
 				ownerType:  "user",
@@ -808,7 +808,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 			},
 			wantDeleted: true,
 			wantErr:     false,
-			wantOutput:  []string{"1 image"},
+			wantOutput:  []string{"by 1 other version"},
 		},
 	}
 

@@ -1,5 +1,9 @@
 # Performance / usability 
 
+## README outdated
+
+E.g., versions --verbose description
+
 ## Is type resolution even necessary for anything but display
 
 If yes, introduce --no-types option to speed up

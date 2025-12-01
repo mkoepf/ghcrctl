@@ -11,6 +11,8 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 ghcrctl provides functionality for:
 
 - **Exploring packages** and their versions (multi-arch platforms, SBOM, provenance, signatures)
+- **Viewing images** with their OCI artifact relationships (platforms, attestations)
+- **Viewing labels** (OCI annotations) embedded in container images
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Discovering signatures** and attestations from both Docker buildx and cosign
@@ -61,6 +63,51 @@ Get output in JSON format:
 ```bash
 ghcrctl packages mkoepf --json
 ```
+
+### Show Package Images
+
+Display all images in a package with their related artifacts (platforms, attestations, signatures):
+
+```bash
+ghcrctl images mkoepf/myimage
+```
+
+This command shows images grouped by their OCI artifact relationships in a tree format:
+
+```
+Images for myimage:
+
+┌ sha256:01af50cc8b0d  [v1.0.0, latest]
+├── linux/amd64       sha256:62f946a8267d
+├── linux/arm64       sha256:89c3b5f1a432
+├── sbom              sha256:9a1636d22702
+└── provenance        sha256:9a1636d22702
+
+┌ sha256:abc123def456  [v0.9.0]
+├── linux/amd64       sha256:62f946a8267d (shared)
+└── linux/arm64       sha256:89c3b5f1a432 (shared)
+```
+
+**Options:**
+
+```bash
+# Show images in flat table format
+ghcrctl images mkoepf/myimage --flat
+
+# Output in JSON format
+ghcrctl images mkoepf/myimage --json
+
+# Filter to images containing a specific version ID
+ghcrctl images mkoepf/myimage --version 12345678
+
+# Filter to images containing a specific digest
+ghcrctl images mkoepf/myimage --digest sha256:abc123...
+```
+
+**Use cases:**
+- Quick overview of all images and their artifacts
+- Find images that contain a specific manifest
+- Identify shared platform manifests across images
 
 ### List Package Versions
 
@@ -204,6 +251,31 @@ When using `--tag` to filter, the command only discovers graph relationships for
 - Find orphaned versions for cleanup
 - Verify attestations exist for all builds
 - Quick lookup of version IDs for deletion
+
+### View Image Labels
+
+Display OCI labels (annotations/metadata) from a container image:
+
+```bash
+ghcrctl labels mkoepf/myimage
+ghcrctl labels mkoepf/myimage:v1.0.0
+```
+
+Labels are key-value pairs embedded in the image config at build time using Docker LABEL instructions. Common labels include:
+- `org.opencontainers.image.source` - Source repository URL
+- `org.opencontainers.image.description` - Image description
+- `org.opencontainers.image.version` - Semantic version
+- `org.opencontainers.image.licenses` - License identifier
+
+**Options:**
+
+```bash
+# Show only a specific label key
+ghcrctl labels mkoepf/myimage --key org.opencontainers.image.source
+
+# Output as JSON
+ghcrctl labels mkoepf/myimage --json
+```
 
 ### View SBOM (Software Bill of Materials)
 
@@ -555,7 +627,9 @@ Dynamic package completion requires `GITHUB_TOKEN` to be exported in your shell.
 ```bash
 ghcrctl --help
 ghcrctl packages --help
+ghcrctl images --help
 ghcrctl versions --help
+ghcrctl labels --help
 ghcrctl sbom --help
 ghcrctl provenance --help
 ghcrctl tag --help

@@ -59,13 +59,9 @@ Added goreleaser configuration and GitHub Actions release workflow:
 
 ---
 
-### 6. Verify README examples work
+### 6. ~~Verify README examples work~~ ✅ DONE
 
-**Issue:** Some examples may reference inconsistent paths or owners.
-
-**Impact:** Confusing for new users trying to follow documentation.
-
-**Solution:** Review all code examples in README and verify they work.
+Verified all README examples. Fixed bug in example message output (`ghcrctl sbom` → `ghcrctl get sbom`). Added practical examples for CI/CD cleanup, auditing, and attestation verification.
 
 ---
 
@@ -99,7 +95,7 @@ Added goreleaser configuration and GitHub Actions release workflow:
 - [x] Remove unused `BuildGraph` stub
 - [x] Add goreleaser configuration
 - [x] Add release workflow
-- [ ] Verify all README examples work
+- [x] Verify all README examples work
 - [ ] Tag v1.0.0
 
 ### Post-Release

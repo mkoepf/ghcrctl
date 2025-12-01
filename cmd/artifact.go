@@ -233,7 +233,7 @@ func listArtifacts(w io.Writer, artifacts []discover.VersionInfo, imageName, art
 		fmt.Fprintf(w, "  %d. %s\n", i+1, artifact.Digest)
 	}
 
-	fmt.Fprintf(w, "\nExample: ghcrctl %s %s --digest %s\n", artifactType, imageName, display.ShortDigest(artifacts[0].Digest))
+	fmt.Fprintf(w, "\nExample: ghcrctl get %s %s --digest %s\n", artifactType, imageName, display.ShortDigest(artifacts[0].Digest))
 
 	return nil
 }

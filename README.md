@@ -261,7 +261,7 @@ Use --digest <digest> to select one, or --all to show all:
   1. sha256:abc123def456...
   2. sha256:789xyz123456...
 
-Example: ghcrctl sbom myimage --digest abc123def456
+Example: ghcrctl get sbom myimage --digest abc123def456
 ```
 
 **Supported formats:**
@@ -551,6 +551,34 @@ This flag logs all HTTP requests to stderr as JSON, including:
 ./ghcrctl list images mkoepf/myimage --log-api-calls 2>api-calls.log
 # Analyze the log to see which API calls take longest
 jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' api-calls.log
+```
+
+### Practical Examples
+
+**CI/CD cleanup script:**
+```bash
+# Clean up old untagged images in CI (preview first with --dry-run)
+ghcrctl delete version myorg/myapp --untagged --older-than-days 30 --dry-run
+
+# Execute cleanup (use --force in CI to skip confirmation)
+ghcrctl delete version myorg/myapp --untagged --older-than-days 30 --force
+```
+
+**Quick audit - count versions:**
+```bash
+# Count total versions in a package
+ghcrctl list versions myorg/myapp --json | jq 'length'
+
+# Count untagged versions
+ghcrctl list versions myorg/myapp --untagged --json | jq 'length'
+```
+
+**Verify a release has attestations:**
+```bash
+# Check if the latest release has SBOM and provenance
+ghcrctl list images myorg/myapp --tag latest
+
+# Look for "sbom, provenance" in the TYPE column of children
 ```
 
 ## Development Status

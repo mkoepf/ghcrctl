@@ -39,48 +39,23 @@ Module path unified to `github.com/mkoepf/ghcrctl` across all files.
 
 ---
 
-### 3. Add `go install` instructions
+### 3. ~~Add `go install` instructions~~ ✅ DONE
 
-**Issue:** README only shows "from source" build instructions.
-
-**Impact:** Standard Go installation method missing - friction for users.
-
-**Solution:** Add to README:
-```bash
-go install github.com/<owner>/ghcrctl@latest
-```
+README includes `go install github.com/mkoepf/ghcrctl@latest` in the Installation section.
 
 ---
 
-### 4. Remove or implement `BuildGraph` stub
+### 4. ~~Remove or implement `BuildGraph` stub~~ ✅ DONE
 
-**Issue:** `internal/discovery/builder.go:64-66` contains a stub that returns `nil`.
-
-```go
-func (b *GraphBuilder) BuildGraph(digest string) (*graph.Graph, error) {
-    // TODO: Implementation will be added incrementally
-    return nil, nil
-}
-```
-
-**Impact:** Dead code / appears incomplete.
-
-**Solution:** This method is never called anywhere in the codebase. Either:
-- Remove it entirely (recommended)
-- Implement it if there's a planned use case
+The `internal/discovery/builder.go` file has been removed entirely.
 
 ---
 
-### 5. Release workflow
+### 5. ~~Release workflow~~ ✅ DONE
 
-**Issue:** No automated release process.
-
-**Impact:** No way to publish versioned releases with binaries.
-
-**Solution:** Add goreleaser configuration:
-- Create `.goreleaser.yaml`
-- Add release workflow to `.github/workflows/release.yml`
-- Trigger on version tags (`v*`)
+Added goreleaser configuration and GitHub Actions release workflow:
+- `.goreleaser.yaml` - builds binaries for Linux/macOS/Windows (amd64/arm64)
+- `.github/workflows/release.yml` - triggers on version tags (`v*`)
 
 ---
 
@@ -100,7 +75,7 @@ func (b *GraphBuilder) BuildGraph(digest string) (*graph.Graph, error) {
 |------|-------------|----------|
 | **CONTRIBUTING.md** | Guide for external contributors | Medium |
 | **CHANGELOG.md** | Track changes between versions | Medium |
-| **Pre-built binaries** | GitHub Releases with downloadable binaries | High |
+| ~~**Pre-built binaries**~~ | ✅ Handled by goreleaser | ~~High~~ |
 | **Homebrew formula** | `brew install ghcrctl` | Medium |
 | **Docker image** | Run without local Go installation | Low |
 | **Interactive mode** | Iteration 10 in spec/plan.md | Low |
@@ -110,12 +85,7 @@ func (b *GraphBuilder) BuildGraph(digest string) (*graph.Graph, error) {
 
 ## Code TODOs
 
-These TODOs exist in the codebase:
-
-| File | Line | Note |
-|------|------|------|
-| `internal/discovery/builder.go` | 65 | Stub implementation (remove) |
-| `internal/discovery/builder.go` | 124 | Testing improvement (minor) |
+✅ No TODOs remain in the codebase.
 
 ---
 
@@ -125,10 +95,10 @@ These TODOs exist in the codebase:
 
 - [x] Add `--version` flag with build-time injection
 - [x] Unify repository/module path
-- [ ] Update README with `go install` instructions
-- [ ] Remove unused `BuildGraph` stub
-- [ ] Add goreleaser configuration
-- [ ] Add release workflow
+- [x] Update README with `go install` instructions
+- [x] Remove unused `BuildGraph` stub
+- [x] Add goreleaser configuration
+- [x] Add release workflow
 - [ ] Verify all README examples work
 - [ ] Tag v1.0.0
 

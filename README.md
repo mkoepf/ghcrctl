@@ -22,6 +22,12 @@ ghcrctl provides functionality for:
 
 ## Installation
 
+### Using Go Install
+
+```bash
+go install github.com/mkoepf/ghcrctl@latest
+```
+
 ### From Source
 
 ```bash
@@ -54,54 +60,61 @@ export GITHUB_TOKEN=ghp_your_token_here
 List all container packages for an owner:
 
 ```bash
-ghcrctl packages mkoepf
-ghcrctl packages myorg
+ghcrctl list packages mkoepf
+ghcrctl list packages myorg
 ```
 
 Get output in JSON format:
 
 ```bash
-ghcrctl packages mkoepf --json
+ghcrctl list packages mkoepf --json
 ```
 
-### Show Package Images
+### List Images
 
 Display all images in a package with their related artifacts (platforms, attestations, signatures):
 
 ```bash
-ghcrctl images mkoepf/myimage
+ghcrctl list images mkoepf/myimage
 ```
 
 This command shows images grouped by their OCI artifact relationships in a tree format:
 
 ```
-Images for myimage:
+       VERSION ID       TYPE              DIGEST        SIZE    TAGS
+       ----------       ----------------  ------------  ------  ----
+┌      585861918        index             01af50cc8b0d  1.6 KB  [v1.0.0, latest]
+├ [⬇✓] 585861919        linux/amd64       62f946a8267d  2.5 KB
+├ [⬇✓] 585861920        linux/arm64       89c3b5f1a432  2.5 KB
+├ [⬇✓] 585861921        sbom, provenance  9a1636d22702  839 B
+└ [⬇✓] 585861922        sbom, provenance  9a1636d22703  839 B
 
-┌ sha256:01af50cc8b0d  [v1.0.0, latest]
-├── linux/amd64       sha256:62f946a8267d
-├── linux/arm64       sha256:89c3b5f1a432
-├── sbom              sha256:9a1636d22702
-└── provenance        sha256:9a1636d22702
+┌      585850123        index             abc123def456  1.6 KB  [v0.9.0]
+├ [⬇✓] 585861919  (2*)  linux/amd64       62f946a8267d  2.5 KB
+└ [⬇✓] 585861920  (2*)  linux/arm64       89c3b5f1a432  2.5 KB
 
-┌ sha256:abc123def456  [v0.9.0]
-├── linux/amd64       sha256:62f946a8267d (shared)
-└── linux/arm64       sha256:89c3b5f1a432 (shared)
+Total: 9 versions in 2 graphs. 2 versions appear in multiple graphs.
 ```
+
+The `(N*)` notation indicates versions shared across multiple graphs.
 
 **Options:**
 
 ```bash
 # Show images in flat table format
-ghcrctl images mkoepf/myimage --flat
+ghcrctl list images mkoepf/myimage --flat
 
 # Output in JSON format
-ghcrctl images mkoepf/myimage --json
+ghcrctl list images mkoepf/myimage --json
 
 # Filter to images containing a specific version ID
-ghcrctl images mkoepf/myimage --version 12345678
+ghcrctl list images mkoepf/myimage --version 12345678
+
+# Filter to images containing a specific tag
+ghcrctl list images mkoepf/myimage --tag v1.0.0
 
 # Filter to images containing a specific digest
-ghcrctl images mkoepf/myimage --digest sha256:abc123...
+ghcrctl list images mkoepf/myimage --digest sha256:abc123...
 ```
 
 **Use cases:**
@@ -111,155 +124,88 @@ ghcrctl images mkoepf/myimage --digest sha256:abc123...
 
 ### List Package Versions
 
-List all versions of a package with their complete OCI artifact relationships:
+List all versions of a package as a flat table:
 
 ```bash
-ghcrctl versions mkoepf/myimage
+ghcrctl list versions mkoepf/myimage
 ```
 
-This command shows all package versions in GHCR organized by their OCI relationships:
-
-**What it shows:**
-- **All versions** - Both tagged and untagged versions
-- **Hierarchical structure** - Root artifacts with their children (platforms, attestations)
-- **Version metadata** - ID, type, digest, tags, and creation time
-- **Graph relationships** - How versions relate to each other
+This command displays all GHCR package versions with their metadata:
 
 **Example output:**
 ```
 Versions for myimage:
 
-  VERSION ID       TYPE         DIGEST        TAGS                          CREATED
-  ---------------  -----------  ------------  ----------------------------  -------------------
-┌ 585861918        index        01af50cc8b0d  [v1.0.0, latest]              2025-01-15 10:30:45
-├ 585861919        linux/amd64  62f946a8267d  []                            2025-01-15 10:30:44
-├ 585861920        linux/arm64  89c3b5f1a432  []                            2025-01-15 10:30:44
-├ 585861921        sbom         9a1636d22702  []                            2025-01-15 10:30:46
-└ 585861922        provenance   9a1636d22702  []                            2025-01-15 10:30:46
+  VERSION ID  DIGEST        TAGS                  CREATED
+  ----------  ------------  --------------------  -------------------
+  585861918   01af50cc8b0d  [v1.0.0, latest]      2025-01-15 10:30:45
+  585861919   62f946a8267d  []                    2025-01-15 10:30:44
+  585861920   89c3b5f1a432  []                    2025-01-15 10:30:44
+  585861921   9a1636d22702  []                    2025-01-15 10:30:46
+  585861922   9a1636d22703  []                    2025-01-15 10:30:46
 
-┌ 585850123        index        abc123def456  [v0.9.0]                      2025-01-14 15:20:10
-├ 585861919 (2*)   linux/amd64  62f946a8267d  []                            2025-01-15 10:30:44
-└ 585861920 (2*)   linux/arm64  89c3b5f1a432  []                            2025-01-15 10:30:44
-
-Total: 7 versions in 2 graphs. 2 versions appear in multiple graphs.
+Total: 5 versions.
 ```
 
-**Shared manifests:**
-
-When multiple image indexes reference the same platform manifests (e.g., two tags pointing to the same underlying builds), those shared versions are marked with `(N*)` where N indicates how many graphs reference them. This is common when:
-- Multiple tags point to the same multi-arch image
-- An image is re-tagged without rebuilding
-- Different index manifests share platform manifests
-
-The summary line reports the count of distinct versions and how many appear in multiple graphs.
+To see artifact relationships (platform manifests, attestations), use `ghcrctl list images` instead.
 
 **Filter options:**
 ```bash
-# Show only versions with a specific tag (optimized - only graphs this version)
-ghcrctl versions mkoepf/myimage --tag v1.0.0
+# Filter by specific tag
+ghcrctl list versions mkoepf/myimage --tag v1.0.0
 
 # Show only tagged versions
-ghcrctl versions mkoepf/myimage --tagged
+ghcrctl list versions mkoepf/myimage --tagged
 
 # Show only untagged versions
-ghcrctl versions mkoepf/myimage --untagged
+ghcrctl list versions mkoepf/myimage --untagged
 
 # Show versions matching a tag pattern (regex)
-ghcrctl versions mkoepf/myimage --tag-pattern "^v1\\..*"
+ghcrctl list versions mkoepf/myimage --tag-pattern "^v1\\..*"
 
 # Filter by specific version ID
-ghcrctl versions mkoepf/myimage --version 585861918
+ghcrctl list versions mkoepf/myimage --version 585861918
 
 # Filter by digest (full or short format)
-ghcrctl versions mkoepf/myimage --digest sha256:01af50cc8b0d
-ghcrctl versions mkoepf/myimage --digest 01af50cc8b0d  # short form from DIGEST column
+ghcrctl list versions mkoepf/myimage --digest sha256:01af50cc8b0d
+ghcrctl list versions mkoepf/myimage --digest 01af50cc8b0d
 
 # Show versions older than a specific date
-ghcrctl versions mkoepf/myimage --older-than 2025-01-01
+ghcrctl list versions mkoepf/myimage --older-than 2025-01-01
 
 # Show versions newer than a specific date
-ghcrctl versions mkoepf/myimage --newer-than 2025-11-01
+ghcrctl list versions mkoepf/myimage --newer-than 2025-11-01
 
 # Show versions older than 30 days
-ghcrctl versions mkoepf/myimage --older-than-days 30
+ghcrctl list versions mkoepf/myimage --older-than-days 30
 
 # Combine filters: untagged versions older than 7 days
-ghcrctl versions mkoepf/myimage --untagged --older-than-days 7
+ghcrctl list versions mkoepf/myimage --untagged --older-than-days 7
 ```
 
 **JSON output:**
 ```bash
-ghcrctl versions mkoepf/myimage --json
+ghcrctl list versions mkoepf/myimage --json
 # or
-ghcrctl versions mkoepf/myimage -o json
+ghcrctl list versions mkoepf/myimage -o json
 ```
-
-**Verbose output:**
-
-For detailed information including full digests and sizes, use the `--verbose` or `-v` flag:
-
-```bash
-ghcrctl versions mkoepf/myimage --tag latest --verbose
-# or
-ghcrctl versions mkoepf/myimage --tag latest -v
-```
-
-Example verbose output:
-```
-Versions for myimage:
-
-┌─ 585861918  index
-│  Digest:  sha256:01af50cc8b0d33e7bb9137d6aa60274975475ee048e6610da62670a30466a824543
-│  Tags:    [v1.0.0, latest]
-│  Created: 2025-01-15 10:30:45
-│
-├─ 585861919  platform: linux/amd64
-│  Digest:  sha256:62f946a8267d2795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
-│  Size:    669 bytes
-│  Created: 2025-01-15 10:30:44
-│
-├─ 585861920  platform: linux/arm64
-│  Digest:  sha256:89c3b5f1a4322795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
-│  Size:    672 bytes
-│  Created: 2025-01-15 10:30:44
-│
-└─ 585861921  attestation: sbom, provenance
-   Digest:  sha256:9a1636d227022795505edc2ee029c7d8f2b76cff34912259b55fe0ad94d612c0
-   Size:    12.4 KB
-   Created: 2025-01-15 10:30:46
-```
-
-The verbose view shows:
-- Full SHA256 digests (not truncated)
-- Artifact sizes in human-readable format
-- Clear type labels (`platform:`, `attestation:`)
-- Combined attestation types when same digest (e.g., `sbom, provenance`)
-
-**Performance optimization:**
-When using `--tag` to filter, the command only discovers graph relationships for matching versions, significantly reducing API calls and execution time. Without the filter, all tagged versions are processed. Other filters (--tagged, --tag-pattern, date filters) are applied after listing all versions.
-
-**Understanding version types:**
-- `index` - Multi-arch image manifest list (references platform manifests)
-- `linux/amd64`, `linux/arm64` - Platform-specific manifests
-- `sbom`, `provenance` - Attestation artifacts (from buildx or cosign)
-- `signature` - Cosign signatures
-- `untagged` - Standalone version with no relationships
 
 **Use cases:**
 - Audit all versions of an image
 - Understand which versions are tagged vs untagged
 - Find orphaned versions for cleanup
-- Verify attestations exist for all builds
 - Quick lookup of version IDs for deletion
 
-### View Image Labels
+### Get Image Labels
 
 Display OCI labels (annotations/metadata) from a container image:
 
 ```bash
-ghcrctl labels mkoepf/myimage
-ghcrctl labels mkoepf/myimage:v1.0.0
+ghcrctl get labels mkoepf/myimage --tag v1.0.0
+ghcrctl get labels mkoepf/myimage --digest sha256:abc123...
 ```
+
+Requires a selector: `--tag` or `--digest` to specify which version.
 
 Labels are key-value pairs embedded in the image config at build time using Docker LABEL instructions. Common labels include:
 - `org.opencontainers.image.source` - Source repository URL
@@ -271,20 +217,22 @@ Labels are key-value pairs embedded in the image config at build time using Dock
 
 ```bash
 # Show only a specific label key
-ghcrctl labels mkoepf/myimage --key org.opencontainers.image.source
+ghcrctl get labels mkoepf/myimage --tag v1.0.0 --key org.opencontainers.image.source
 
 # Output as JSON
-ghcrctl labels mkoepf/myimage --json
+ghcrctl get labels mkoepf/myimage --tag latest --json
 ```
 
-### View SBOM (Software Bill of Materials)
+### Get SBOM (Software Bill of Materials)
 
 Display the SBOM attestation for a container image:
 
 ```bash
-ghcrctl sbom mkoepf/myimage
-ghcrctl sbom mkoepf/myimage:v1.0.0
+ghcrctl get sbom mkoepf/myimage --tag v1.0.0
+ghcrctl get sbom mkoepf/myimage --digest sha256:abc123...
 ```
+
+Requires a selector: `--tag` or `--digest` to specify which version.
 
 The command automatically handles multiple SBOMs:
 - **One SBOM found**: Displays it automatically
@@ -294,26 +242,24 @@ The command automatically handles multiple SBOMs:
 **Options:**
 
 ```bash
-# Select a specific SBOM by digest
-ghcrctl sbom mkoepf/myimage --digest abc123def456
+# Select a specific SBOM by its digest
+ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --sbom-digest abc123def456
 
 # Show all SBOMs
-ghcrctl sbom mkoepf/myimage --all
+ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
-ghcrctl sbom mkoepf/myimage --json
+ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --json
 ```
 
 **Example with multiple SBOMs:**
 ```
-Multiple SBOMs found for myimage
+Multiple sbom documents found for myimage
 
 Use --digest <digest> to select one, or --all to show all:
 
   1. sha256:abc123def456...
-     Type: application/vnd.in-toto+json
   2. sha256:789xyz123456...
-     Type: application/spdx+json
 
 Example: ghcrctl sbom myimage --digest abc123def456
 ```
@@ -324,14 +270,16 @@ Example: ghcrctl sbom myimage --digest abc123def456
 - Syft native format
 - Docker buildx attestations (in-toto DSSE envelopes)
 
-### View Provenance Attestation
+### Get Provenance Attestation
 
 Display the provenance attestation for a container image:
 
 ```bash
-ghcrctl provenance mkoepf/myimage
-ghcrctl provenance mkoepf/myimage:v1.0.0
+ghcrctl get provenance mkoepf/myimage --tag v1.0.0
+ghcrctl get provenance mkoepf/myimage --digest sha256:abc123...
 ```
+
+Requires a selector: `--tag` or `--digest` to specify which version.
 
 Provenance attestations contain build information including:
 - Builder details (GitHub Actions, GitLab CI, etc.)
@@ -342,14 +290,14 @@ Provenance attestations contain build information including:
 **Options:**
 
 ```bash
-# Select specific provenance by digest
-ghcrctl provenance mkoepf/myimage --digest abc123def456
+# Select specific provenance by its digest
+ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --provenance-digest abc123def456
 
 # Show all provenance documents
-ghcrctl provenance mkoepf/myimage --all
+ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
-ghcrctl provenance mkoepf/myimage --json
+ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --json
 ```
 
 **Smart behavior:**
@@ -368,54 +316,48 @@ ghcrctl provenance mkoepf/myimage --json
 Add a new tag to an existing image version:
 
 ```bash
-ghcrctl tag mkoepf/myimage:v1.0.0 latest
+ghcrctl tag add mkoepf/myimage latest --tag v1.0.0
+ghcrctl tag add mkoepf/myimage stable --digest sha256:abc123...
 ```
 
-This command creates a new tag reference pointing to the same image digest as the existing tag, using the OCI registry API. It works like `docker tag` but operates directly on GHCR.
+Requires a selector: `--tag` or `--digest` to specify the source version.
+
+This command creates a new tag reference pointing to the same image digest as the source, using the OCI registry API. It works like `docker tag` but operates directly on GHCR.
 
 **Requirements:**
 - GITHUB_TOKEN with `write:packages` scope
 - Must use Personal Access Token (not GitHub App installation token)
 
 **Example use cases:**
-- Promote a version to `latest`: `ghcrctl tag mkoepf/myapp:v2.1.0 latest`
-- Add semantic version alias: `ghcrctl tag mkoepf/myapp:v1.2.3 v1.2`
-- Tag for environment: `ghcrctl tag mkoepf/myapp:sha256:abc123... production`
+- Promote a version to `latest`: `ghcrctl tag add mkoepf/myapp latest --tag v2.1.0`
+- Add semantic version alias: `ghcrctl tag add mkoepf/myapp v1.2 --tag v1.2.3`
+- Tag for environment: `ghcrctl tag add mkoepf/myapp production --tag v2.1.0`
 
 ### Delete Package Versions
 
-Safely delete package versions or complete OCI artifact graphs from GHCR.
+Safely delete package versions or complete OCI images from GHCR.
 
 #### Delete a Single Version
 
-Delete an individual package version by version ID or digest:
+Delete an individual package version by version ID, digest, or tag:
 
 ```bash
 # Delete by version ID
-ghcrctl delete version mkoepf/myimage 12345678
+ghcrctl delete version mkoepf/myimage --version 12345678
 
 # Delete by digest (full or short format)
 ghcrctl delete version mkoepf/myimage --digest sha256:abc123...
-ghcrctl delete version mkoepf/myimage --digest abc123  # short form from DIGEST column
+ghcrctl delete version mkoepf/myimage --digest abc123
+
+# Delete by tag
+ghcrctl delete version mkoepf/myimage --tag v1.0.0
 
 # Skip confirmation prompt
-ghcrctl delete version mkoepf/myimage 12345678 --force
+ghcrctl delete version mkoepf/myimage --version 12345678 --force
 
 # Preview what would be deleted (dry-run)
-ghcrctl delete version mkoepf/myimage 12345678 --dry-run
+ghcrctl delete version mkoepf/myimage --version 12345678 --dry-run
 ```
-
-The command shows how many graphs the version belongs to:
-```
-Preparing to delete package version:
-  Image:      myimage
-  Owner:      myorg (org)
-  Version ID: 12345678
-  Tags:       []
-  Graphs:     2 graphs
-```
-
-If a version belongs to multiple graphs, deleting it will affect all those graphs.
 
 **Use cases:**
 - Remove specific untagged versions (e.g., orphaned attestations)
@@ -457,23 +399,6 @@ ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force
 
 Filters can be combined using AND logic (all must match).
 
-**Example output:**
-```bash
-$ ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
-
-Preparing to delete 5 package version(s):
-  Image: myimage
-  Owner: myorg (org)
-
-  - ID: 12345678, Tags: [], Created: 2024-11-15 10:30:45
-  - ID: 12345679, Tags: [], Created: 2024-11-16 14:22:10
-  - ID: 12345680, Tags: [], Created: 2024-11-17 09:15:33
-  - ID: 12345681, Tags: [], Created: 2024-11-18 16:45:22
-  - ID: 12345682, Tags: [], Created: 2024-11-20 11:30:15
-
-Are you sure you want to delete 5 version(s)? [y/N]:
-```
-
 **Use cases:**
 - Clean up old untagged versions to reduce storage costs
 - Remove release candidates after final release
@@ -481,36 +406,36 @@ Are you sure you want to delete 5 version(s)? [y/N]:
 - Automate cleanup in CI/CD pipelines
 
 **Safety features:**
-- Preview of what will be deleted (shows up to 10 versions, then "...and N more")
 - Confirmation prompt (unless `--force`)
 - Dry-run mode (`--dry-run`) to preview without deleting
-- Reports success/failure counts after deletion
 - Gracefully handles no matching versions
 
 **Requirements:**
 - GITHUB_TOKEN with `write:packages` and `delete:packages` scope
 - Must use Personal Access Token (not GitHub App installation token)
 
-#### Delete an Entire Graph
+#### Delete an Entire Image
 
-Delete a complete OCI artifact graph including the root image, all platform manifests, and attestations (SBOM, provenance):
+Delete a complete OCI image including the root index, all platform manifests, and attestations (SBOM, provenance):
 
 ```bash
 # Delete by tag (most common)
-ghcrctl delete graph mkoepf/myimage:v1.0.0
+ghcrctl delete image mkoepf/myimage --tag v1.0.0
 
 # Delete by digest
-ghcrctl delete graph mkoepf/myimage --digest sha256:abc123...
+ghcrctl delete image mkoepf/myimage --digest sha256:abc123...
 
-# Delete graph containing a specific version
-ghcrctl delete graph mkoepf/myimage --version 12345678
+# Delete image containing a specific version
+ghcrctl delete image mkoepf/myimage --version 12345678
 
 # Skip confirmation
-ghcrctl delete graph mkoepf/myimage:v1.0.0 --force
+ghcrctl delete image mkoepf/myimage --tag v1.0.0 --force
 
 # Preview what would be deleted
-ghcrctl delete graph mkoepf/myimage:v1.0.0 --dry-run
+ghcrctl delete image mkoepf/myimage --tag v1.0.0 --dry-run
 ```
+
+Requires a selector: `--tag`, `--digest`, or `--version`.
 
 **What gets deleted:**
 
@@ -519,53 +444,7 @@ For a multi-arch image with attestations, this command discovers and deletes:
 2. All **exclusive** platform manifests (linux/amd64, linux/arm64, etc.)
 3. The root image index or manifest - deleted last
 
-**Shared manifests are preserved:** If a platform manifest or attestation is referenced by multiple graphs (e.g., two tags share the same builds), those shared artifacts are NOT deleted. They remain available for the other graphs that still reference them. Only when deleting the last graph that references a shared artifact will it be deleted.
-
-Example output:
-```bash
-$ ghcrctl delete graph mkoepf/myimage:v1.0.0
-
-Preparing to delete complete OCI graph:
-  Image: myimage
-  Tag:   v1.0.0
-
-Root (Image): sha256:01af50c...
-  Tags: [v1.0.0]
-  Version ID: 585861918
-
-Platforms to delete (2):
-  - linux/amd64 (version 585861919)
-  - linux/arm64 (version 585861920)
-
-Attestations to delete (2):
-  - sbom (version 585861921)
-  - provenance (version 585861922)
-
-Total: 5 version(s) will be deleted
-
-Are you sure you want to delete this graph? [y/N]:
-```
-
-**Example with shared manifests:**
-```bash
-$ ghcrctl delete graph mkoepf/myimage:v0.9.0 --dry-run
-
-Preparing to delete complete OCI graph:
-  Image: myimage
-
-Root (Image): sha256:abc123d...
-  Version ID: 585850123
-
-Shared artifacts (preserved, used by other graphs):
-  - linux/amd64 (version 585861919, shared by 2 graphs)
-  - linux/arm64 (version 585861920, shared by 2 graphs)
-
-Total: 1 version(s) will be deleted
-
-DRY RUN: No changes made
-```
-
-In this example, only the root index is deleted because the platform manifests are shared with another graph (v1.0.0).
+**Shared manifests are preserved:** If a platform manifest or attestation is referenced by multiple images (e.g., two tags share the same builds), those shared artifacts are NOT deleted. They remain available for the other images that still reference them.
 
 **Use cases:**
 - Remove an entire release (tag)
@@ -577,7 +456,6 @@ In this example, only the root index is deleted because the platform manifests a
 - Deletion order - children (attestations, platforms) deleted before root
 - Confirmation prompt (unless `--force`)
 - Dry-run mode to preview
-- Clear summary of what will be deleted
 
 **Requirements:**
 - GITHUB_TOKEN with `write:packages` and `delete:packages` scope
@@ -616,8 +494,8 @@ ghcrctl completion powershell > ghcrctl.ps1
 After setup, press TAB to complete commands and image names:
 
 ```bash
-ghcrctl ver<TAB>           # completes to: ghcrctl versions
-ghcrctl versions mkoepf/<TAB>  # shows: mkoepf/myimage, mkoepf/otherapp, ...
+ghcrctl list ver<TAB>              # completes to: ghcrctl list versions
+ghcrctl list versions mkoepf/<TAB> # shows: mkoepf/myimage, mkoepf/otherapp, ...
 ```
 
 Dynamic package completion requires `GITHUB_TOKEN` to be exported in your shell.
@@ -626,16 +504,19 @@ Dynamic package completion requires `GITHUB_TOKEN` to be exported in your shell.
 
 ```bash
 ghcrctl --help
-ghcrctl packages --help
-ghcrctl images --help
-ghcrctl versions --help
-ghcrctl labels --help
-ghcrctl sbom --help
-ghcrctl provenance --help
+ghcrctl list --help
+ghcrctl list packages --help
+ghcrctl list images --help
+ghcrctl list versions --help
+ghcrctl get --help
+ghcrctl get labels --help
+ghcrctl get sbom --help
+ghcrctl get provenance --help
 ghcrctl tag --help
+ghcrctl tag add --help
 ghcrctl delete --help
 ghcrctl delete version --help
-ghcrctl delete graph --help
+ghcrctl delete image --help
 ghcrctl completion --help
 ```
 
@@ -665,9 +546,9 @@ This flag logs all HTTP requests to stderr as JSON, including:
 - Auditing: Track which operations make API calls
 - Optimization: Find opportunities to reduce API calls
 
-**Example: Analyzing versions command performance:**
+**Example: Analyzing list images command performance:**
 ```bash
-./ghcrctl versions myimage --verbose --log-api-calls 2>api-calls.log
+./ghcrctl list images mkoepf/myimage --log-api-calls 2>api-calls.log
 # Analyze the log to see which API calls take longest
 jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' api-calls.log
 ```

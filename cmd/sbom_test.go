@@ -1,21 +1,22 @@
 package cmd
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/display"
 )
 
-func TestSBOMCommandStructure(t *testing.T) {
+func TestGetSBOMCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	sbomCmd, _, err := cmd.Find([]string{"sbom"})
+	sbomCmd, _, err := cmd.Find([]string{"get", "sbom"})
 	if err != nil {
-		t.Fatalf("Failed to find sbom command: %v", err)
+		t.Fatalf("Failed to find get sbom command: %v", err)
 	}
 
-	if sbomCmd.Use != "sbom <owner/package[:tag]>" {
-		t.Errorf("Expected Use 'sbom <owner/package[:tag]>', got '%s'", sbomCmd.Use)
+	if sbomCmd.Use != "sbom <owner/package>" {
+		t.Errorf("Expected Use 'sbom <owner/package>', got '%s'", sbomCmd.Use)
 	}
 
 	if sbomCmd.Short == "" {
@@ -27,7 +28,7 @@ func TestSBOMCommandStructure(t *testing.T) {
 	}
 }
 
-func TestSBOMCommandArguments(t *testing.T) {
+func TestGetSBOMCommandArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -36,17 +37,17 @@ func TestSBOMCommandArguments(t *testing.T) {
 	}{
 		{
 			name:      "missing image argument",
-			args:      []string{},
+			args:      []string{"get", "sbom"},
 			wantError: true,
 		},
 		{
 			name:      "valid single argument with owner/package",
-			args:      []string{"mkoepf/test-image"},
-			wantError: false,
+			args:      []string{"get", "sbom", "mkoepf/test-image"},
+			wantError: false, // Will fail for other reasons (no selector flag), but not arg count
 		},
 		{
 			name:      "too many arguments",
-			args:      []string{"image1", "image2"},
+			args:      []string{"get", "sbom", "image1", "image2"},
 			wantError: true,
 		},
 	}
@@ -54,25 +55,34 @@ func TestSBOMCommandArguments(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewRootCmd()
-			sbomCmd, _, _ := cmd.Find([]string{"sbom"})
-			err := sbomCmd.Args(sbomCmd, tt.args)
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+			cmd.SetOut(&out)
+			cmd.SetErr(&errOut)
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 			if tt.wantError && err == nil {
 				t.Error("Expected error but got none")
 			}
+			// For valid args count, it may still fail but not due to arg count
 			if !tt.wantError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				// Check if it's an args error
+				errStr := err.Error()
+				if errStr == "accepts 1 arg(s), received 0" || errStr == "accepts 1 arg(s), received 2" {
+					t.Errorf("Unexpected arg count error: %v", err)
+				}
 			}
 		})
 	}
 }
 
-func TestSBOMCommandHasFlags(t *testing.T) {
+func TestGetSBOMCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	sbomCmd, _, _ := cmd.Find([]string{"sbom"})
+	sbomCmd, _, _ := cmd.Find([]string{"get", "sbom"})
 
-	// Tag is now part of the image reference, not a separate flag
-	flags := []string{"digest", "all", "json"}
+	// Check for required flags
+	flags := []string{"tag", "digest", "sbom-digest", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := sbomCmd.Flags().Lookup(flagName)

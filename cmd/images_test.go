@@ -5,79 +5,89 @@ import (
 	"testing"
 )
 
-func TestImagesCmd_RequiresPackageName(t *testing.T) {
-	cmd := newImagesCmd()
-	cmd.SetArgs([]string{})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
+func TestListImagesCmd_RequiresPackageName(t *testing.T) {
+	rootCmd := NewRootCmd()
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&errOut)
+	rootCmd.SetArgs([]string{"list", "images"})
 
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Error("expected error for missing package name")
 	}
 }
 
-func TestImagesCmd_HasFlags(t *testing.T) {
-	cmd := newImagesCmd()
+func TestListImagesCmd_HasFlags(t *testing.T) {
+	rootCmd := NewRootCmd()
+	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
+	if err != nil {
+		t.Fatalf("Failed to find list images command: %v", err)
+	}
 
 	// Check --json flag exists
-	jsonFlag := cmd.Flags().Lookup("json")
+	jsonFlag := imagesCmd.Flags().Lookup("json")
 	if jsonFlag == nil {
 		t.Error("expected --json flag")
 	}
 
 	// Check --flat flag exists (replaced --tree, default is now tree)
-	flatFlag := cmd.Flags().Lookup("flat")
+	flatFlag := imagesCmd.Flags().Lookup("flat")
 	if flatFlag == nil {
 		t.Error("expected --flat flag")
 	}
 
 	// Check -o flag exists
-	outputFlag := cmd.Flags().Lookup("output")
+	outputFlag := imagesCmd.Flags().Lookup("output")
 	if outputFlag == nil {
 		t.Error("expected -o/--output flag")
 	}
 }
 
-func TestImagesCmd_InvalidOutputFormat(t *testing.T) {
-	cmd := newImagesCmd()
+func TestListImagesCmd_InvalidOutputFormat(t *testing.T) {
+	rootCmd := NewRootCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&errOut)
-	cmd.SetArgs([]string{"owner/test-package", "-o", "invalid"})
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&errOut)
+	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "-o", "invalid"})
 
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Error("expected error for invalid output format")
 	}
 }
 
-func TestImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
-	cmd := newImagesCmd()
+func TestListImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
+	rootCmd := NewRootCmd()
+	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
+	if err != nil {
+		t.Fatalf("Failed to find list images command: %v", err)
+	}
 
 	// Check --version flag exists
-	versionFlag := cmd.Flags().Lookup("version")
+	versionFlag := imagesCmd.Flags().Lookup("version")
 	if versionFlag == nil {
 		t.Error("expected --version flag")
 	}
 
 	// Check --digest flag exists
-	digestFlag := cmd.Flags().Lookup("digest")
+	digestFlag := imagesCmd.Flags().Lookup("digest")
 	if digestFlag == nil {
 		t.Error("expected --digest flag")
 	}
 }
 
-func TestImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
-	cmd := newImagesCmd()
+func TestListImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
+	rootCmd := NewRootCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&errOut)
-	cmd.SetArgs([]string{"owner/test-package", "--version", "123", "--digest", "sha256:abc"})
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&errOut)
+	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "--version", "123", "--digest", "sha256:abc"})
 
-	err := cmd.Execute()
+	err := rootCmd.Execute()
 	if err == nil {
 		t.Error("expected error when both --version and --digest are specified")
 	}

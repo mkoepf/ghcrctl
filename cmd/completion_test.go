@@ -182,13 +182,13 @@ func TestCompleteImageRefStructure(t *testing.T) {
 func TestVersionsCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	versionsCmd, _, err := cmd.Find([]string{"versions"})
+	versionsCmd, _, err := cmd.Find([]string{"list", "versions"})
 	if err != nil {
-		t.Fatalf("Failed to find versions command: %v", err)
+		t.Fatalf("Failed to find list versions command: %v", err)
 	}
 
 	if versionsCmd.ValidArgsFunction == nil {
-		t.Error("Expected versions command to have ValidArgsFunction for dynamic completion")
+		t.Error("Expected list versions command to have ValidArgsFunction for dynamic completion")
 	}
 }
 
@@ -196,13 +196,13 @@ func TestVersionsCommandHasValidArgsFunction(t *testing.T) {
 func TestLabelsCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	labelsCmd, _, err := cmd.Find([]string{"labels"})
+	labelsCmd, _, err := cmd.Find([]string{"get", "labels"})
 	if err != nil {
-		t.Fatalf("Failed to find labels command: %v", err)
+		t.Fatalf("Failed to find get labels command: %v", err)
 	}
 
 	if labelsCmd.ValidArgsFunction == nil {
-		t.Error("Expected labels command to have ValidArgsFunction for dynamic completion")
+		t.Error("Expected get labels command to have ValidArgsFunction for dynamic completion")
 	}
 }
 
@@ -210,13 +210,13 @@ func TestLabelsCommandHasValidArgsFunction(t *testing.T) {
 func TestSBOMCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	sbomCmd, _, err := cmd.Find([]string{"sbom"})
+	sbomCmd, _, err := cmd.Find([]string{"get", "sbom"})
 	if err != nil {
-		t.Fatalf("Failed to find sbom command: %v", err)
+		t.Fatalf("Failed to find get sbom command: %v", err)
 	}
 
 	if sbomCmd.ValidArgsFunction == nil {
-		t.Error("Expected sbom command to have ValidArgsFunction for dynamic completion")
+		t.Error("Expected get sbom command to have ValidArgsFunction for dynamic completion")
 	}
 }
 
@@ -224,12 +224,12 @@ func TestSBOMCommandHasValidArgsFunction(t *testing.T) {
 func TestProvenanceCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	provenanceCmd, _, err := cmd.Find([]string{"provenance"})
+	provenanceCmd, _, err := cmd.Find([]string{"get", "provenance"})
 	if err != nil {
-		t.Fatalf("Failed to find provenance command: %v", err)
+		t.Fatalf("Failed to find get provenance command: %v", err)
 	}
 
 	if provenanceCmd.ValidArgsFunction == nil {
-		t.Error("Expected provenance command to have ValidArgsFunction for dynamic completion")
+		t.Error("Expected get provenance command to have ValidArgsFunction for dynamic completion")
 	}
 }

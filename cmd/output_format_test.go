@@ -7,12 +7,14 @@ import (
 
 // TestOutputFormatFlag ensures all commands that support --json also support -o json
 func TestOutputFormatFlag(t *testing.T) {
+	// Updated command paths for new structure
 	commandsWithJSON := []string{
-		"packages",
-		"labels",
-		"sbom",
-		"provenance",
-		"versions",
+		"list packages",
+		"list versions",
+		"list images",
+		"get labels",
+		"get sbom",
+		"get provenance",
 	}
 
 	for _, cmdName := range commandsWithJSON {
@@ -49,18 +51,18 @@ func TestOutputFormatValues(t *testing.T) {
 		outputValue string
 		shouldError bool
 	}{
-		{"packages", "json", false},
-		{"packages", "table", false},
-		{"packages", "yaml", true}, // not supported
-		{"packages", "csv", true},  // not supported
-		{"labels", "json", false},
-		{"labels", "table", false},
-		{"sbom", "json", false},
-		{"sbom", "table", false},
-		{"provenance", "json", false},
-		{"provenance", "table", false},
-		{"versions", "json", false},
-		{"versions", "table", false},
+		{"list packages", "json", false},
+		{"list packages", "table", false},
+		{"list packages", "yaml", true}, // not supported
+		{"list packages", "csv", true},  // not supported
+		{"get labels", "json", false},
+		{"get labels", "table", false},
+		{"get sbom", "json", false},
+		{"get sbom", "table", false},
+		{"get provenance", "json", false},
+		{"get provenance", "table", false},
+		{"list versions", "json", false},
+		{"list versions", "table", false},
 	}
 
 	for _, tt := range tests {
@@ -84,11 +86,11 @@ func TestOutputFormatValues(t *testing.T) {
 // TestBackwardCompatibility ensures --json still works after adding -o
 func TestBackwardCompatibility(t *testing.T) {
 	commandsWithJSON := []string{
-		"packages",
-		"labels",
-		"sbom",
-		"provenance",
-		"versions",
+		"list packages",
+		"list versions",
+		"get labels",
+		"get sbom",
+		"get provenance",
 	}
 
 	for _, cmdName := range commandsWithJSON {
@@ -110,11 +112,11 @@ func TestBackwardCompatibility(t *testing.T) {
 // TestOutputFlagDescription checks that help text is clear
 func TestOutputFlagDescription(t *testing.T) {
 	commandsWithJSON := []string{
-		"packages",
-		"labels",
-		"sbom",
-		"provenance",
-		"versions",
+		"list packages",
+		"list versions",
+		"get labels",
+		"get sbom",
+		"get provenance",
 	}
 
 	for _, cmdName := range commandsWithJSON {

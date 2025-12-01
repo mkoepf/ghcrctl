@@ -320,6 +320,51 @@ func FetchImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Im
 	return &imageConfig, nil
 }
 
+// CopyTagByDigest creates a new tag pointing to the specified digest
+func CopyTagByDigest(ctx context.Context, image, digest, destTag string) error {
+	// Validate inputs
+	if image == "" {
+		return fmt.Errorf("image cannot be empty")
+	}
+	if digest == "" {
+		return fmt.Errorf("digest cannot be empty")
+	}
+	if destTag == "" {
+		return fmt.Errorf("destination tag cannot be empty")
+	}
+
+	// Parse image reference
+	registry, path, err := ParseImageReference(image)
+	if err != nil {
+		return err
+	}
+
+	// Create repository reference
+	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
+	if err != nil {
+		return fmt.Errorf("failed to create repository reference: %w", err)
+	}
+
+	// Configure authentication
+	if err := configureAuth(ctx, repo); err != nil {
+		return fmt.Errorf("failed to configure authentication: %w", err)
+	}
+
+	// Resolve the digest to get its descriptor
+	sourceDesc, err := repo.Resolve(ctx, digest)
+	if err != nil {
+		return fmt.Errorf("failed to resolve digest '%s': %w", digest, err)
+	}
+
+	// Tag the descriptor with the destination tag
+	err = repo.Tag(ctx, sourceDesc, destTag)
+	if err != nil {
+		return fmt.Errorf("failed to tag with '%s': %w", destTag, err)
+	}
+
+	return nil
+}
+
 // CopyTag copies a tag by fetching the manifest from the source tag and pushing it with the destination tag
 // This effectively creates a new tag pointing to the same digest as the source tag
 func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {

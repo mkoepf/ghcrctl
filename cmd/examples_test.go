@@ -14,13 +14,14 @@ func TestCommandExamples(t *testing.T) {
 		commandName string
 		wantExample bool
 	}{
-		// Commands that should have examples
-		{"packages command", "packages", true},
-		{"sbom command", "sbom", true},
-		{"provenance command", "provenance", true},
-		{"labels command", "labels", true},
-		{"tag command", "tag", true},
-		{"versions command", "versions", true},
+		// Commands that should have examples (updated for new structure)
+		{"list packages command", "list packages", true},
+		{"list versions command", "list versions", true},
+		{"list images command", "list images", true},
+		{"get labels command", "get labels", true},
+		{"get sbom command", "get sbom", true},
+		{"get provenance command", "get provenance", true},
+		{"tag add command", "tag add", true},
 		{"delete version command", "delete version", true},
 		{"delete image command", "delete image", true},
 	}
@@ -46,12 +47,13 @@ func TestExampleFormat(t *testing.T) {
 		name        string
 		commandName string
 	}{
-		{"packages command", "packages"},
-		{"sbom command", "sbom"},
-		{"provenance command", "provenance"},
-		{"labels command", "labels"},
-		{"tag command", "tag"},
-		{"versions command", "versions"},
+		{"list packages command", "list packages"},
+		{"list versions command", "list versions"},
+		{"list images command", "list images"},
+		{"get labels command", "get labels"},
+		{"get sbom command", "get sbom"},
+		{"get provenance command", "get provenance"},
+		{"tag add command", "tag add"},
 		{"delete version command", "delete version"},
 		{"delete image command", "delete image"},
 	}

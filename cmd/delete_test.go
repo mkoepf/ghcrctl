@@ -26,7 +26,7 @@ func TestDeleteCommandStructure(t *testing.T) {
 	// Check for subcommands
 	subcommands := deleteCmd.Commands()
 	if len(subcommands) < 2 {
-		t.Errorf("Expected at least 2 subcommands (version, graph), got %d", len(subcommands))
+		t.Errorf("Expected at least 2 subcommands (version, image), got %d", len(subcommands))
 	}
 }
 
@@ -39,8 +39,8 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete version command: %v", err)
 	}
 
-	if deleteVersionCmd.Use != "version <owner/package> [version-id]" {
-		t.Errorf("Expected Use 'version <owner/package> [version-id]', got '%s'", deleteVersionCmd.Use)
+	if deleteVersionCmd.Use != "version <owner/package>" {
+		t.Errorf("Expected Use 'version <owner/package>', got '%s'", deleteVersionCmd.Use)
 	}
 
 	if deleteVersionCmd.Short == "" {
@@ -128,8 +128,8 @@ func TestDeleteImageCommandStructure(t *testing.T) {
 		t.Fatalf("Failed to find delete image command: %v", err)
 	}
 
-	if deleteImageCmd.Use != "image <owner/package[:tag]>" {
-		t.Errorf("Expected Use 'image <owner/package[:tag]>', got '%s'", deleteImageCmd.Use)
+	if deleteImageCmd.Use != "image <owner/package>" {
+		t.Errorf("Expected Use 'image <owner/package>', got '%s'", deleteImageCmd.Use)
 	}
 
 	if deleteImageCmd.Short == "" {
@@ -288,7 +288,7 @@ func TestBuildDeleteFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter, err := buildDeleteFilterWithFlags(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
+			filter, err := BuildDeleteFilterWithFlags(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
 				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays)
 
 			if tt.wantErr {
@@ -510,7 +510,7 @@ func TestDisplayImageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			displayImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
+			DisplayImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
 			output := buf.String()
 
 			for _, want := range tt.wantContains {
@@ -621,7 +621,7 @@ func TestDeleteGraphWithDeleter(t *testing.T) {
 			var buf strings.Builder
 			ctx := context.Background()
 
-			err := deleteGraphWithDeleter(ctx, mock, "owner", "user", "image", tt.versionIDs, &buf)
+			err := DeleteGraphWithDeleter(ctx, mock, "owner", "user", "image", tt.versionIDs, &buf)
 
 			// Check error
 			if (err != nil) != tt.wantErr {
@@ -662,7 +662,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
-		params          deleteVersionParams
+		params          DeleteVersionParams
 		confirmResponse bool
 		confirmErr      error
 		deleteErr       error
@@ -673,15 +673,15 @@ func TestExecuteSingleDelete(t *testing.T) {
 	}{
 		{
 			name: "successful deletion with force",
-			params: deleteVersionParams{
-				owner:      "testowner",
-				ownerType:  "user",
-				imageName:  "testimage",
-				versionID:  12345,
-				tags:       []string{"v1.0", "latest"},
-				imageCount: 0,
-				force:      true,
-				dryRun:     false,
+			params: DeleteVersionParams{
+				Owner:      "testowner",
+				OwnerType:  "user",
+				ImageName:  "testimage",
+				VersionID:  12345,
+				Tags:       []string{"v1.0", "latest"},
+				ImageCount: 0,
+				Force:      true,
+				DryRun:     false,
 			},
 			wantDeleted: true,
 			wantErr:     false,
@@ -696,14 +696,14 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "dry run does not delete",
-			params: deleteVersionParams{
-				owner:     "testowner",
-				ownerType: "org",
-				imageName: "testimage",
-				versionID: 67890,
-				tags:      []string{},
-				force:     false,
-				dryRun:    true,
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "org",
+				ImageName: "testimage",
+				VersionID: 67890,
+				Tags:      []string{},
+				Force:     false,
+				DryRun:    true,
 			},
 			wantDeleted: false,
 			wantErr:     false,
@@ -717,14 +717,14 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "confirmed deletion",
-			params: deleteVersionParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versionID: 11111,
-				tags:      []string{"test"},
-				force:     false,
-				dryRun:    false,
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				VersionID: 11111,
+				Tags:      []string{"test"},
+				Force:     false,
+				DryRun:    false,
 			},
 			confirmResponse: true,
 			wantDeleted:     true,
@@ -733,14 +733,14 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "cancelled by user",
-			params: deleteVersionParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versionID: 22222,
-				tags:      []string{},
-				force:     false,
-				dryRun:    false,
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				VersionID: 22222,
+				Tags:      []string{},
+				Force:     false,
+				DryRun:    false,
 			},
 			confirmResponse: false,
 			wantDeleted:     false,
@@ -750,14 +750,14 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "confirmation error",
-			params: deleteVersionParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versionID: 33333,
-				tags:      []string{},
-				force:     false,
-				dryRun:    false,
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				VersionID: 33333,
+				Tags:      []string{},
+				Force:     false,
+				DryRun:    false,
 			},
 			confirmErr:  fmt.Errorf("stdin closed"),
 			wantDeleted: false,
@@ -765,14 +765,14 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "delete API error",
-			params: deleteVersionParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versionID: 44444,
-				tags:      []string{},
-				force:     true,
-				dryRun:    false,
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				VersionID: 44444,
+				Tags:      []string{},
+				Force:     true,
+				DryRun:    false,
 			},
 			deleteErr:   fmt.Errorf("permission denied"),
 			wantDeleted: false,
@@ -780,15 +780,15 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "shows ref count when present",
-			params: deleteVersionParams{
-				owner:      "testowner",
-				ownerType:  "user",
-				imageName:  "testimage",
-				versionID:  55555,
-				tags:       []string{},
-				imageCount: 2,
-				force:      true,
-				dryRun:     false,
+			params: DeleteVersionParams{
+				Owner:      "testowner",
+				OwnerType:  "user",
+				ImageName:  "testimage",
+				VersionID:  55555,
+				Tags:       []string{},
+				ImageCount: 2,
+				Force:      true,
+				DryRun:     false,
 			},
 			wantDeleted: true,
 			wantErr:     false,
@@ -796,15 +796,15 @@ func TestExecuteSingleDelete(t *testing.T) {
 		},
 		{
 			name: "shows singular version when count is 1",
-			params: deleteVersionParams{
-				owner:      "testowner",
-				ownerType:  "user",
-				imageName:  "testimage",
-				versionID:  66666,
-				tags:       []string{},
-				imageCount: 1,
-				force:      true,
-				dryRun:     false,
+			params: DeleteVersionParams{
+				Owner:      "testowner",
+				OwnerType:  "user",
+				ImageName:  "testimage",
+				VersionID:  66666,
+				Tags:       []string{},
+				ImageCount: 1,
+				Force:      true,
+				DryRun:     false,
 			},
 			wantDeleted: true,
 			wantErr:     false,
@@ -816,7 +816,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := newMockPackageDeleter()
 			if tt.deleteErr != nil {
-				mock.deleteErrors[tt.params.versionID] = tt.deleteErr
+				mock.deleteErrors[tt.params.VersionID] = tt.deleteErr
 			}
 
 			var buf strings.Builder
@@ -826,7 +826,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 				return tt.confirmResponse, tt.confirmErr
 			}
 
-			err := executeSingleDelete(ctx, mock, tt.params, &buf, confirmFn)
+			err := ExecuteSingleDelete(ctx, mock, tt.params, &buf, confirmFn)
 
 			// Check error
 			if (err != nil) != tt.wantErr {
@@ -863,7 +863,7 @@ func TestExecuteBulkDelete(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
-		params          bulkDeleteParams
+		params          BulkDeleteParams
 		confirmResponse bool
 		confirmErr      error
 		deleteErrors    map[int64]error
@@ -874,17 +874,17 @@ func TestExecuteBulkDelete(t *testing.T) {
 	}{
 		{
 			name: "successful bulk deletion with force",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 100, Tags: []string{"v1.0"}, CreatedAt: "2025-01-01"},
 					{ID: 101, Tags: []string{}, CreatedAt: "2025-01-02"},
 					{ID: 102, Tags: []string{"v2.0"}, CreatedAt: "2025-01-03"},
 				},
-				force:  true,
-				dryRun: false,
+				Force:  true,
+				DryRun: false,
 			},
 			wantDeleted: []int64{100, 101, 102},
 			wantErr:     false,
@@ -903,15 +903,15 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "dry run does not delete",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "org",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "org",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 200, Tags: []string{"test"}, CreatedAt: "2025-01-01"},
 				},
-				force:  false,
-				dryRun: true,
+				Force:  false,
+				DryRun: true,
 			},
 			wantDeleted: []int64{},
 			wantErr:     false,
@@ -923,15 +923,15 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "cancelled by user",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 300, Tags: []string{}, CreatedAt: "2025-01-01"},
 				},
-				force:  false,
-				dryRun: false,
+				Force:  false,
+				DryRun: false,
 			},
 			confirmResponse: false,
 			wantDeleted:     []int64{},
@@ -940,16 +940,16 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "confirmed bulk deletion",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 400, Tags: []string{}, CreatedAt: "2025-01-01"},
 					{ID: 401, Tags: []string{}, CreatedAt: "2025-01-02"},
 				},
-				force:  false,
-				dryRun: false,
+				Force:  false,
+				DryRun: false,
 			},
 			confirmResponse: true,
 			wantDeleted:     []int64{400, 401},
@@ -958,17 +958,17 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "partial failure continues",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 500, Tags: []string{}, CreatedAt: "2025-01-01"},
 					{ID: 501, Tags: []string{}, CreatedAt: "2025-01-02"},
 					{ID: 502, Tags: []string{}, CreatedAt: "2025-01-03"},
 				},
-				force:  true,
-				dryRun: false,
+				Force:  true,
+				DryRun: false,
 			},
 			deleteErrors: map[int64]error{501: fmt.Errorf("permission denied")},
 			wantDeleted:  []int64{500, 502}, // 501 fails but others succeed
@@ -981,16 +981,16 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "all failures",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 600, Tags: []string{}, CreatedAt: "2025-01-01"},
 					{ID: 601, Tags: []string{}, CreatedAt: "2025-01-02"},
 				},
-				force:  true,
-				dryRun: false,
+				Force:  true,
+				DryRun: false,
 			},
 			deleteErrors: map[int64]error{
 				600: fmt.Errorf("error 1"),
@@ -1005,11 +1005,11 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "truncates display at 10 versions",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 1, CreatedAt: "2025-01-01"},
 					{ID: 2, CreatedAt: "2025-01-01"},
 					{ID: 3, CreatedAt: "2025-01-01"},
@@ -1023,8 +1023,8 @@ func TestExecuteBulkDelete(t *testing.T) {
 					{ID: 11, CreatedAt: "2025-01-01"},
 					{ID: 12, CreatedAt: "2025-01-01"},
 				},
-				force:  true,
-				dryRun: false,
+				Force:  true,
+				DryRun: false,
 			},
 			wantDeleted: []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
 			wantErr:     false,
@@ -1035,15 +1035,15 @@ func TestExecuteBulkDelete(t *testing.T) {
 		},
 		{
 			name: "confirmation error",
-			params: bulkDeleteParams{
-				owner:     "testowner",
-				ownerType: "user",
-				imageName: "testimage",
-				versions: []gh.PackageVersionInfo{
+			params: BulkDeleteParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				Versions: []gh.PackageVersionInfo{
 					{ID: 700, Tags: []string{}, CreatedAt: "2025-01-01"},
 				},
-				force:  false,
-				dryRun: false,
+				Force:  false,
+				DryRun: false,
 			},
 			confirmErr:  fmt.Errorf("input error"),
 			wantDeleted: []int64{},
@@ -1065,7 +1065,7 @@ func TestExecuteBulkDelete(t *testing.T) {
 				return tt.confirmResponse, tt.confirmErr
 			}
 
-			err := executeBulkDelete(ctx, mock, tt.params, &buf, confirmFn)
+			err := ExecuteBulkDelete(ctx, mock, tt.params, &buf, confirmFn)
 
 			// Check error
 			if (err != nil) != tt.wantErr {

@@ -5,32 +5,32 @@ import (
 	"testing"
 )
 
-func TestTagCommandStructure(t *testing.T) {
+func TestTagAddCommandStructure(t *testing.T) {
 	t.Parallel()
-	// Verify tag command exists and is properly structured
+	// Verify tag add command exists and is properly structured
 	cmd := NewRootCmd()
-	tagCmd, _, err := cmd.Find([]string{"tag"})
+	tagAddCmd, _, err := cmd.Find([]string{"tag", "add"})
 	if err != nil {
-		t.Fatalf("Failed to find tag command: %v", err)
+		t.Fatalf("Failed to find tag add command: %v", err)
 	}
-	if tagCmd == nil {
-		t.Fatal("tagCmd should not be nil")
-	}
-
-	if tagCmd.Use != "tag <owner/package:existing-tag> <new-tag>" {
-		t.Errorf("Expected Use to be 'tag <owner/package:existing-tag> <new-tag>', got '%s'", tagCmd.Use)
+	if tagAddCmd == nil {
+		t.Fatal("tagAddCmd should not be nil")
 	}
 
-	if tagCmd.RunE == nil {
-		t.Error("tagCmd should have RunE function")
+	if tagAddCmd.Use != "add <owner/package> <new-tag>" {
+		t.Errorf("Expected Use to be 'add <owner/package> <new-tag>', got '%s'", tagAddCmd.Use)
 	}
 
-	if tagCmd.Short == "" {
-		t.Error("tagCmd should have a Short description")
+	if tagAddCmd.RunE == nil {
+		t.Error("tagAddCmd should have RunE function")
+	}
+
+	if tagAddCmd.Short == "" {
+		t.Error("tagAddCmd should have a Short description")
 	}
 }
 
-func TestTagCommandArguments(t *testing.T) {
+func TestTagAddCommandArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -40,19 +40,19 @@ func TestTagCommandArguments(t *testing.T) {
 	}{
 		{
 			name:      "missing all arguments",
-			args:      []string{"tag"},
+			args:      []string{"tag", "add"},
 			wantError: true,
 			errorMsg:  "accepts 2 arg",
 		},
 		{
 			name:      "missing new-tag argument",
-			args:      []string{"tag", "mkoepf/myimage:v1.0"},
+			args:      []string{"tag", "add", "mkoepf/myimage"},
 			wantError: true,
 			errorMsg:  "accepts 2 arg",
 		},
 		{
 			name:      "too many arguments",
-			args:      []string{"tag", "mkoepf/myimage:v1.0", "v2.0", "extra"},
+			args:      []string{"tag", "add", "mkoepf/myimage", "v2.0", "extra"},
 			wantError: true,
 			errorMsg:  "accepts 2 arg",
 		},
@@ -76,5 +76,23 @@ func TestTagCommandArguments(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTagAddCommandHasFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	tagAddCmd, _, err := cmd.Find([]string{"tag", "add"})
+	if err != nil {
+		t.Fatalf("Failed to find tag add command: %v", err)
+	}
+
+	// Check for selector flags
+	flags := []string{"tag", "digest"}
+	for _, flagName := range flags {
+		flag := tagAddCmd.Flags().Lookup(flagName)
+		if flag == nil {
+			t.Errorf("Expected --%s flag to exist", flagName)
+		}
 	}
 }

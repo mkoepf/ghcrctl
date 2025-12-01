@@ -50,7 +50,7 @@ func TestCountIncomingRefsRootVersion(t *testing.T) {
 	t.Logf("Root version ID: %d, digest: %s", rootVersionID, rootDigest)
 
 	// Count incoming refs (versions that reference this version)
-	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, rootVersionID)
+	count := CountIncomingRefs(ctx, client, owner, ownerType, imageName, rootVersionID)
 
 	t.Logf("Root version incoming ref count: %d", count)
 
@@ -84,7 +84,7 @@ func TestCountIncomingRefsNonexistentVersion(t *testing.T) {
 	nonexistentVersionID := int64(999999999)
 
 	// Count membership
-	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
+	count := CountIncomingRefs(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
 
 	t.Logf("Nonexistent version membership count: %d", count)
 
@@ -140,15 +140,15 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 	}
 
 	// Build params for dry-run
-	params := deleteVersionParams{
-		owner:      owner,
-		ownerType:  ownerType,
-		imageName:  imageName,
-		versionID:  versionID,
-		tags:       tags,
-		imageCount: 1, // It's a root, so count is 1
-		force:      true,
-		dryRun:     true, // DRY RUN
+	params := DeleteVersionParams{
+		Owner:      owner,
+		OwnerType:  ownerType,
+		ImageName:  imageName,
+		VersionID:  versionID,
+		Tags:       tags,
+		ImageCount: 1, // It's a root, so count is 1
+		Force:      true,
+		DryRun:     true, // DRY RUN
 	}
 
 	var buf strings.Builder
@@ -157,7 +157,7 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 		return false, nil
 	}
 
-	err = executeSingleDelete(ctx, mock, params, &buf, confirmFn)
+	err = ExecuteSingleDelete(ctx, mock, params, &buf, confirmFn)
 	if err != nil {
 		t.Fatalf("executeSingleDelete failed: %v", err)
 	}
@@ -235,13 +235,13 @@ func TestExecuteBulkDeleteDryRunIntegration(t *testing.T) {
 	}
 
 	// Build params for dry-run
-	params := bulkDeleteParams{
-		owner:     owner,
-		ownerType: ownerType,
-		imageName: imageName,
-		versions:  testVersions,
-		force:     true,
-		dryRun:    true, // DRY RUN
+	params := BulkDeleteParams{
+		Owner:     owner,
+		OwnerType: ownerType,
+		ImageName: imageName,
+		Versions:  testVersions,
+		Force:     true,
+		DryRun:    true, // DRY RUN
 	}
 
 	var buf strings.Builder
@@ -250,7 +250,7 @@ func TestExecuteBulkDeleteDryRunIntegration(t *testing.T) {
 		return false, nil
 	}
 
-	err = executeBulkDelete(ctx, mock, params, &buf, confirmFn)
+	err = ExecuteBulkDelete(ctx, mock, params, &buf, confirmFn)
 	if err != nil {
 		t.Fatalf("executeBulkDelete failed: %v", err)
 	}

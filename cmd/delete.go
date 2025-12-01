@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +26,7 @@ func newDeleteCmd() *cobra.Command {
 Use subcommands to delete individual versions or complete OCI images.
 
 Available Commands:
-  version     Delete a single package version
+  version     Delete a single package version or bulk delete with filters
   image       Delete an entire OCI image (index + platforms + attestations)`,
 	}
 
@@ -43,7 +42,9 @@ func newDeleteVersionCmd() *cobra.Command {
 	var (
 		force         bool
 		dryRun        bool
+		versionID     int64
 		digest        string
+		tag           string
 		tagPattern    string
 		onlyTagged    bool
 		onlyUntagged  bool
@@ -54,22 +55,27 @@ func newDeleteVersionCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "version <owner/package> [version-id]",
+		Use:   "version <owner/package>",
 		Short: "Delete package version(s)",
 		Long: `Delete package version(s) from GitHub Container Registry.
 
-This command can delete a single version by ID/digest, or multiple versions using filters.
+This command can delete a single version by ID/digest/tag, or multiple versions using filters.
 By default, it will prompt for confirmation before deleting.
 
 IMPORTANT: Deletion is permanent and cannot be undone (except within 30 days
 via the GitHub web UI if the package namespace is available).
 
+Requires a selector: --version, --digest, --tag, or filter flags for bulk deletion.
+
 Examples:
   # Delete by version ID
-  ghcrctl delete version mkoepf/myimage 12345678
+  ghcrctl delete version mkoepf/myimage --version 12345678
 
   # Delete by digest
   ghcrctl delete version mkoepf/myimage --digest sha256:abc123...
+
+  # Delete by tag
+  ghcrctl delete version mkoepf/myimage --tag v1.0.0
 
   # Delete all untagged versions (bulk deletion)
   ghcrctl delete version mkoepf/myimage --untagged
@@ -85,37 +91,24 @@ Examples:
 
   # Skip confirmation for bulk deletion
   ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			// Check if any filter flags are set (indicates bulk deletion)
-			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
-				olderThan != "" || newerThan != "" ||
-				olderThanDays > 0 || newerThanDays > 0
-
-			// If --digest is provided, we need exactly 1 arg (owner/image)
-			if digest != "" {
-				if len(args) != 1 {
-					return fmt.Errorf("accepts 1 arg(s) when using --digest, received %d", len(args))
-				}
-				return nil
-			}
-
-			// If filter flags are set (bulk deletion), we need exactly 1 arg (owner/package)
-			if filterFlagsSet {
-				if len(args) != 1 {
-					return fmt.Errorf("accepts 1 arg (owner/package) when using filters, received %d", len(args))
-				}
-				return nil
-			}
-
-			// Otherwise, we need exactly 2 args (owner/image and version-id)
-			return cobra.ExactArgs(2)(cmd, args)
-		},
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse owner/image reference
-			owner, imageName, _, err := parseImageRef(args[0])
+			// Parse owner/package reference (reject inline tags)
+			owner, packageName, err := parsePackageRef(args[0])
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
+			}
+
+			// Check if any selector is provided
+			hasSingleSelector := versionID != 0 || digest != "" || tag != ""
+			hasFilterSelector := onlyTagged || onlyUntagged || tagPattern != "" ||
+				olderThan != "" || newerThan != "" ||
+				olderThanDays > 0 || newerThanDays > 0
+
+			if !hasSingleSelector && !hasFilterSelector {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("selector required: use --version, --digest, --tag, or filter flags (--untagged, --older-than-days, etc.)")
 			}
 
 			// Get GitHub token
@@ -141,28 +134,24 @@ Examples:
 				return fmt.Errorf("failed to determine owner type: %w", err)
 			}
 
-			// Check if this is bulk deletion mode
-			filterFlagsSet := onlyTagged || onlyUntagged || tagPattern != "" ||
-				olderThan != "" || newerThan != "" ||
-				olderThanDays > 0 || newerThanDays > 0
-
-			if filterFlagsSet {
+			// Route to appropriate handler
+			if hasFilterSelector && !hasSingleSelector {
 				// Bulk deletion mode
-				return runBulkDeleteWithFlags(ctx, cmd, client, owner, ownerType, imageName,
+				return runBulkDeleteVersion(ctx, cmd, client, owner, ownerType, packageName,
 					tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan,
 					olderThanDays, newerThanDays, force, dryRun)
 			}
 
 			// Single deletion mode
-			return runSingleDeleteWithFlags(ctx, cmd, args, client, owner, ownerType, imageName,
-				digest, force, dryRun)
+			return runSingleDeleteVersion(ctx, cmd, client, owner, ownerType, packageName,
+				versionID, digest, tag, force, dryRun)
 		},
 	}
 
-	// Flags for delete version
-	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
+	// Single version selectors
+	cmd.Flags().Int64Var(&versionID, "version", 0, "Delete version by ID")
 	cmd.Flags().StringVar(&digest, "digest", "", "Delete version by digest")
+	cmd.Flags().StringVar(&tag, "tag", "", "Delete version by tag")
 
 	// Filter flags for bulk deletion
 	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "Delete versions matching regex pattern")
@@ -173,6 +162,14 @@ Examples:
 	cmd.Flags().IntVar(&olderThanDays, "older-than-days", 0, "Delete versions older than N days")
 	cmd.Flags().IntVar(&newerThanDays, "newer-than-days", 0, "Delete versions newer than N days")
 
+	// Common flags
+	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
+
+	// Mark single selectors as mutually exclusive
+	cmd.MarkFlagsMutuallyExclusive("version", "digest", "tag")
+	cmd.MarkFlagsMutuallyExclusive("tagged", "untagged")
+
 	return cmd
 }
 
@@ -181,29 +178,27 @@ func newDeleteImageCmd() *cobra.Command {
 	var (
 		force     bool
 		dryRun    bool
+		tag       string
 		digest    string
 		versionID int64
 	)
 
 	cmd := &cobra.Command{
-		Use:   "image <owner/package[:tag]>",
+		Use:   "image <owner/package>",
 		Short: "Delete an entire OCI image",
 		Long: `Delete an entire OCI image from GitHub Container Registry.
 
 This command discovers and deletes all versions that make up an OCI image,
 including the root index, platform manifests, and attestations (SBOM, provenance).
 
-The image can be identified by:
-  - Tag (in the image reference) - most common
-  - Digest (--digest flag)
-  - Version ID (--version flag) - finds the image containing this version
+Requires a selector: --tag, --digest, or --version.
 
 IMPORTANT: Deletion is permanent and cannot be undone (except within 30 days
 via the GitHub web UI if the package namespace is available).
 
 Examples:
   # Delete image by tag (most common)
-  ghcrctl delete image mkoepf/myimage:v1.0.0
+  ghcrctl delete image mkoepf/myimage --tag v1.0.0
 
   # Delete image by digest
   ghcrctl delete image mkoepf/myimage --digest sha256:abc123...
@@ -212,31 +207,23 @@ Examples:
   ghcrctl delete image mkoepf/myimage --version 12345678
 
   # Skip confirmation
-  ghcrctl delete image mkoepf/myimage:v1.0.0 --force
+  ghcrctl delete image mkoepf/myimage --tag v1.0.0 --force
 
   # Preview what would be deleted
-  ghcrctl delete image mkoepf/myimage:v1.0.0 --dry-run`,
+  ghcrctl delete image mkoepf/myimage --tag v1.0.0 --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse owner/image[:tag] reference
-			owner, imageName, tag, err := parseImageRef(args[0])
+			// Parse owner/package reference (reject inline tags)
+			owner, packageName, err := parsePackageRef(args[0])
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			// Validate: need either tag in reference, or --digest, or --version
-			hasDigestFlag := cmd.Flags().Changed("digest")
-			hasVersionFlag := cmd.Flags().Changed("version")
-
-			if hasDigestFlag && hasVersionFlag {
+			// Require at least one selector
+			if tag == "" && digest == "" && versionID == 0 {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("flags --digest and --version are mutually exclusive")
-			}
-
-			if tag == "" && !hasDigestFlag && !hasVersionFlag {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("tag required: use format owner/image:tag, or use --digest or --version flag")
+				return fmt.Errorf("selector required: use --tag, --digest, or --version")
 			}
 
 			// Get GitHub token
@@ -262,12 +249,19 @@ Examples:
 				return fmt.Errorf("failed to determine owner type: %w", err)
 			}
 
-			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 
-			// Determine the root digest based on which flag/argument was used
+			// Determine the root digest based on which selector was used
 			var rootDigest string
 
-			if digest != "" {
+			if tag != "" {
+				// Resolve tag to digest
+				rootDigest, err = discover.ResolveTag(ctx, fullImage, tag)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
+				}
+			} else if digest != "" {
 				// Lookup by digest - support both full and short (prefix) format
 				digestInput := digest
 				if !strings.HasPrefix(digestInput, "sha256:") {
@@ -276,7 +270,7 @@ Examples:
 
 				// If it looks like a short digest, resolve to full digest
 				if len(digestInput) < 71 { // sha256: (7) + 64 hex chars = 71
-					allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+					allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, packageName)
 					if err != nil {
 						cmd.SilenceUsage = true
 						return fmt.Errorf("failed to list package versions: %w", err)
@@ -300,7 +294,7 @@ Examples:
 				}
 			} else if versionID != 0 {
 				// Lookup by version ID - need to find the digest first
-				allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+				allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, packageName)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to list package versions: %w", err)
@@ -319,17 +313,10 @@ Examples:
 					cmd.SilenceUsage = true
 					return fmt.Errorf("version ID %d not found", versionID)
 				}
-			} else {
-				// Lookup by tag (from image reference)
-				rootDigest, err = discover.ResolveTag(ctx, fullImage, tag)
-				if err != nil {
-					cmd.SilenceUsage = true
-					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
-				}
 			}
 
 			// Use discover package to get all versions and their relationships
-			allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, imageName)
+			allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, packageName)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to list package versions: %w", err)
@@ -362,12 +349,12 @@ Examples:
 
 			// Display what will be deleted
 			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI image:\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "  Image: %s\n", imageName)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Package: %s\n", packageName)
 			if tag != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:   %s\n", tag)
+				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:     %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			displayImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
+			displayDeleteImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -391,104 +378,135 @@ Examples:
 			}
 
 			// Perform deletions (children first, then root)
-			err = deleteGraphVersions(ctx, ghClient, owner, ownerType, imageName, versionIDs, cmd.OutOrStdout())
+			err = deleteVersionsInOrder(ctx, ghClient, owner, ownerType, packageName, versionIDs, cmd.OutOrStdout())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n",
-				display.ColorSuccess(fmt.Sprintf("Successfully deleted %d version(s) of %s", len(versionIDs), imageName)))
+				display.ColorSuccess(fmt.Sprintf("Successfully deleted %d version(s) of %s", len(versionIDs), packageName)))
 			return nil
 		},
 	}
 
-	// Flags for delete image
+	// Selector flags
+	cmd.Flags().StringVar(&tag, "tag", "", "Delete image by tag")
+	cmd.Flags().StringVar(&digest, "digest", "", "Delete image by digest")
+	cmd.Flags().Int64Var(&versionID, "version", 0, "Delete image containing this version ID")
+
+	// Common flags
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
-	cmd.Flags().StringVar(&digest, "digest", "", "Find image by digest")
-	cmd.Flags().Int64Var(&versionID, "version", 0, "Find image containing this version ID")
+
+	cmd.MarkFlagsMutuallyExclusive("tag", "digest", "version")
 
 	return cmd
 }
 
-// runSingleDeleteWithFlags handles deletion of a single version with explicit flag values
-func runSingleDeleteWithFlags(ctx context.Context, cmd *cobra.Command, args []string, client *gh.Client, owner, ownerType, imageName string,
-	digestFlag string, force, dryRun bool) error {
-	var versionID int64
+// runSingleDeleteVersion handles deletion of a single version
+func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, packageName string,
+	versionID int64, digest, tag string, force, dryRun bool) error {
+
+	var targetVersionID int64
 	var err error
 
-	// Determine version ID from either positional arg or --digest flag
-	if digestFlag != "" {
+	if versionID != 0 {
+		targetVersionID = versionID
+	} else if digest != "" {
 		// Normalize digest format
-		digest := digestFlag
 		if !strings.HasPrefix(digest, "sha256:") {
 			digest = "sha256:" + digest
 		}
-
 		// Look up version ID by digest
-		versionID, err = client.GetVersionIDByDigest(ctx, owner, ownerType, imageName, digest)
+		targetVersionID, err = client.GetVersionIDByDigest(ctx, owner, ownerType, packageName, digest)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to find version by digest: %w", err)
 		}
-	} else {
-		// Parse version ID from positional argument
-		versionIDStr := args[1]
-		versionID, err = strconv.ParseInt(versionIDStr, 10, 64)
+	} else if tag != "" {
+		// Resolve tag to digest first, then get version ID
+		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+		resolvedDigest, err := discover.ResolveTag(ctx, fullImage, tag)
 		if err != nil {
 			cmd.SilenceUsage = true
-			return fmt.Errorf("invalid version-id: must be a number, got %q", versionIDStr)
+			return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
+		}
+		targetVersionID, err = client.GetVersionIDByDigest(ctx, owner, ownerType, packageName, resolvedDigest)
+		if err != nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("failed to find version for tag '%s': %w", tag, err)
 		}
 	}
 
 	// Get version tags to show what we're deleting
-	tags, err := client.GetVersionTags(ctx, owner, ownerType, imageName, versionID)
+	tags, err := client.GetVersionTags(ctx, owner, ownerType, packageName, targetVersionID)
 	if err != nil {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("failed to get version details: %w", err)
 	}
 
 	// Count how many other versions reference this one
-	imageCount := countIncomingRefs(ctx, client, owner, ownerType, imageName, versionID)
+	imageCount := countIncomingRefsForVersion(ctx, client, owner, ownerType, packageName, targetVersionID)
 
-	// Build params and delegate to testable function
-	params := deleteVersionParams{
-		owner:      owner,
-		ownerType:  ownerType,
-		imageName:  imageName,
-		versionID:  versionID,
-		tags:       tags,
-		imageCount: imageCount,
-		force:      force,
-		dryRun:     dryRun,
+	// Show what will be deleted
+	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  Package:    %s\n", packageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", targetVersionID)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", formatTagsForDisplay(tags))
+	if imageCount > 0 {
+		versionWord := "version"
+		if imageCount > 1 {
+			versionWord = "versions"
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", imageCount, versionWord)))
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Handle dry-run
+	if dryRun {
+		fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
+		return nil
 	}
 
-	confirmFn := func() (bool, error) {
-		return prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this version?"))
+	// Confirm deletion unless --force is used
+	if !force {
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this version?"))
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+
+		if !confirmed {
+			fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+			return nil
+		}
 	}
 
-	err = executeSingleDelete(ctx, client, params, cmd.OutOrStdout(), confirmFn)
+	// Perform deletion
+	err = client.DeletePackageVersion(ctx, owner, ownerType, packageName, targetVersionID)
 	if err != nil {
-		cmd.SilenceUsage = true
-		return err
+		return fmt.Errorf("failed to delete package version: %w", err)
 	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", targetVersionID, packageName)))
 	return nil
 }
 
-// runBulkDeleteWithFlags handles deletion of multiple versions using filters with explicit flag values
-func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, imageName string,
+// runBulkDeleteVersion handles deletion of multiple versions using filters
+func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, packageName string,
 	tagPattern string, onlyTagged, onlyUntagged bool, olderThan, newerThan string,
 	olderThanDays, newerThanDays int, force, dryRun bool) error {
+
 	// Build filter from flags
-	versionFilter, err := buildDeleteFilterWithFlags(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
+	versionFilter, err := buildDeleteVersionFilter(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
 	if err != nil {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("invalid filter options: %w", err)
 	}
 
 	// List all package versions
-	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, packageName)
 	if err != nil {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("failed to list package versions: %w", err)
@@ -504,7 +522,7 @@ func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.
 	}
 
 	// Build all images to identify shared children that should be protected
-	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 	discoverer := discover.NewPackageDiscoverer()
 	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
 
@@ -562,133 +580,41 @@ func runBulkDeleteWithFlags(ctx context.Context, cmd *cobra.Command, client *gh.
 		return nil
 	}
 
-	// Build params and delegate to testable function
-	params := bulkDeleteParams{
-		owner:     owner,
-		ownerType: ownerType,
-		imageName: imageName,
-		versions:  matchingVersions,
-		force:     force,
-		dryRun:    dryRun,
-	}
-
-	confirmFn := func(count int) (bool, error) {
-		return prompts.Confirm(os.Stdin, cmd.OutOrStdout(),
-			display.ColorWarning(fmt.Sprintf("Are you sure you want to delete %d version(s)?", count)))
-	}
-
-	return executeBulkDelete(ctx, client, params, cmd.OutOrStdout(), confirmFn)
-}
-
-// Helper functions for delete version bulk operations
-
-// deleteVersionParams holds the parameters for single version deletion.
-// This struct allows for dependency injection and testing.
-type deleteVersionParams struct {
-	owner      string
-	ownerType  string
-	imageName  string
-	versionID  int64
-	tags       []string
-	imageCount int
-	force      bool
-	dryRun     bool
-}
-
-// executeSingleDelete performs the actual deletion after all parameters are resolved.
-// This function is extracted for testability.
-func executeSingleDelete(ctx context.Context, deleter gh.PackageDeleter, params deleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
-	// Show what will be deleted
-	fmt.Fprintf(w, "Preparing to delete package version:\n")
-	fmt.Fprintf(w, "  Image:      %s\n", params.imageName)
-	fmt.Fprintf(w, "  Owner:      %s (%s)\n", params.owner, params.ownerType)
-	fmt.Fprintf(w, "  Version ID: %d\n", params.versionID)
-	fmt.Fprintf(w, "  Tags:       %s\n", FormatTagsForDisplay(params.tags))
-	if params.imageCount > 0 {
-		versionWord := "version"
-		if params.imageCount > 1 {
-			versionWord = "versions"
-		}
-		fmt.Fprintf(w, "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", params.imageCount, versionWord)))
-	}
-	fmt.Fprintln(w)
-
-	// Handle dry-run
-	if params.dryRun {
-		fmt.Fprintln(w, display.ColorDryRun("DRY RUN: No changes made"))
-		return nil
-	}
-
-	// Confirm deletion unless --force is used
-	if !params.force {
-		confirmed, err := confirmFn()
-		if err != nil {
-			return fmt.Errorf("failed to read confirmation: %w", err)
-		}
-
-		if !confirmed {
-			fmt.Fprintln(w, "Deletion cancelled")
-			return nil
-		}
-	}
-
-	// Perform deletion
-	err := deleter.DeletePackageVersion(ctx, params.owner, params.ownerType, params.imageName, params.versionID)
-	if err != nil {
-		return fmt.Errorf("failed to delete package version: %w", err)
-	}
-
-	fmt.Fprintln(w, display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", params.versionID, params.imageName)))
-	return nil
-}
-
-// bulkDeleteParams holds the parameters for bulk deletion.
-type bulkDeleteParams struct {
-	owner     string
-	ownerType string
-	imageName string
-	versions  []gh.PackageVersionInfo
-	force     bool
-	dryRun    bool
-}
-
-// executeBulkDelete performs bulk deletion of versions.
-// This function is extracted for testability.
-func executeBulkDelete(ctx context.Context, deleter gh.PackageDeleter, params bulkDeleteParams, w io.Writer, confirmFn func(count int) (bool, error)) error {
 	// Display summary of what will be deleted
-	fmt.Fprintf(w, "Preparing to delete %s package version(s):\n",
-		display.ColorWarning(fmt.Sprintf("%d", len(params.versions))))
-	fmt.Fprintf(w, "  Image: %s\n", params.imageName)
-	fmt.Fprintf(w, "  Owner: %s (%s)\n\n", params.owner, params.ownerType)
+	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete %s package version(s):\n",
+		display.ColorWarning(fmt.Sprintf("%d", len(matchingVersions))))
+	fmt.Fprintf(cmd.OutOrStdout(), "  Package: %s\n", packageName)
+	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:   %s (%s)\n\n", owner, ownerType)
 
 	// Show details of matching versions (limit to first 10 for readability)
 	displayLimit := 10
-	for i, ver := range params.versions {
+	for i, ver := range matchingVersions {
 		if i >= displayLimit {
-			fmt.Fprintf(w, "  ... and %d more\n", len(params.versions)-displayLimit)
+			fmt.Fprintf(cmd.OutOrStdout(), "  ... and %d more\n", len(matchingVersions)-displayLimit)
 			break
 		}
 
-		tagsStr := FormatTagsForDisplay(ver.Tags)
-		fmt.Fprintf(w, "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
+		tagsStr := formatTagsForDisplay(ver.Tags)
+		fmt.Fprintf(cmd.OutOrStdout(), "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
 	}
-	fmt.Fprintln(w)
+	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Handle dry-run
-	if params.dryRun {
-		fmt.Fprintln(w, display.ColorDryRun("DRY RUN: No changes made"))
+	if dryRun {
+		fmt.Fprintln(cmd.OutOrStdout(), display.ColorDryRun("DRY RUN: No changes made"))
 		return nil
 	}
 
 	// Confirm deletion unless --force is used
-	if !params.force {
-		confirmed, err := confirmFn(len(params.versions))
+	if !force {
+		confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(),
+			display.ColorWarning(fmt.Sprintf("Are you sure you want to delete %d version(s)?", len(matchingVersions))))
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
 		}
 
 		if !confirmed {
-			fmt.Fprintln(w, "Deletion cancelled")
+			fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
 			return nil
 		}
 	}
@@ -696,11 +622,11 @@ func executeBulkDelete(ctx context.Context, deleter gh.PackageDeleter, params bu
 	// Perform bulk deletion
 	successCount := 0
 	failCount := 0
-	for i, ver := range params.versions {
-		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(params.versions), ver.ID)
-		err := deleter.DeletePackageVersion(ctx, params.owner, params.ownerType, params.imageName, ver.ID)
+	for i, ver := range matchingVersions {
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleting version %d/%d (ID: %d)...\n", i+1, len(matchingVersions), ver.ID)
+		err := client.DeletePackageVersion(ctx, owner, ownerType, packageName, ver.ID)
 		if err != nil {
-			fmt.Fprintf(w, "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
 			failCount++
 		} else {
 			successCount++
@@ -708,13 +634,13 @@ func executeBulkDelete(ctx context.Context, deleter gh.PackageDeleter, params bu
 	}
 
 	// Summary
-	fmt.Fprintln(w)
+	fmt.Fprintln(cmd.OutOrStdout())
 	if failCount > 0 {
-		fmt.Fprintf(w, "Deletion complete: %s succeeded, %s failed\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %s succeeded, %s failed\n",
 			display.ColorSuccess(fmt.Sprintf("%d", successCount)),
 			display.ColorError(fmt.Sprintf("%d", failCount)))
 	} else {
-		fmt.Fprintf(w, "Deletion complete: %s succeeded\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %s succeeded\n",
 			display.ColorSuccess(fmt.Sprintf("%d", successCount)))
 	}
 
@@ -725,48 +651,9 @@ func executeBulkDelete(ctx context.Context, deleter gh.PackageDeleter, params bu
 	return nil
 }
 
-// FormatTagsForDisplay formats a tag slice for display
-// Returns "[]" for empty/nil slices, or comma-separated tags otherwise
-func FormatTagsForDisplay(tags []string) string {
-	if len(tags) == 0 {
-		return "[]"
-	}
-	return strings.Join(tags, ", ")
-}
-
-// parseDeleteDate attempts to parse a date string in multiple user-friendly formats
-func parseDeleteDate(dateStr string) (time.Time, error) {
-	if dateStr == "" {
-		return time.Time{}, nil
-	}
-
-	// Try multiple formats in order of likelihood
-	formats := []string{
-		"2006-01-02",          // Date only (most convenient)
-		time.RFC3339,          // Full datetime with timezone
-		"2006-01-02T15:04:05", // Datetime without timezone
-		time.RFC3339Nano,      // With fractional seconds
-	}
-
-	var lastErr error
-	for _, format := range formats {
-		t, err := time.Parse(format, dateStr)
-		if err == nil {
-			return t, nil
-		}
-		lastErr = err
-	}
-
-	return time.Time{}, lastErr
-}
-
-// buildDeleteFilterWithFlags constructs a VersionFilter from explicit flag values
-func buildDeleteFilterWithFlags(tagPattern string, onlyTagged, onlyUntagged bool,
+// buildDeleteVersionFilter creates a VersionFilter from command-line flags
+func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
-	// Check for conflicting flags
-	if onlyTagged && onlyUntagged {
-		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
-	}
 
 	vf := &filter.VersionFilter{
 		OnlyTagged:    onlyTagged,
@@ -797,12 +684,33 @@ func buildDeleteFilterWithFlags(tagPattern string, onlyTagged, onlyUntagged bool
 	return vf, nil
 }
 
-func deleteGraphVersions(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionIDs []int64, w io.Writer) error {
-	return deleteGraphWithDeleter(ctx, client, owner, ownerType, imageName, versionIDs, w)
+// parseDeleteDate attempts to parse a date string in multiple user-friendly formats
+func parseDeleteDate(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, nil
+	}
+
+	formats := []string{
+		"2006-01-02",          // Date only (most convenient)
+		time.RFC3339,          // Full datetime with timezone
+		"2006-01-02T15:04:05", // Datetime without timezone
+		time.RFC3339Nano,      // With fractional seconds
+	}
+
+	var lastErr error
+	for _, format := range formats {
+		t, err := time.Parse(format, dateStr)
+		if err == nil {
+			return t, nil
+		}
+		lastErr = err
+	}
+
+	return time.Time{}, lastErr
 }
 
-// displayImageVersions displays versions to delete and shared versions.
-func displayImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
+// displayDeleteImageVersions displays versions to delete and shared versions.
+func displayDeleteImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
 	// Build set of digests in this image for counting external refs
 	imageDigests := make(map[string]bool)
 	for _, v := range imageVersions {
@@ -813,7 +721,7 @@ func displayImageVersions(w io.Writer, toDelete, shared, imageVersions []discove
 	if len(toDelete) > 0 {
 		fmt.Fprintf(w, "Versions to delete (%d):\n", len(toDelete))
 		for _, v := range toDelete {
-			fmt.Fprintf(w, "  - %s (version %d)%s\n", formatType(v.Types), v.ID, formatTags(v.Tags))
+			fmt.Fprintf(w, "  - %s (version %d)%s\n", formatVersionType(v.Types), v.ID, formatVersionTags(v.Tags))
 		}
 	}
 
@@ -829,33 +737,91 @@ func displayImageVersions(w io.Writer, toDelete, shared, imageVersions []discove
 				}
 			}
 			fmt.Fprintf(w, "  - %s (version %d, referenced by %d versions outside this delete)%s\n",
-				formatType(v.Types), v.ID, externalRefs, formatTags(v.Tags))
+				formatVersionType(v.Types), v.ID, externalRefs, formatVersionTags(v.Tags))
 		}
 	}
 }
 
-// formatType returns the first type or "unknown" if none.
-func formatType(types []string) string {
+// formatVersionType returns the first type or "unknown" if none.
+func formatVersionType(types []string) string {
 	if len(types) > 0 {
 		return types[0]
 	}
 	return "unknown"
 }
 
-// formatTags returns formatted tags or empty string if none.
-func formatTags(tags []string) string {
+// formatVersionTags returns formatted tags or empty string if none.
+func formatVersionTags(tags []string) string {
 	if len(tags) > 0 {
 		return fmt.Sprintf(" [%s]", strings.Join(tags, ", "))
 	}
 	return ""
 }
 
-// deleteGraphWithDeleter is the internal implementation that accepts a PackageDeleter interface.
-// This allows for dependency injection and testing with mocks.
-func deleteGraphWithDeleter(ctx context.Context, deleter gh.PackageDeleter, owner, ownerType, imageName string, versionIDs []int64, w io.Writer) error {
+// formatTagsForDisplay formats a tag slice for display
+func formatTagsForDisplay(tags []string) string {
+	if len(tags) == 0 {
+		return "[]"
+	}
+	return strings.Join(tags, ", ")
+}
+
+// FormatTagsForDisplay is the exported version for testing
+func FormatTagsForDisplay(tags []string) string {
+	return formatTagsForDisplay(tags)
+}
+
+// =============================================================================
+// Exported types and functions for testing
+// =============================================================================
+
+// PackageDeleter interface for mocking in tests
+type PackageDeleter interface {
+	DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error
+}
+
+// DeleteVersionParams contains parameters for single version deletion
+type DeleteVersionParams struct {
+	Owner      string
+	OwnerType  string
+	ImageName  string
+	VersionID  int64
+	Tags       []string
+	ImageCount int
+	Force      bool
+	DryRun     bool
+}
+
+// BulkDeleteParams contains parameters for bulk version deletion
+type BulkDeleteParams struct {
+	Owner     string
+	OwnerType string
+	ImageName string
+	Versions  []gh.PackageVersionInfo
+	Force     bool
+	DryRun    bool
+}
+
+// BuildDeleteFilterWithFlags is exported for testing - wraps buildDeleteVersionFilter
+func BuildDeleteFilterWithFlags(tagPattern string, onlyTagged, onlyUntagged bool,
+	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
+	// Check for conflicting flags - this validation was in older code
+	if onlyTagged && onlyUntagged {
+		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
+	}
+	return buildDeleteVersionFilter(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
+}
+
+// DisplayImageVersions is exported for testing - wraps displayDeleteImageVersions
+func DisplayImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
+	displayDeleteImageVersions(w, toDelete, shared, imageVersions)
+}
+
+// DeleteGraphWithDeleter deletes versions using a deleter interface (for testing)
+func DeleteGraphWithDeleter(ctx context.Context, deleter PackageDeleter, owner, ownerType, packageName string, versionIDs []int64, w io.Writer) error {
 	for i, versionID := range versionIDs {
 		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(versionIDs), versionID)
-		err := deleter.DeletePackageVersion(ctx, owner, ownerType, imageName, versionID)
+		err := deleter.DeletePackageVersion(ctx, owner, ownerType, packageName, versionID)
 		if err != nil {
 			return fmt.Errorf("failed to delete version %d: %w", versionID, err)
 		}
@@ -863,16 +829,147 @@ func deleteGraphWithDeleter(ctx context.Context, deleter gh.PackageDeleter, owne
 	return nil
 }
 
-// countIncomingRefs returns how many other versions reference the given version ID.
-// Returns 0 if unable to determine or if the version has no incoming refs.
-func countIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType, imageName string, versionID int64) int {
+// ExecuteSingleDelete executes a single version deletion with confirmation (for testing)
+func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params DeleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
+	// Show what will be deleted
+	fmt.Fprintf(w, "Preparing to delete package version:\n")
+	fmt.Fprintf(w, "  Image:      %s\n", params.ImageName)
+	fmt.Fprintf(w, "  Owner:      %s (%s)\n", params.Owner, params.OwnerType)
+	fmt.Fprintf(w, "  Version ID: %d\n", params.VersionID)
+	fmt.Fprintf(w, "  Tags:       %s\n", formatTagsForDisplay(params.Tags))
+	if params.ImageCount > 0 {
+		versionWord := "version"
+		if params.ImageCount > 1 {
+			versionWord = "versions"
+		}
+		fmt.Fprintf(w, "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", params.ImageCount, versionWord)))
+	}
+	fmt.Fprintln(w)
+
+	// Handle dry-run
+	if params.DryRun {
+		fmt.Fprintln(w, display.ColorDryRun("DRY RUN: No changes made"))
+		return nil
+	}
+
+	// Confirm deletion unless --force is used
+	if !params.Force {
+		confirmed, err := confirmFn()
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		if !confirmed {
+			fmt.Fprintln(w, "Deletion cancelled")
+			return nil
+		}
+	}
+
+	// Perform deletion
+	err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.ImageName, params.VersionID)
+	if err != nil {
+		return fmt.Errorf("failed to delete package version: %w", err)
+	}
+
+	fmt.Fprintln(w, display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", params.VersionID, params.ImageName)))
+	return nil
+}
+
+// ExecuteBulkDelete executes bulk version deletion with confirmation (for testing)
+func ExecuteBulkDelete(ctx context.Context, deleter PackageDeleter, params BulkDeleteParams, w io.Writer, confirmFn func(count int) (bool, error)) error {
+	// Display summary of what will be deleted
+	fmt.Fprintf(w, "Preparing to delete %s package version(s):\n",
+		display.ColorWarning(fmt.Sprintf("%d", len(params.Versions))))
+	fmt.Fprintf(w, "  Image: %s\n", params.ImageName)
+	fmt.Fprintf(w, "  Owner: %s (%s)\n\n", params.Owner, params.OwnerType)
+
+	// Show details of matching versions (limit to first 10 for readability)
+	displayLimit := 10
+	for i, ver := range params.Versions {
+		if i >= displayLimit {
+			fmt.Fprintf(w, "  ... and %d more\n", len(params.Versions)-displayLimit)
+			break
+		}
+		tagsStr := formatTagsForDisplay(ver.Tags)
+		fmt.Fprintf(w, "  - ID: %d, Tags: %s, Created: %s\n", ver.ID, tagsStr, ver.CreatedAt)
+	}
+	fmt.Fprintln(w)
+
+	// Handle dry-run
+	if params.DryRun {
+		fmt.Fprintln(w, display.ColorDryRun("DRY RUN: No changes made"))
+		return nil
+	}
+
+	// Confirm deletion unless --force is used
+	if !params.Force {
+		confirmed, err := confirmFn(len(params.Versions))
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		if !confirmed {
+			fmt.Fprintln(w, "Deletion cancelled")
+			return nil
+		}
+	}
+
+	// Perform bulk deletion
+	successCount := 0
+	failCount := 0
+	for i, ver := range params.Versions {
+		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(params.Versions), ver.ID)
+		err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.ImageName, ver.ID)
+		if err != nil {
+			fmt.Fprintf(w, "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
+			failCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// Summary
+	fmt.Fprintln(w)
+	if failCount > 0 {
+		fmt.Fprintf(w, "Deletion complete: %s succeeded, %s failed\n",
+			display.ColorSuccess(fmt.Sprintf("%d", successCount)),
+			display.ColorError(fmt.Sprintf("%d", failCount)))
+	} else {
+		fmt.Fprintf(w, "Deletion complete: %s succeeded\n",
+			display.ColorSuccess(fmt.Sprintf("%d", successCount)))
+	}
+
+	if failCount > 0 {
+		return fmt.Errorf("failed to delete %d version(s)", failCount)
+	}
+
+	return nil
+}
+
+// deleteVersionsInOrder deletes versions in the correct order
+func deleteVersionsInOrder(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionIDs []int64, w io.Writer) error {
+	for i, versionID := range versionIDs {
+		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(versionIDs), versionID)
+		err := client.DeletePackageVersion(ctx, owner, ownerType, packageName, versionID)
+		if err != nil {
+			return fmt.Errorf("failed to delete version %d: %w", versionID, err)
+		}
+	}
+	return nil
+}
+
+// CountIncomingRefs is exported for testing - returns how many other versions reference the given version ID.
+func CountIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionID int64) int {
+	return countIncomingRefsForVersion(ctx, client, owner, ownerType, packageName, versionID)
+}
+
+// countIncomingRefsForVersion returns how many other versions reference the given version ID.
+func countIncomingRefsForVersion(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionID int64) int {
 	// Get all versions for this package
-	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, imageName)
+	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, packageName)
 	if err != nil {
 		return 0
 	}
 
-	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, imageName)
+	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 
 	// Use discover package to get version relationships
 	discoverer := discover.NewPackageDiscoverer()

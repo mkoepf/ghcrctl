@@ -9,13 +9,13 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/display"
 )
 
-func TestPackagesCommandStructure(t *testing.T) {
+func TestListPackagesCommandStructure(t *testing.T) {
 	t.Parallel()
-	// Verify packages command exists and is properly structured
+	// Verify list packages command exists and is properly structured
 	cmd := NewRootCmd()
-	packagesCmd, _, err := cmd.Find([]string{"packages"})
+	packagesCmd, _, err := cmd.Find([]string{"list", "packages"})
 	if err != nil {
-		t.Fatalf("Failed to find packages command: %v", err)
+		t.Fatalf("Failed to find list packages command: %v", err)
 	}
 	if packagesCmd == nil {
 		t.Fatal("packagesCmd should not be nil")
@@ -30,9 +30,9 @@ func TestPackagesCommandStructure(t *testing.T) {
 	}
 }
 
-func TestPackagesCommandArguments(t *testing.T) {
+func TestListPackagesCommandArguments(t *testing.T) {
 	t.Parallel()
-	// Test that packages command requires exactly one argument (owner)
+	// Test that list packages command requires exactly one argument (owner)
 
 	tests := []struct {
 		name        string
@@ -42,19 +42,19 @@ func TestPackagesCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "no arguments",
-			args:        []string{"packages"},
+			args:        []string{"list", "packages"},
 			wantError:   true,
 			errContains: "accepts 1 arg",
 		},
 		{
 			name:        "with owner argument",
-			args:        []string{"packages", "mkoepf"},
+			args:        []string{"list", "packages", "mkoepf"},
 			wantError:   false, // Will fail for other reasons (no token), but not arg validation
 			errContains: "",
 		},
 		{
 			name:        "with too many arguments",
-			args:        []string{"packages", "mkoepf", "extra"},
+			args:        []string{"list", "packages", "mkoepf", "extra"},
 			wantError:   true,
 			errContains: "accepts 1 arg",
 		},
@@ -82,14 +82,14 @@ func TestPackagesCommandArguments(t *testing.T) {
 	}
 }
 
-func TestPackagesCommandHasJSONFlag(t *testing.T) {
+func TestListPackagesCommandHasJSONFlag(t *testing.T) {
 	t.Parallel()
-	// Verify that the packages command has a --json flag
+	// Verify that the list packages command has a --json flag
 	cmd := NewRootCmd()
-	packagesCmd, _, _ := cmd.Find([]string{"packages"})
+	packagesCmd, _, _ := cmd.Find([]string{"list", "packages"})
 	jsonFlag := packagesCmd.Flags().Lookup("json")
 	if jsonFlag == nil {
-		t.Error("packages command should have --json flag")
+		t.Error("list packages command should have --json flag")
 	}
 }
 
@@ -188,7 +188,7 @@ func TestPackagesOutputTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output in buffer
 			buf := &bytes.Buffer{}
-			err := outputPackagesTable(buf, tt.packages, tt.owner)
+			err := OutputPackagesTable(buf, tt.packages, tt.owner)
 
 			if tt.wantErr {
 				if err == nil {

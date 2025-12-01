@@ -38,20 +38,26 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestRootCommandHasPackagesSubcommand(t *testing.T) {
+func TestRootCommandHasListSubcommand(t *testing.T) {
 	t.Parallel()
-	// Verify packages subcommand is registered
+	// Verify list subcommand is registered (contains packages, versions, images)
 	cmd := NewRootCmd()
-	found := false
-	for _, c := range cmd.Commands() {
+	listCmd, _, err := cmd.Find([]string{"list"})
+	if err != nil {
+		t.Fatalf("Failed to find list subcommand: %v", err)
+	}
+
+	// Verify list has packages subcommand
+	packagesFound := false
+	for _, c := range listCmd.Commands() {
 		if strings.HasPrefix(c.Use, "packages") {
-			found = true
+			packagesFound = true
 			break
 		}
 	}
 
-	if !found {
-		t.Error("Expected packages subcommand to be registered with root command")
+	if !packagesFound {
+		t.Error("Expected packages subcommand under list command")
 	}
 }
 

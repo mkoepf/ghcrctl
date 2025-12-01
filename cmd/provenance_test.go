@@ -1,19 +1,20 @@
 package cmd
 
 import (
+	"bytes"
 	"testing"
 )
 
-func TestProvenanceCommandStructure(t *testing.T) {
+func TestGetProvenanceCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	provenanceCmd, _, err := cmd.Find([]string{"provenance"})
+	provenanceCmd, _, err := cmd.Find([]string{"get", "provenance"})
 	if err != nil {
-		t.Fatalf("Failed to find provenance command: %v", err)
+		t.Fatalf("Failed to find get provenance command: %v", err)
 	}
 
-	if provenanceCmd.Use != "provenance <owner/package[:tag]>" {
-		t.Errorf("Expected Use 'provenance <owner/package[:tag]>', got '%s'", provenanceCmd.Use)
+	if provenanceCmd.Use != "provenance <owner/package>" {
+		t.Errorf("Expected Use 'provenance <owner/package>', got '%s'", provenanceCmd.Use)
 	}
 
 	if provenanceCmd.Short == "" {
@@ -25,7 +26,7 @@ func TestProvenanceCommandStructure(t *testing.T) {
 	}
 }
 
-func TestProvenanceCommandArguments(t *testing.T) {
+func TestGetProvenanceCommandArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -34,17 +35,17 @@ func TestProvenanceCommandArguments(t *testing.T) {
 	}{
 		{
 			name:      "missing image argument",
-			args:      []string{},
+			args:      []string{"get", "provenance"},
 			wantError: true,
 		},
 		{
 			name:      "valid single argument with owner/package",
-			args:      []string{"mkoepf/test-image"},
-			wantError: false,
+			args:      []string{"get", "provenance", "mkoepf/test-image"},
+			wantError: false, // Will fail for other reasons (no selector flag), but not arg count
 		},
 		{
 			name:      "too many arguments",
-			args:      []string{"image1", "image2"},
+			args:      []string{"get", "provenance", "image1", "image2"},
 			wantError: true,
 		},
 	}
@@ -52,25 +53,34 @@ func TestProvenanceCommandArguments(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewRootCmd()
-			provenanceCmd, _, _ := cmd.Find([]string{"provenance"})
-			err := provenanceCmd.Args(provenanceCmd, tt.args)
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+			cmd.SetOut(&out)
+			cmd.SetErr(&errOut)
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
 			if tt.wantError && err == nil {
 				t.Error("Expected error but got none")
 			}
+			// For valid args count, it may still fail but not due to arg count
 			if !tt.wantError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				// Check if it's an args error
+				errStr := err.Error()
+				if errStr == "accepts 1 arg(s), received 0" || errStr == "accepts 1 arg(s), received 2" {
+					t.Errorf("Unexpected arg count error: %v", err)
+				}
 			}
 		})
 	}
 }
 
-func TestProvenanceCommandHasFlags(t *testing.T) {
+func TestGetProvenanceCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	provenanceCmd, _, _ := cmd.Find([]string{"provenance"})
+	provenanceCmd, _, _ := cmd.Find([]string{"get", "provenance"})
 
-	// Tag is now part of the image reference, not a separate flag
-	flags := []string{"digest", "all", "json"}
+	// Check for required flags
+	flags := []string{"tag", "digest", "provenance-digest", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := provenanceCmd.Flags().Lookup(flagName)

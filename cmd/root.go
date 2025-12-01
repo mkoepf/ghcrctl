@@ -45,15 +45,11 @@ It provides functionality for:
 	root.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
 
 	// Add subcommands via their factories
-	root.AddCommand(newPackagesCmd())
-	root.AddCommand(newVersionsCmd())
+	root.AddCommand(newListCmd())
+	root.AddCommand(newGetCmd())
 	root.AddCommand(newDeleteCmd())
-	root.AddCommand(newLabelsCmd())
-	root.AddCommand(newSBOMCmd())
-	root.AddCommand(newProvenanceCmd())
 	root.AddCommand(newTagCmd())
 	root.AddCommand(newCompletionCmd())
-	root.AddCommand(newImagesCmd())
 
 	return root
 }

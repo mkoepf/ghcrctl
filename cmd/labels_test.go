@@ -9,13 +9,13 @@ import (
 func TestLabelsCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	labelsCmd, _, err := cmd.Find([]string{"labels"})
+	labelsCmd, _, err := cmd.Find([]string{"get", "labels"})
 	if err != nil {
-		t.Fatalf("Failed to find labels command: %v", err)
+		t.Fatalf("Failed to find get labels command: %v", err)
 	}
 
-	if labelsCmd.Use != "labels <owner/package[:tag]>" {
-		t.Errorf("Expected Use 'labels <owner/package[:tag]>', got '%s'", labelsCmd.Use)
+	if labelsCmd.Use != "labels <owner/package>" {
+		t.Errorf("Expected Use 'labels <owner/package>', got '%s'", labelsCmd.Use)
 	}
 
 	if labelsCmd.Short == "" {
@@ -33,12 +33,12 @@ func TestLabelsCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "missing image argument",
-			args:        []string{"labels"},
+			args:        []string{"get", "labels"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"labels", "myimage", "extra"},
+			args:        []string{"get", "labels", "myimage", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -70,22 +70,17 @@ func TestLabelsCommandArguments(t *testing.T) {
 func TestLabelsCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	labelsCmd, _, err := cmd.Find([]string{"labels"})
+	labelsCmd, _, err := cmd.Find([]string{"get", "labels"})
 	if err != nil {
-		t.Fatalf("Failed to find labels command: %v", err)
+		t.Fatalf("Failed to find get labels command: %v", err)
 	}
 
-	// Tag is now part of the image reference, not a separate flag
-
-	// Check for --key flag
-	keyFlag := labelsCmd.Flags().Lookup("key")
-	if keyFlag == nil {
-		t.Error("Expected --key flag to exist")
-	}
-
-	// Check for --json flag
-	jsonFlag := labelsCmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Error("Expected --json flag to exist")
+	// Check for selector flags
+	flags := []string{"tag", "digest", "key", "json"}
+	for _, flagName := range flags {
+		flag := labelsCmd.Flags().Lookup(flagName)
+		if flag == nil {
+			t.Errorf("Expected --%s flag to exist", flagName)
+		}
 	}
 }

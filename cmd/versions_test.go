@@ -68,7 +68,7 @@ func TestBuildVersionFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter, err := buildVersionFilter(
+			filter, err := BuildVersionFilter(
 				tt.tag, tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
 				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays,
 				tt.versionID, tt.digest,
@@ -106,13 +106,13 @@ func findSubstring(s, substr string) bool {
 	return false
 }
 
-// TestVersionsCommandStructure verifies the versions command is properly set up
-func TestVersionsCommandStructure(t *testing.T) {
+// TestListVersionsCommandStructure verifies the list versions command is properly set up
+func TestListVersionsCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	versionsCmd, _, err := cmd.Find([]string{"versions"})
+	versionsCmd, _, err := cmd.Find([]string{"list", "versions"})
 	if err != nil {
-		t.Fatalf("Failed to find versions command: %v", err)
+		t.Fatalf("Failed to find list versions command: %v", err)
 	}
 
 	if versionsCmd.Use != "versions <owner/package>" {
@@ -124,8 +124,8 @@ func TestVersionsCommandStructure(t *testing.T) {
 	}
 }
 
-// TestVersionsCommandArguments verifies argument validation
-func TestVersionsCommandArguments(t *testing.T) {
+// TestListVersionsCommandArguments verifies argument validation
+func TestListVersionsCommandArguments(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string
@@ -133,12 +133,12 @@ func TestVersionsCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "missing image argument",
-			args:        []string{"versions"},
+			args:        []string{"list", "versions"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"versions", "myimage", "extra"},
+			args:        []string{"list", "versions", "myimage", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -157,11 +157,11 @@ func TestVersionsCommandArguments(t *testing.T) {
 	}
 }
 
-// TestVersionsCommandHasFlags verifies required flags exist
-func TestVersionsCommandHasFlags(t *testing.T) {
+// TestListVersionsCommandHasFlags verifies required flags exist
+func TestListVersionsCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	versionsCmd, _, _ := cmd.Find([]string{"versions"})
+	versionsCmd, _, _ := cmd.Find([]string{"list", "versions"})
 
 	requiredFlags := []string{
 		"json",
@@ -180,20 +180,20 @@ func TestVersionsCommandHasFlags(t *testing.T) {
 	for _, flagName := range requiredFlags {
 		flag := versionsCmd.Flags().Lookup(flagName)
 		if flag == nil {
-			t.Errorf("versions command should have --%s flag", flagName)
+			t.Errorf("list versions command should have --%s flag", flagName)
 		}
 	}
 }
 
-// TestVersionsCommandNoTreeFlag verifies --tree flag was removed
-// (use 'ghcrctl images' for tree view instead)
-func TestVersionsCommandNoTreeFlag(t *testing.T) {
+// TestListVersionsCommandNoTreeFlag verifies --tree flag was removed
+// (use 'ghcrctl list images' for tree view instead)
+func TestListVersionsCommandNoTreeFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	versionsCmd, _, _ := cmd.Find([]string{"versions"})
+	versionsCmd, _, _ := cmd.Find([]string{"list", "versions"})
 
 	flag := versionsCmd.Flags().Lookup("tree")
 	if flag != nil {
-		t.Error("versions command should NOT have --tree flag (use 'ghcrctl images' instead)")
+		t.Error("list versions command should NOT have --tree flag (use 'ghcrctl list images' instead)")
 	}
 }

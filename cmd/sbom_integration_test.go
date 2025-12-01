@@ -19,7 +19,7 @@ func TestSBOMCommandWithImage(t *testing.T) {
 	// Create fresh command instance
 	// Use --all flag since the test image is multiarch and has multiple SBOMs (one per platform)
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"sbom", "mkoepf/ghcrctl-test-with-sbom:latest", "--all"})
+	cmd.SetArgs([]string{"get", "sbom", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest", "--all"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -62,7 +62,7 @@ func TestSBOMCommandWithoutSBOM(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"sbom", "mkoepf/ghcrctl-test-no-sbom:latest"})
+	cmd.SetArgs([]string{"get", "sbom", "mkoepf/ghcrctl-test-no-sbom", "--tag", "latest"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -92,7 +92,7 @@ func TestSBOMCommandJSONOutput(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"sbom", "mkoepf/ghcrctl-test-with-sbom:latest", "--json"})
+	cmd.SetArgs([]string{"get", "sbom", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

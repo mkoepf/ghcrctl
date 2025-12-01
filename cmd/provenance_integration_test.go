@@ -18,7 +18,7 @@ func TestProvenanceCommandWithImage(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"provenance", "mkoepf/ghcrctl-test-with-sbom:latest"})
+	cmd.SetArgs([]string{"get", "provenance", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -62,7 +62,7 @@ func TestProvenanceCommandJSONOutput(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"provenance", "mkoepf/ghcrctl-test-with-sbom:latest", "--json"})
+	cmd.SetArgs([]string{"get", "provenance", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -99,7 +99,7 @@ func TestProvenanceCommandWithBothAttestations(t *testing.T) {
 
 	// Test SBOM
 	sbomCmd := NewRootCmd()
-	sbomCmd.SetArgs([]string{"sbom", "mkoepf/ghcrctl-test-with-sbom:latest"})
+	sbomCmd.SetArgs([]string{"get", "sbom", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest"})
 	stdout := new(bytes.Buffer)
 	sbomCmd.SetOut(stdout)
 	sbomCmd.SetErr(new(bytes.Buffer))
@@ -115,7 +115,7 @@ func TestProvenanceCommandWithBothAttestations(t *testing.T) {
 
 	// Test Provenance
 	provCmd := NewRootCmd()
-	provCmd.SetArgs([]string{"provenance", "mkoepf/ghcrctl-test-with-sbom:latest"})
+	provCmd.SetArgs([]string{"get", "provenance", "mkoepf/ghcrctl-test-with-sbom", "--tag", "latest"})
 	stdout = new(bytes.Buffer)
 	provCmd.SetOut(stdout)
 	provCmd.SetErr(new(bytes.Buffer))

@@ -20,7 +20,7 @@ func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"packages", "mkoepf"})
+	cmd.SetArgs([]string{"list", "packages", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -91,7 +91,7 @@ func TestPackagesCommandErrorFormat(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"packages", "mkoepf"})
+	cmd.SetArgs([]string{"list", "packages", "mkoepf"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

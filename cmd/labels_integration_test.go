@@ -20,7 +20,7 @@ func TestLabelsCommandWithRealImage(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"labels", image})
+	cmd.SetArgs([]string{"get", "labels", image, "--tag", "latest"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -59,7 +59,7 @@ func TestLabelsCommandJSON(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"labels", image, "--json"})
+	cmd.SetArgs([]string{"get", "labels", image, "--tag", "latest", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -100,7 +100,7 @@ func TestLabelsCommandWithKey(t *testing.T) {
 	// Test with a common OCI label key
 	// Note: We don't know which labels exist, so we'll just verify the command works
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"labels", image, "--key", "org.opencontainers.image.source"})
+	cmd.SetArgs([]string{"get", "labels", image, "--tag", "latest", "--key", "org.opencontainers.image.source"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

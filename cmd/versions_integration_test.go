@@ -23,7 +23,7 @@ func TestVersionsCommandFlat(t *testing.T) {
 
 	// Create fresh command instance - flat table output is default
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom"})
+	cmd.SetArgs([]string{"list", "versions", "mkoepf/ghcrctl-test-with-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -75,7 +75,7 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
+	cmd.SetArgs([]string{"list", "versions", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -108,7 +108,7 @@ func TestVersionsCommandJSON(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-with-sbom", "--json"})
+	cmd.SetArgs([]string{"list", "versions", "mkoepf/ghcrctl-test-with-sbom", "--json"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)
@@ -161,7 +161,7 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"versions", "mkoepf/ghcrctl-test-no-sbom"})
+	cmd.SetArgs([]string{"list", "versions", "mkoepf/ghcrctl-test-no-sbom"})
 
 	// Capture output
 	stdout := new(bytes.Buffer)

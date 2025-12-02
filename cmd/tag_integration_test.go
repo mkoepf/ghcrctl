@@ -12,10 +12,10 @@ import (
 func TestTagCommandIntegration(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Skip("GITHUB_TOKEN not set, skipping integration test")
+		t.Fatal("GITHUB_TOKEN not set")
 	}
 
-	// TODO: Add integration tests for actual tag creation (token has write:packages permission)
+	// Note: Actual tag creation tests are in tag_mutating_test.go (with //go:build mutating)
 
 	tests := []struct {
 		name          string
@@ -34,6 +34,12 @@ func TestTagCommandIntegration(t *testing.T) {
 			args:          []string{"tag", "add", "mkoepf/myimage", "v2.0", "extra"},
 			wantError:     true,
 			errorContains: "accepts 2 arg",
+		},
+		{
+			name:          "missing selector",
+			args:          []string{"tag", "add", "mkoepf/ghcrctl-test-no-sbom", "new-tag"},
+			wantError:     true,
+			errorContains: "selector required",
 		},
 	}
 
@@ -61,5 +67,92 @@ func TestTagCommandIntegration(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestTagAdd_SourceTagNotFound tests error when source tag doesn't exist
+func TestTagAdd_SourceTagNotFound(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		t.Fatal("GITHUB_TOKEN not set")
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"tag", "add", "mkoepf/ghcrctl-test-no-sbom", "new-tag", "--tag", "nonexistent-tag-12345"})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent source tag, got none")
+	}
+
+	// Should mention tag resolution failure
+	if !strings.Contains(err.Error(), "failed to resolve source tag") {
+		t.Errorf("Expected error about tag resolution, got: %v", err)
+	}
+
+	// Should be operational error, not show usage
+	if strings.Contains(stderr.String(), "Usage:") {
+		t.Error("Operational error should not show usage hint")
+	}
+}
+
+// TestTagAdd_InvalidPackage tests error for nonexistent package
+func TestTagAdd_InvalidPackage(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		t.Fatal("GITHUB_TOKEN not set")
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"tag", "add", "mkoepf/nonexistent-package-12345", "new-tag", "--tag", "v1.0"})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent package, got none")
+	}
+
+	// Should be operational error, not show usage
+	if strings.Contains(stderr.String(), "Usage:") {
+		t.Error("Operational error should not show usage hint")
+	}
+}
+
+// TestTagCommand_ParentHelp tests that tag command shows help with subcommands
+func TestTagCommand_ParentHelp(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"tag", "--help"})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("tag --help failed: %v", err)
+	}
+
+	output := stdout.String()
+
+	// Should show subcommand info
+	if !strings.Contains(output, "add") {
+		t.Error("Expected help to mention 'add' subcommand")
+	}
+
+	// Should show description
+	if !strings.Contains(output, "Manage tags") {
+		t.Error("Expected help to contain 'Manage tags'")
 	}
 }

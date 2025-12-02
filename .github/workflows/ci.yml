@@ -55,6 +55,7 @@ jobs:
       - name: Run tests (Unix)
         if: runner.os != 'Windows'
         run: |
+          set -o pipefail
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test-output.txt
           if grep -q "SKIP:" test-output.txt; then
             echo "ERROR: Tests were skipped in CI. All integration tests must run."
@@ -66,13 +67,16 @@ jobs:
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: |
+          $ErrorActionPreference = "Continue"
           go test -v -race -coverprofile="coverage.out" -covermode=atomic ./... 2>&1 | Tee-Object -FilePath test-output.txt
+          $testExitCode = $LASTEXITCODE
           if (Select-String -Path test-output.txt -Pattern "SKIP:" -Quiet) {
             Write-Host "ERROR: Tests were skipped in CI. All integration tests must run."
             Write-Host "Skipped tests:"
             Select-String -Path test-output.txt -Pattern "SKIP:"
             exit 1
           }
+          exit $testExitCode
 
       - name: Report test coverage
         if: matrix.os == 'ubuntu-latest'

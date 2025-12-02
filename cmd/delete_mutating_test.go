@@ -13,7 +13,8 @@ import (
 )
 
 func TestDeletePackage_Mutating(t *testing.T) {
-	t.Parallel()
+	// Note: t.Parallel() is disabled due to race conditions in oras-go library
+	// when multiple copies run concurrently (internal http2PusherState race)
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -55,7 +56,7 @@ func TestDeletePackage_Mutating(t *testing.T) {
 }
 
 func TestDeletePackageVersion_Mutating(t *testing.T) {
-	t.Parallel()
+	// Note: t.Parallel() is disabled due to race conditions in oras-go library
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {

@@ -49,6 +49,10 @@ func CopyImage(ctx context.Context, srcImage, srcTag, dstImage, dstTag string) e
 		return fmt.Errorf("failed to create source repository: %w", err)
 	}
 	configureAuth(srcRepo)
+	// Disable referrers API to avoid race condition in ORAS library
+	// (GHCR doesn't support OCI referrers API anyway)
+	// Error is only returned if called twice, which won't happen here
+	_ = srcRepo.SetReferrersCapability(false)
 
 	// Create destination repository
 	dstRepo, err := remote.NewRepository(fmt.Sprintf("%s/%s", dstRegistry, dstPath))
@@ -56,9 +60,15 @@ func CopyImage(ctx context.Context, srcImage, srcTag, dstImage, dstTag string) e
 		return fmt.Errorf("failed to create destination repository: %w", err)
 	}
 	configureAuth(dstRepo)
+	// Disable referrers API to avoid race condition in ORAS library
+	// Error is only returned if called twice, which won't happen here
+	_ = dstRepo.SetReferrersCapability(false)
 
-	// Copy the image
-	_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, oras.DefaultCopyOptions)
+	// Copy the image with sequential concurrency to avoid race conditions
+	// in oras-go library's internal parallel blob handling
+	copyOpts := oras.CopyOptions{}
+	copyOpts.Concurrency = 1
+	_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, copyOpts)
 	if err != nil {
 		return fmt.Errorf("failed to copy image: %w", err)
 	}

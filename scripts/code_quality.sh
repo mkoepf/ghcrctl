@@ -25,7 +25,7 @@ echo ""
 ###########################################
 # 1. Code Formatting Check (gofmt)
 ###########################################
-echo -e "${BLUE}[1/6] Checking code formatting with gofmt...${NC}"
+echo -e "${BLUE}[1/7] Checking code formatting with gofmt...${NC}"
 UNFORMATTED=$(gofmt -s -l . 2>&1)
 if [ -n "$UNFORMATTED" ]; then
     echo -e "${RED}✗ The following files are not formatted:${NC}"
@@ -41,7 +41,7 @@ echo ""
 ###########################################
 # 2. Build Check
 ###########################################
-echo -e "${BLUE}[2/6] Building binary...${NC}"
+echo -e "${BLUE}[2/7] Building binary...${NC}"
 if go build -v -o ghcrctl . 2>&1 > /dev/null; then
     echo -e "${GREEN}✓ Build successful${NC}"
 
@@ -65,7 +65,7 @@ echo ""
 ###########################################
 # 3. Static Analysis (go vet)
 ###########################################
-echo -e "${BLUE}[3/6] Running static analysis with go vet...${NC}"
+echo -e "${BLUE}[3/7] Running static analysis with go vet...${NC}"
 if go vet ./... 2>&1; then
     echo -e "${GREEN}✓ go vet passed${NC}"
 else
@@ -78,11 +78,12 @@ echo ""
 ###########################################
 # 4. Tests with Race Detection and SKIP detection
 ###########################################
-echo -e "${BLUE}[4/6] Running tests with race and skip detection...${NC}"
+echo -e "${BLUE}[4/7] Running readonly tests with race and skip detection...${NC}"
 # Run go test and capture combined stdout+stderr
 output=$(go test -json -v -race \
     -coverprofile=coverage.out \
     -covermode=atomic \
+    -coverpkg=./... \
     ./... 2>&1)
 
 test_exit_code=$?   # exit code of go test
@@ -104,17 +105,63 @@ echo -e "${GREEN}✓ All tests passed${NC}"
 echo ""
 
 ###########################################
-# 5. Security scans
+# 5. Mutating Tests (without race detection)
 ###########################################
-echo -e "${BLUE}[5/6] Running security scans... ${NC}"
+echo -e "${BLUE}[5/7] Running mutating tests with skip detection...${NC}"
+# Run mutating tests without -race flag due to race conditions in oras-go library's
+# HTTP/2 handling during push operations. This only affects test setup code (CopyImage),
+# not the actual functional code being tested.
+mutating_output=$(go test -json -v \
+    -tags=mutating \
+    -coverprofile=coverage-mutating.out \
+    -covermode=atomic \
+    -coverpkg=./... \
+    ./... 2>&1)
+
+mutating_exit_code=$?   # exit code of go test
+
+# Fail if any tests failed
+if [ "$mutating_exit_code" -ne 0 ]; then
+    echo -e "${RED}✗ One or more mutating tests failed${NC}"
+    exit 1
+fi
+
+# Fail if any tests were skipped
+if echo "$mutating_output" | grep -q '"Action":"skip"'; then
+    echo -e "${RED}✗ One or more mutating tests were SKIPPED${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ All mutating tests passed${NC}"
+
+# Merge coverage files
+if [ -f coverage.out ] && [ -f coverage-mutating.out ]; then
+    echo -e "${BLUE}Merging coverage data...${NC}"
+    GOCOVMERGE="$(go env GOPATH)/bin/gocovmerge"
+    # Install gocovmerge if not present
+    if [ ! -f "$GOCOVMERGE" ]; then
+        go install github.com/wadey/gocovmerge@latest
+    fi
+    "$GOCOVMERGE" coverage.out coverage-mutating.out > coverage-merged.out
+    mv coverage-merged.out coverage.out
+    rm -f coverage-mutating.out
+    echo -e "${GREEN}✓ Coverage data merged${NC}"
+fi
+
+echo ""
+
+###########################################
+# 6. Security scans
+###########################################
+echo -e "${BLUE}[6/7] Running security scans... ${NC}"
 govulncheck ./...
 gosec ./...
 trivy fs . --skip-dirs .claude --scanners=vuln,misconfig,secret --exit-code 1
 
 ###########################################
-# 6. Coverage Report (informational only)
+# 7. Coverage Report (informational only)
 ###########################################
-echo -e "${BLUE}[6/6] Reporting test coverage (informational)...${NC}"
+echo -e "${BLUE}[7/7] Reporting test coverage (informational)...${NC}"
 if [ -f coverage.out ]; then
     COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
     echo -e "Total coverage: ${YELLOW}${COVERAGE}%${NC}"

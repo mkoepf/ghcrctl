@@ -41,6 +41,7 @@ Available Commands:
 func newDeleteVersionCmd() *cobra.Command {
 	var (
 		force         bool
+		yes           bool
 		dryRun        bool
 		versionID     int64
 		digest        string
@@ -135,16 +136,17 @@ Examples:
 			}
 
 			// Route to appropriate handler
+			skipConfirm := force || yes
 			if hasFilterSelector && !hasSingleSelector {
 				// Bulk deletion mode
 				return runBulkDeleteVersion(ctx, cmd, client, owner, ownerType, packageName,
 					tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan,
-					olderThanDays, newerThanDays, force, dryRun)
+					olderThanDays, newerThanDays, skipConfirm, dryRun)
 			}
 
 			// Single deletion mode
 			return runSingleDeleteVersion(ctx, cmd, client, owner, ownerType, packageName,
-				versionID, digest, tag, force, dryRun)
+				versionID, digest, tag, skipConfirm, dryRun)
 		},
 	}
 
@@ -164,6 +166,7 @@ Examples:
 
 	// Common flags
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt (alias for --force)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
 
 	// Mark single selectors as mutually exclusive
@@ -177,6 +180,7 @@ Examples:
 func newDeleteImageCmd() *cobra.Command {
 	var (
 		force     bool
+		yes       bool
 		dryRun    bool
 		tag       string
 		digest    string
@@ -364,8 +368,9 @@ Examples:
 				return nil
 			}
 
-			// Confirm deletion unless --force is used
-			if !force {
+			// Confirm deletion unless --force or --yes is used
+			skipConfirm := force || yes
+			if !skipConfirm {
 				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this image?"))
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
@@ -397,6 +402,7 @@ Examples:
 
 	// Common flags
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt (alias for --force)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without deleting")
 
 	cmd.MarkFlagsMutuallyExclusive("tag", "digest", "version")

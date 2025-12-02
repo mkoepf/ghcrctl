@@ -100,6 +100,7 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 
 	requiredFlags := []string{
 		"force",
+		"yes",
 		"dry-run",
 		"digest",
 		"tag-pattern",
@@ -186,6 +187,18 @@ func TestDeleteImageCommandHasFlags(t *testing.T) {
 	forceFlag := deleteImageCmd.Flags().Lookup("force")
 	if forceFlag == nil {
 		t.Error("Expected --force flag to exist")
+	}
+
+	// Check for --yes flag (alias for --force)
+	yesFlag := deleteImageCmd.Flags().Lookup("yes")
+	if yesFlag == nil {
+		t.Error("Expected --yes flag to exist")
+	}
+
+	// Check for -y shorthand
+	yShorthand := deleteImageCmd.Flags().ShorthandLookup("y")
+	if yShorthand == nil {
+		t.Error("Expected -y shorthand for --yes flag")
 	}
 
 	// Check for --dry-run flag

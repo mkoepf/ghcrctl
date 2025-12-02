@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestConfirm_EOF(t *testing.T) {
+	t.Parallel()
+
+	// Empty reader simulates EOF (closed stdin)
+	reader := strings.NewReader("")
+	writer := &bytes.Buffer{}
+
+	result, err := Confirm(reader, writer, "Test prompt")
+	if err != nil {
+		t.Fatalf("EOF should not return error, got: %v", err)
+	}
+
+	if result != false {
+		t.Error("EOF should default to no (false)")
+	}
+}
+
 func TestConfirm(t *testing.T) {
 	tests := []struct {
 		name     string

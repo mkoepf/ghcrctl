@@ -242,6 +242,47 @@ func TestVersionFilter_Apply_InvalidDate(t *testing.T) {
 	assert.Equal(t, int64(2), result[0].ID)
 }
 
+func TestVersionFilter_Apply_MalformedDates_WithDateFilter(t *testing.T) {
+	t.Parallel()
+
+	// When filtering by date with malformed CreatedAt timestamps,
+	// those versions should be excluded from results
+	versions := []gh.PackageVersionInfo{
+		createTestVersion(1, []string{"v1"}, "not-a-date"),
+		createTestVersion(2, []string{"v2"}, ""),
+		createTestVersion(3, []string{"v3"}, "01-01-2025"), // Wrong format
+		createTestVersion(4, []string{"v4"}, "2025-01-05T00:00:00Z"),
+	}
+
+	cutoff, _ := time.Parse(time.RFC3339, "2025-01-10T00:00:00Z")
+	filter := &VersionFilter{OlderThan: cutoff}
+	result := filter.Apply(versions)
+
+	// Only version 4 has valid parseable date
+	assert.Equal(t, 1, len(result))
+	assert.Equal(t, int64(4), result[0].ID)
+}
+
+func TestVersionFilter_Apply_MalformedDates_NoDateFilter(t *testing.T) {
+	t.Parallel()
+
+	// When no date filters are active, versions with malformed dates
+	// should still be included (date parsing is skipped)
+	versions := []gh.PackageVersionInfo{
+		createTestVersion(1, []string{"v1"}, "not-a-date"),
+		createTestVersion(2, []string{"v2"}, ""),
+		createTestVersion(3, []string{"v3"}, "01-01-2025"),
+		createTestVersion(4, []string{"v4"}, "2025-01-05T00:00:00Z"),
+	}
+
+	// Only tag filter, no date filter
+	filter := &VersionFilter{OnlyTagged: true}
+	result := filter.Apply(versions)
+
+	// All 4 versions should pass because date parsing is skipped
+	assert.Equal(t, 4, len(result))
+}
+
 func TestVersionFilter_Apply_TagsFilter_Exact(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
 		createTestVersion(1, []string{"v1.0.0"}, "2025-01-01T00:00:00Z"),

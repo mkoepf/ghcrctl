@@ -136,6 +136,46 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 	}
 }
 
+func TestDiscoverPackage_ResolverFailure(t *testing.T) {
+	t.Parallel()
+
+	// When OCI registry is unreachable, version type should be marked as 'unknown'
+	mockResolver := &MockResolver{
+		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
+			return nil, fmt.Errorf("registry unreachable")
+		},
+	}
+
+	mockDiscoverer := &MockChildDiscoverer{
+		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
+			return nil, nil
+		},
+	}
+
+	versions := []gh.PackageVersionInfo{
+		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
+	}
+
+	discoverer := &PackageDiscoverer{
+		Resolver:        mockResolver,
+		ChildDiscoverer: mockDiscoverer,
+	}
+
+	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
+	if err != nil {
+		t.Fatalf("DiscoverPackage should not fail even when resolver fails: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	// When resolver fails, type should be "unknown"
+	if len(results[0].Types) != 1 || results[0].Types[0] != "unknown" {
+		t.Errorf("expected type 'unknown' when resolver fails, got %v", results[0].Types)
+	}
+}
+
 func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 	mockResolver := &MockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {

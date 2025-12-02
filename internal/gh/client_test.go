@@ -352,6 +352,67 @@ func TestGetOwnerType(t *testing.T) {
 	}
 }
 
+func TestListPackageVersions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		owner     string
+		ownerType string
+		pkg       string
+		wantError bool
+		errMsg    string
+	}{
+		{
+			name:      "empty owner",
+			owner:     "",
+			ownerType: "org",
+			pkg:       "test-package",
+			wantError: true,
+			errMsg:    "owner cannot be empty",
+		},
+		{
+			name:      "invalid owner type",
+			owner:     "test",
+			ownerType: "invalid",
+			pkg:       "test-package",
+			wantError: true,
+			errMsg:    "owner type must be",
+		},
+		{
+			name:      "empty package name",
+			owner:     "test",
+			ownerType: "org",
+			pkg:       "",
+			wantError: true,
+			errMsg:    "package name cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewClient("ghp_fake_token")
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ctx := context.Background()
+			versions, err := client.ListPackageVersions(ctx, tt.owner, tt.ownerType, tt.pkg)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				_ = versions
+			}
+		})
+	}
+}
+
 func TestGetVersionTags(t *testing.T) {
 	tests := []struct {
 		name      string

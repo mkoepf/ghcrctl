@@ -320,8 +320,8 @@ func FetchImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Im
 	return &imageConfig, nil
 }
 
-// CopyTagByDigest creates a new tag pointing to the specified digest
-func CopyTagByDigest(ctx context.Context, image, digest, destTag string) error {
+// AddTagByDigest creates a new tag pointing to the specified digest
+func AddTagByDigest(ctx context.Context, image, digest, destTag string) error {
 	// Validate inputs
 	if image == "" {
 		return fmt.Errorf("image cannot be empty")
@@ -365,9 +365,8 @@ func CopyTagByDigest(ctx context.Context, image, digest, destTag string) error {
 	return nil
 }
 
-// CopyTag copies a tag by fetching the manifest from the source tag and pushing it with the destination tag
-// This effectively creates a new tag pointing to the same digest as the source tag
-func CopyTag(ctx context.Context, image, sourceTag, destTag string) error {
+// AddTag creates a new tag pointing to the same digest as an existing tag
+func AddTag(ctx context.Context, image, sourceTag, destTag string) error {
 	// Validate inputs
 	if image == "" {
 		return fmt.Errorf("image cannot be empty")

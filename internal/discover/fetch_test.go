@@ -258,7 +258,7 @@ func TestFetchArtifactContent(t *testing.T) {
 	}
 }
 
-func TestCopyTag(t *testing.T) {
+func TestAddTag(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -305,7 +305,7 @@ func TestCopyTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			err := CopyTag(ctx, tt.image, tt.sourceTag, tt.destTag)
+			err := AddTag(ctx, tt.image, tt.sourceTag, tt.destTag)
 
 			if tt.wantError {
 				if err == nil {

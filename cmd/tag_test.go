@@ -104,22 +104,22 @@ func TestTagAddCommandHasFlags(t *testing.T) {
 // Tests for ExecuteTagAdd
 // =============================================================================
 
-// mockTagCopier implements TagCopier for testing
-type mockTagCopier struct {
+// mockTagAdder implements TagAdder for testing
+type mockTagAdder struct {
 	resolvedDigest string
 	resolveErr     error
-	copyErr        error
+	addErr         error
 }
 
-func (m *mockTagCopier) ResolveTag(ctx context.Context, fullImage, tag string) (string, error) {
+func (m *mockTagAdder) ResolveTag(ctx context.Context, fullImage, tag string) (string, error) {
 	if m.resolveErr != nil {
 		return "", m.resolveErr
 	}
 	return m.resolvedDigest, nil
 }
 
-func (m *mockTagCopier) CopyTagByDigest(ctx context.Context, fullImage, digest, newTag string) error {
-	return m.copyErr
+func (m *mockTagAdder) AddTagByDigest(ctx context.Context, fullImage, digest, newTag string) error {
+	return m.addErr
 }
 
 func TestExecuteTagAdd(t *testing.T) {
@@ -130,7 +130,7 @@ func TestExecuteTagAdd(t *testing.T) {
 		params         TagAddParams
 		resolvedDigest string
 		resolveErr     error
-		copyErr        error
+		addErr         error
 		wantErr        bool
 		wantErrMsg     string
 		wantOutput     []string
@@ -175,14 +175,14 @@ func TestExecuteTagAdd(t *testing.T) {
 			wantErrMsg: "failed to resolve source tag 'nonexistent'",
 		},
 		{
-			name: "copy tag failure",
+			name: "add tag failure",
 			params: TagAddParams{
 				Owner:        "testowner",
 				PackageName:  "testimage",
 				NewTag:       "latest",
 				SourceDigest: "sha256:abc123def456789",
 			},
-			copyErr:    fmt.Errorf("permission denied"),
+			addErr:     fmt.Errorf("permission denied"),
 			wantErr:    true,
 			wantErrMsg: "failed to add tag",
 		},
@@ -190,10 +190,10 @@ func TestExecuteTagAdd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mock := &mockTagCopier{
+			mock := &mockTagAdder{
 				resolvedDigest: tt.resolvedDigest,
 				resolveErr:     tt.resolveErr,
-				copyErr:        tt.copyErr,
+				addErr:         tt.addErr,
 			}
 
 			var buf bytes.Buffer

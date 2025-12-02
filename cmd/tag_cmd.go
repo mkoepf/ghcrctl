@@ -25,10 +25,10 @@ Available subcommands:
 	return cmd
 }
 
-// TagCopier is an interface for tag copying operations
-type TagCopier interface {
+// TagAdder is an interface for tag add operations
+type TagAdder interface {
 	ResolveTag(ctx context.Context, fullImage, tag string) (string, error)
-	CopyTagByDigest(ctx context.Context, fullImage, digest, newTag string) error
+	AddTagByDigest(ctx context.Context, fullImage, digest, newTag string) error
 }
 
 // TagAddParams contains parameters for tag add execution
@@ -41,21 +41,21 @@ type TagAddParams struct {
 }
 
 // ExecuteTagAdd executes the tag add logic with injected dependencies
-func ExecuteTagAdd(ctx context.Context, copier TagCopier, params TagAddParams, out io.Writer) error {
+func ExecuteTagAdd(ctx context.Context, adder TagAdder, params TagAddParams, out io.Writer) error {
 	fullImage := fmt.Sprintf("ghcr.io/%s/%s", params.Owner, params.PackageName)
 
 	// Resolve source to digest if tag was provided
 	targetDigest := params.SourceDigest
 	if params.SourceTag != "" {
 		var err error
-		targetDigest, err = copier.ResolveTag(ctx, fullImage, params.SourceTag)
+		targetDigest, err = adder.ResolveTag(ctx, fullImage, params.SourceTag)
 		if err != nil {
 			return fmt.Errorf("failed to resolve source tag '%s': %w", params.SourceTag, err)
 		}
 	}
 
-	// Use ORAS to copy the tag
-	err := copier.CopyTagByDigest(ctx, fullImage, targetDigest, params.NewTag)
+	// Add the new tag
+	err := adder.AddTagByDigest(ctx, fullImage, targetDigest, params.NewTag)
 	if err != nil {
 		return fmt.Errorf("failed to add tag: %w", err)
 	}
@@ -131,8 +131,8 @@ Examples:
 				}
 			}
 
-			// Use ORAS to copy the tag (creates new tag pointing to same digest)
-			err = discover.CopyTagByDigest(ctx, fullImage, targetDigest, newTag)
+			// Add the new tag (creates new tag pointing to same digest)
+			err = discover.AddTagByDigest(ctx, fullImage, targetDigest, newTag)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to add tag: %w", err)

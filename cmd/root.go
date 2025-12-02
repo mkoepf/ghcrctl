@@ -22,12 +22,14 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "ghcrctl",
 		Short: "A CLI tool for managing GitHub Container Registry",
-		Long: `ghcrctl is a command-line tool for interacting with GitHub Container Registry (GHCR).
+		Long: fmt.Sprintf(`ghcrctl version %s
+
+A command-line tool for interacting with GitHub Container Registry (GHCR).
 
 It provides functionality for:
 - Exploring packages and their OCI artifact graph (image, SBOM, provenance)
 - Managing GHCR version metadata (labels, tags)
-- Safe deletion of package versions`,
+- Safe deletion of package versions`, Version),
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Enable API call logging if flag is set

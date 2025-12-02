@@ -95,3 +95,22 @@ func TestRootCommandVersion(t *testing.T) {
 		t.Errorf("Expected version to be 'dev' or start with 'v', got %q", cmd.Version)
 	}
 }
+
+func TestRootCommandOutputIncludesVersion(t *testing.T) {
+	t.Parallel()
+	// Test that running ghcrctl without args shows version in output
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+
+	_ = cmd.Execute()
+
+	output := stdout.String()
+	if !strings.Contains(output, "ghcrctl version") {
+		t.Errorf("Expected root command output to contain version, got:\n%s", output)
+	}
+}

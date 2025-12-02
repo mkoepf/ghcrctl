@@ -59,6 +59,7 @@ It provides functionality for:
 	root.AddCommand(newGetCmd())
 	root.AddCommand(newDeleteCmd())
 	root.AddCommand(newTagCmd())
+	root.AddCommand(newStatsCmd())
 	root.AddCommand(newCompletionCmd())
 
 	return root

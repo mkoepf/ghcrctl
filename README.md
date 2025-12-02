@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml/badge.svg)](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mkoepf/ghcrctl)](https://goreportcard.com/report/github.com/mkoepf/ghcrctl)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mkoepf/GIST_ID/raw/coverage.json)](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mkoepf/baae226f8088579c1405b06f7dd1a07a/raw/coverage.json)](https://github.com/mkoepf/ghcrctl/actions/workflows/ci.yml)
 
 A command-line tool for interacting with GitHub Container Registry (GHCR).
 

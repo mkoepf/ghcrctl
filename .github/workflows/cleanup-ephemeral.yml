@@ -1,0 +1,46 @@
+name: Cleanup Ephemeral Test Packages
+
+on:
+  schedule:
+    # Run weekly on Sundays at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Delete Orphaned Ephemeral Packages
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete ephemeral packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Looking for orphaned ghcrctl-ephemeral-* packages..."
+
+          # List all container packages for the repository owner
+          packages=$(gh api /users/${{ github.repository_owner }}/packages?package_type=container \
+            --jq '.[] | select(.name | startswith("ghcrctl-ephemeral-")) | .name' 2>/dev/null || echo "")
+
+          if [ -z "$packages" ]; then
+            echo "No ephemeral packages found."
+            exit 0
+          fi
+
+          echo "Found ephemeral packages:"
+          echo "$packages"
+          echo ""
+
+          # Delete each ephemeral package
+          echo "$packages" | while read -r pkg; do
+            if [ -n "$pkg" ]; then
+              echo "Deleting package: $pkg"
+              gh api --method DELETE "/users/${{ github.repository_owner }}/packages/container/$pkg" || \
+                echo "  Warning: Failed to delete $pkg (may already be deleted)"
+            fi
+          done
+
+          echo ""
+          echo "Cleanup complete."

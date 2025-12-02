@@ -116,6 +116,51 @@ jobs:
           maxColorRange: 100
           minColorRange: 0
 
+  test-mutating:
+    name: Mutating Tests
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run mutating tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -o pipefail
+          go test -v -race -tags=mutating ./... 2>&1 | tee test-output.txt
+          if grep -q "SKIP:" test-output.txt; then
+            echo "ERROR: Tests were skipped in CI. All mutating tests must run."
+            echo "Skipped tests:"
+            grep "SKIP:" test-output.txt
+            exit 1
+          fi
+
+      - name: Run mutating tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = "Continue"
+          go test -v -race -tags=mutating ./... 2>&1 | Tee-Object -FilePath test-output.txt
+          $testExitCode = $LASTEXITCODE
+          if (Select-String -Path test-output.txt -Pattern "SKIP:" -Quiet) {
+            Write-Host "ERROR: Tests were skipped in CI. All mutating tests must run."
+            Write-Host "Skipped tests:"
+            Select-String -Path test-output.txt -Pattern "SKIP:"
+            exit 1
+          }
+          exit $testExitCode
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest

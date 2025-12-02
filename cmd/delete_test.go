@@ -25,8 +25,8 @@ func TestDeleteCommandStructure(t *testing.T) {
 
 	// Check for subcommands
 	subcommands := deleteCmd.Commands()
-	if len(subcommands) < 2 {
-		t.Errorf("Expected at least 2 subcommands (version, image), got %d", len(subcommands))
+	if len(subcommands) < 3 {
+		t.Errorf("Expected at least 3 subcommands (version, image, package), got %d", len(subcommands))
 	}
 }
 
@@ -116,6 +116,42 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 		flag := deleteVersionCmd.Flags().Lookup(flagName)
 		if flag == nil {
 			t.Errorf("delete version command should have --%s flag", flagName)
+		}
+	}
+}
+
+// TestDeletePackageCommandStructure verifies the delete package subcommand
+func TestDeletePackageCommandStructure(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	deletePackageCmd, _, err := cmd.Find([]string{"delete", "package"})
+	if err != nil {
+		t.Fatalf("Failed to find delete package command: %v", err)
+	}
+
+	if deletePackageCmd.Use != "package <owner/package>" {
+		t.Errorf("Expected Use 'package <owner/package>', got '%s'", deletePackageCmd.Use)
+	}
+
+	if deletePackageCmd.Short == "" {
+		t.Error("Short description should not be empty")
+	}
+}
+
+// TestDeletePackageCommandHasFlags verifies required flags exist
+func TestDeletePackageCommandHasFlags(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+	deletePackageCmd, _, err := cmd.Find([]string{"delete", "package"})
+	if err != nil {
+		t.Fatalf("Failed to find delete package command: %v", err)
+	}
+
+	requiredFlags := []string{"force", "yes"}
+	for _, flagName := range requiredFlags {
+		flag := deletePackageCmd.Flags().Lookup(flagName)
+		if flag == nil {
+			t.Errorf("delete package command should have --%s flag", flagName)
 		}
 	}
 }
@@ -822,6 +858,22 @@ func TestExecuteSingleDelete(t *testing.T) {
 			wantDeleted: true,
 			wantErr:     false,
 			wantOutput:  []string{"by 1 other version"},
+		},
+		{
+			name: "last tagged version error shows helpful message",
+			params: DeleteVersionParams{
+				Owner:     "testowner",
+				OwnerType: "user",
+				ImageName: "testimage",
+				VersionID: 77777,
+				Tags:      []string{"latest"},
+				Force:     true,
+				DryRun:    false,
+			},
+			deleteErr:   fmt.Errorf("You cannot delete the last tagged version of a package"),
+			wantDeleted: false,
+			wantErr:     true,
+			wantOutput:  []string{"GHCR does not allow", "delete package", "testowner/testimage"},
 		},
 	}
 

@@ -385,3 +385,39 @@ func (c *Client) DeletePackageVersion(ctx context.Context, owner, ownerType, pac
 
 	return nil
 }
+
+// IsLastTaggedVersionError checks if the error is due to trying to delete the last tagged version.
+func IsLastTaggedVersionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "cannot delete the last tagged version")
+}
+
+// DeletePackage deletes an entire package (not just a version)
+func (c *Client) DeletePackage(ctx context.Context, owner, ownerType, packageName string) error {
+	// Validate inputs
+	if owner == "" {
+		return fmt.Errorf("owner cannot be empty")
+	}
+	if ownerType != "org" && ownerType != "user" {
+		return fmt.Errorf("owner type must be 'org' or 'user', got '%s'", ownerType)
+	}
+	if packageName == "" {
+		return fmt.Errorf("package name cannot be empty")
+	}
+
+	// Delete the package based on owner type
+	var err error
+	if ownerType == "org" {
+		_, err = c.client.Organizations.DeletePackage(ctx, owner, "container", packageName)
+	} else {
+		_, err = c.client.Users.DeletePackage(ctx, owner, "container", packageName)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to delete package: %w", err)
+	}
+
+	return nil
+}

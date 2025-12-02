@@ -20,19 +20,21 @@ import (
 func newDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete package versions from GitHub Container Registry",
-		Long: `Delete package versions from GitHub Container Registry.
+		Short: "Delete resources (versions, images, packages)",
+		Long: `Delete resources from GitHub Container Registry.
 
-Use subcommands to delete individual versions or complete OCI images.
+Use subcommands to delete individual versions, complete OCI images, or entire packages.
 
 Available Commands:
   version     Delete a single package version or bulk delete with filters
-  image       Delete an entire OCI image (index + platforms + attestations)`,
+  image       Delete an entire OCI image (index + platforms + attestations)
+  package     Delete an entire package (all versions)`,
 	}
 
 	// Add subcommands via their factories
 	cmd.AddCommand(newDeleteVersionCmd())
 	cmd.AddCommand(newDeleteImageCmd())
+	cmd.AddCommand(newDeletePackageCmd())
 
 	return cmd
 }
@@ -410,6 +412,102 @@ Examples:
 	return cmd
 }
 
+// newDeletePackageCmd creates the delete package subcommand with isolated flag state.
+func newDeletePackageCmd() *cobra.Command {
+	var (
+		force bool
+		yes   bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "package <owner/package>",
+		Short: "Delete an entire package",
+		Long: `Delete an entire package from GitHub Container Registry.
+
+This command deletes the package and ALL its versions permanently.
+Use this when you cannot delete the last tagged version of a package.
+
+IMPORTANT: Deletion is permanent and cannot be undone (except within 30 days
+via the GitHub web UI if the package namespace is available).
+
+Examples:
+  # Delete a package
+  ghcrctl delete package mkoepf/myimage
+
+  # Delete without confirmation
+  ghcrctl delete package mkoepf/myimage --force`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse owner/package reference
+			owner, packageName, err := parsePackageRef(args[0])
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Get GitHub token
+			token, err := gh.GetToken()
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Create GitHub client
+			client, err := gh.NewClientWithContext(cmd.Context(), token)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to create GitHub client: %w", err)
+			}
+
+			ctx := cmd.Context()
+
+			// Auto-detect owner type
+			ownerType, err := client.GetOwnerType(ctx, owner)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to determine owner type: %w", err)
+			}
+
+			// Show what will be deleted
+			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete entire package:\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  Package: %s/%s\n", owner, packageName)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Owner:   %s (%s)\n\n", owner, ownerType)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n", display.ColorWarning("WARNING: This will delete ALL versions of this package!"))
+
+			// Confirm deletion unless --force or --yes is used
+			skipConfirm := force || yes
+			if !skipConfirm {
+				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(),
+					display.ColorError("Are you sure you want to delete the entire package?"))
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
+
+				if !confirmed {
+					fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+					return nil
+				}
+			}
+
+			// Perform deletion
+			err = client.DeletePackage(ctx, owner, ownerType, packageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to delete package: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), display.ColorSuccess(fmt.Sprintf("Successfully deleted package %s/%s", owner, packageName)))
+			return nil
+		},
+	}
+
+	// Common flags
+	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt (alias for --force)")
+
+	return cmd
+}
+
 // runSingleDeleteVersion handles deletion of a single version
 func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, packageName string,
 	versionID int64, digest, tag string, force, dryRun bool) error {
@@ -492,6 +590,13 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 	// Perform deletion
 	err = client.DeletePackageVersion(ctx, owner, ownerType, packageName, targetVersionID)
 	if err != nil {
+		cmd.SilenceUsage = true
+		if gh.IsLastTaggedVersionError(err) {
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n", display.ColorWarning("GHCR does not allow to delete the last tagged version of a package."))
+			fmt.Fprintf(cmd.OutOrStdout(), "You can delete the package instead:\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  ghcrctl delete package %s/%s\n", owner, packageName)
+			return fmt.Errorf("GHCR does not allow to delete the last tagged version of a package. You can delete the package instead.")
+		}
 		return fmt.Errorf("failed to delete package version: %w", err)
 	}
 
@@ -628,10 +733,14 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 	// Perform bulk deletion
 	successCount := 0
 	failCount := 0
+	lastTaggedHit := false
 	for i, ver := range matchingVersions {
 		fmt.Fprintf(cmd.OutOrStdout(), "Deleting version %d/%d (ID: %d)...\n", i+1, len(matchingVersions), ver.ID)
 		err := client.DeletePackageVersion(ctx, owner, ownerType, packageName, ver.ID)
 		if err != nil {
+			if gh.IsLastTaggedVersionError(err) {
+				lastTaggedHit = true
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
 			failCount++
 		} else {
@@ -648,6 +757,12 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "Deletion complete: %s succeeded\n",
 			display.ColorSuccess(fmt.Sprintf("%d", successCount)))
+	}
+
+	if lastTaggedHit {
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n", display.ColorWarning("Note: GHCR does not allow to delete the last tagged version of a package."))
+		fmt.Fprintf(cmd.OutOrStdout(), "You can delete the package instead:\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  ghcrctl delete package %s/%s\n", owner, packageName)
 	}
 
 	if failCount > 0 {
@@ -873,6 +988,12 @@ func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params Del
 	// Perform deletion
 	err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.ImageName, params.VersionID)
 	if err != nil {
+		if gh.IsLastTaggedVersionError(err) {
+			fmt.Fprintf(w, "\n%s\n", display.ColorWarning("GHCR does not allow to delete the last tagged version of a package."))
+			fmt.Fprintf(w, "You can delete the package instead:\n")
+			fmt.Fprintf(w, "  ghcrctl delete package %s/%s\n", params.Owner, params.ImageName)
+			return fmt.Errorf("GHCR does not allow to delete the last tagged version of a package. You can delete the package instead.")
+		}
 		return fmt.Errorf("failed to delete package version: %w", err)
 	}
 

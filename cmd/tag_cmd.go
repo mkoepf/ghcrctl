@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"io"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/spf13/cobra"
@@ -21,6 +23,50 @@ Available subcommands:
 	cmd.AddCommand(newTagAddCmd())
 
 	return cmd
+}
+
+// TagCopier is an interface for tag copying operations
+type TagCopier interface {
+	ResolveTag(ctx context.Context, fullImage, tag string) (string, error)
+	CopyTagByDigest(ctx context.Context, fullImage, digest, newTag string) error
+}
+
+// TagAddParams contains parameters for tag add execution
+type TagAddParams struct {
+	Owner        string
+	PackageName  string
+	NewTag       string
+	SourceTag    string
+	SourceDigest string
+}
+
+// ExecuteTagAdd executes the tag add logic with injected dependencies
+func ExecuteTagAdd(ctx context.Context, copier TagCopier, params TagAddParams, out io.Writer) error {
+	fullImage := fmt.Sprintf("ghcr.io/%s/%s", params.Owner, params.PackageName)
+
+	// Resolve source to digest if tag was provided
+	targetDigest := params.SourceDigest
+	if params.SourceTag != "" {
+		var err error
+		targetDigest, err = copier.ResolveTag(ctx, fullImage, params.SourceTag)
+		if err != nil {
+			return fmt.Errorf("failed to resolve source tag '%s': %w", params.SourceTag, err)
+		}
+	}
+
+	// Use ORAS to copy the tag
+	err := copier.CopyTagByDigest(ctx, fullImage, targetDigest, params.NewTag)
+	if err != nil {
+		return fmt.Errorf("failed to add tag: %w", err)
+	}
+
+	// Display success message
+	if params.SourceTag != "" {
+		fmt.Fprintf(out, "Successfully added tag '%s' to %s (source: %s)\n", params.NewTag, params.PackageName, params.SourceTag)
+	} else {
+		fmt.Fprintf(out, "Successfully added tag '%s' to %s (source: %s)\n", params.NewTag, params.PackageName, params.SourceDigest[:19])
+	}
+	return nil
 }
 
 // newTagAddCmd creates the tag add subcommand.

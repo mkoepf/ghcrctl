@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -123,6 +124,37 @@ func CalculateStats(versions []gh.PackageVersionInfo) PackageStats {
 	stats.NewestVersion = newest
 
 	return stats
+}
+
+// VersionLister is an interface for listing package versions
+type VersionLister interface {
+	ListPackageVersions(ctx context.Context, owner, ownerType, packageName string) ([]gh.PackageVersionInfo, error)
+}
+
+// StatsParams contains parameters for stats execution
+type StatsParams struct {
+	Owner       string
+	OwnerType   string
+	PackageName string
+	JSONOutput  bool
+	QuietMode   bool
+}
+
+// ExecuteStats executes the stats command logic with injected dependencies
+func ExecuteStats(ctx context.Context, lister VersionLister, params StatsParams, out io.Writer) error {
+	versions, err := lister.ListPackageVersions(ctx, params.Owner, params.OwnerType, params.PackageName)
+	if err != nil {
+		return fmt.Errorf("failed to list versions: %w", err)
+	}
+
+	stats := CalculateStats(versions)
+	stats.PackageName = params.PackageName
+
+	if params.JSONOutput {
+		return display.OutputJSON(out, stats)
+	}
+
+	return OutputStatsTable(out, stats, params.QuietMode)
 }
 
 // OutputStatsTable outputs package statistics in table format

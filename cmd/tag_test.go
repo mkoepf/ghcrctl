@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -94,5 +97,128 @@ func TestTagAddCommandHasFlags(t *testing.T) {
 		if flag == nil {
 			t.Errorf("Expected --%s flag to exist", flagName)
 		}
+	}
+}
+
+// =============================================================================
+// Tests for ExecuteTagAdd
+// =============================================================================
+
+// mockTagCopier implements TagCopier for testing
+type mockTagCopier struct {
+	resolvedDigest string
+	resolveErr     error
+	copyErr        error
+}
+
+func (m *mockTagCopier) ResolveTag(ctx context.Context, fullImage, tag string) (string, error) {
+	if m.resolveErr != nil {
+		return "", m.resolveErr
+	}
+	return m.resolvedDigest, nil
+}
+
+func (m *mockTagCopier) CopyTagByDigest(ctx context.Context, fullImage, digest, newTag string) error {
+	return m.copyErr
+}
+
+func TestExecuteTagAdd(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		params         TagAddParams
+		resolvedDigest string
+		resolveErr     error
+		copyErr        error
+		wantErr        bool
+		wantErrMsg     string
+		wantOutput     []string
+	}{
+		{
+			name: "successful add with source tag",
+			params: TagAddParams{
+				Owner:       "testowner",
+				PackageName: "testimage",
+				NewTag:      "latest",
+				SourceTag:   "v1.0.0",
+			},
+			resolvedDigest: "sha256:abc123",
+			wantErr:        false,
+			wantOutput: []string{
+				"Successfully added tag 'latest' to testimage (source: v1.0.0)",
+			},
+		},
+		{
+			name: "successful add with source digest",
+			params: TagAddParams{
+				Owner:        "testowner",
+				PackageName:  "testimage",
+				NewTag:       "production",
+				SourceDigest: "sha256:abc123def456789",
+			},
+			wantErr: false,
+			wantOutput: []string{
+				"Successfully added tag 'production' to testimage (source: sha256:abc123def456)",
+			},
+		},
+		{
+			name: "resolve tag failure",
+			params: TagAddParams{
+				Owner:       "testowner",
+				PackageName: "testimage",
+				NewTag:      "latest",
+				SourceTag:   "nonexistent",
+			},
+			resolveErr: fmt.Errorf("tag not found"),
+			wantErr:    true,
+			wantErrMsg: "failed to resolve source tag 'nonexistent'",
+		},
+		{
+			name: "copy tag failure",
+			params: TagAddParams{
+				Owner:        "testowner",
+				PackageName:  "testimage",
+				NewTag:       "latest",
+				SourceDigest: "sha256:abc123def456789",
+			},
+			copyErr:    fmt.Errorf("permission denied"),
+			wantErr:    true,
+			wantErrMsg: "failed to add tag",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockTagCopier{
+				resolvedDigest: tt.resolvedDigest,
+				resolveErr:     tt.resolveErr,
+				copyErr:        tt.copyErr,
+			}
+
+			var buf bytes.Buffer
+			ctx := context.Background()
+
+			err := ExecuteTagAdd(ctx, mock, tt.params, &buf)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExecuteTagAdd() error = %v, wantErr = %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr && tt.wantErrMsg != "" {
+				if !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("error message should contain %q, got %q", tt.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			output := buf.String()
+			for _, want := range tt.wantOutput {
+				if !strings.Contains(output, want) {
+					t.Errorf("output missing %q\nGot:\n%s", want, output)
+				}
+			}
+		})
 	}
 }

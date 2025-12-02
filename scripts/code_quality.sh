@@ -109,7 +109,7 @@ echo ""
 echo -e "${BLUE}[5/6] Running security scans... ${NC}"
 govulncheck ./...
 gosec ./...
-trivy fs . --skip-dirs .claude --scanners=vuln,misconfig,secret
+trivy fs . --skip-dirs .claude --scanners=vuln,misconfig,secret --exit-code 1
 
 ###########################################
 # 6. Coverage Report (informational only)

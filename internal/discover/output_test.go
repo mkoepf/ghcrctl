@@ -361,6 +361,116 @@ func TestFormatTable_Summary(t *testing.T) {
 	}
 }
 
+func TestFormatSize(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		bytes int64
+		want  string
+	}{
+		{
+			name:  "zero bytes",
+			bytes: 0,
+			want:  "-",
+		},
+		{
+			name:  "negative bytes",
+			bytes: -1,
+			want:  "-",
+		},
+		{
+			name:  "small bytes",
+			bytes: 500,
+			want:  "500 B",
+		},
+		{
+			name:  "exactly 1 KB",
+			bytes: 1024,
+			want:  "1.0 KB",
+		},
+		{
+			name:  "1.5 KB",
+			bytes: 1536,
+			want:  "1.5 KB",
+		},
+		{
+			name:  "exactly 1 MB",
+			bytes: 1024 * 1024,
+			want:  "1.0 MB",
+		},
+		{
+			name:  "50 MB",
+			bytes: 50 * 1024 * 1024,
+			want:  "50.0 MB",
+		},
+		{
+			name:  "exactly 1 GB",
+			bytes: 1024 * 1024 * 1024,
+			want:  "1.0 GB",
+		},
+		{
+			name:  "2.5 GB",
+			bytes: int64(2.5 * 1024 * 1024 * 1024),
+			want:  "2.5 GB",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatSize(tt.bytes)
+			if got != tt.want {
+				t.Errorf("formatSize(%d) = %q, want %q", tt.bytes, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatTypes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		types []string
+		want  string
+	}{
+		{
+			name:  "nil types",
+			types: nil,
+			want:  "unknown",
+		},
+		{
+			name:  "empty types",
+			types: []string{},
+			want:  "unknown",
+		},
+		{
+			name:  "single type",
+			types: []string{"index"},
+			want:  "index",
+		},
+		{
+			name:  "multiple types",
+			types: []string{"sbom", "provenance"},
+			want:  "sbom, provenance",
+		},
+		{
+			name:  "platform type",
+			types: []string{"linux/amd64"},
+			want:  "linux/amd64",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatTypes(tt.types)
+			if got != tt.want {
+				t.Errorf("formatTypes(%v) = %q, want %q", tt.types, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFormatTree_AlignedVersionIDs(t *testing.T) {
 	versions := []VersionInfo{
 		{

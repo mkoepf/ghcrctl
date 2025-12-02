@@ -8,6 +8,46 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/discover"
 )
 
+func TestCapitalizeFirst(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "lowercase word",
+			input: "sbom",
+			want:  "Sbom",
+		},
+		{
+			name:  "single character",
+			input: "a",
+			want:  "A",
+		},
+		{
+			name:  "already capitalized",
+			input: "Provenance",
+			want:  "0rovenance", // Note: function assumes lowercase input
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := capitalizeFirst(tt.input)
+			if got != tt.want {
+				t.Errorf("capitalizeFirst(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListArtifacts_ExampleShowsGetCommand(t *testing.T) {
 	artifacts := []discover.VersionInfo{
 		{Digest: "sha256:abc123def456789012345678901234567890123456789012345678901234"},

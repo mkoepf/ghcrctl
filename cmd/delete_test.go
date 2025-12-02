@@ -1157,3 +1157,57 @@ func TestExecuteBulkDelete(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Tests for helper functions
+// =============================================================================
+
+func TestFormatVersionType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		types []string
+		want  string
+	}{
+		{
+			name:  "empty types",
+			types: []string{},
+			want:  "unknown",
+		},
+		{
+			name:  "nil types",
+			types: nil,
+			want:  "unknown",
+		},
+		{
+			name:  "single type",
+			types: []string{"index"},
+			want:  "index",
+		},
+		{
+			name:  "signature type",
+			types: []string{"signature"},
+			want:  "signature",
+		},
+		{
+			name:  "platform type",
+			types: []string{"linux/amd64"},
+			want:  "linux/amd64",
+		},
+		{
+			name:  "multiple types returns first",
+			types: []string{"sbom", "provenance"},
+			want:  "sbom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatVersionType(tt.types)
+			if got != tt.want {
+				t.Errorf("formatVersionType(%v) = %q, want %q", tt.types, got, tt.want)
+			}
+		})
+	}
+}

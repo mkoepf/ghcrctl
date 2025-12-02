@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/mkoepf/ghcrctl/internal/logging"
+	"github.com/mkoepf/ghcrctl/internal/quiet"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,7 @@ var (
 // This enables parallel test execution by avoiding shared global state.
 func NewRootCmd() *cobra.Command {
 	var logAPICalls bool
+	var quietMode bool
 
 	root := &cobra.Command{
 		Use:   "ghcrctl",
@@ -32,19 +34,25 @@ It provides functionality for:
 - Safe deletion of package versions`, Version),
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
 			// Enable API call logging if flag is set
 			if logAPICalls {
-				ctx := logging.EnableLogging(cmd.Context())
-				cmd.SetContext(ctx)
+				ctx = logging.EnableLogging(ctx)
 			}
+			// Enable quiet mode if flag is set
+			if quietMode {
+				ctx = quiet.EnableQuiet(ctx)
+			}
+			cmd.SetContext(ctx)
 		},
 	}
 
 	// Set version for --version flag
 	root.Version = Version
 
-	// Add persistent flag for API call logging
+	// Add persistent flags
 	root.PersistentFlags().BoolVar(&logAPICalls, "log-api-calls", false, "Log all API calls with timing and categorization to stderr")
+	root.PersistentFlags().BoolVarP(&quietMode, "quiet", "q", false, "Suppress informational output (for scripting)")
 
 	// Add subcommands via their factories
 	root.AddCommand(newListCmd())

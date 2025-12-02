@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"bytes"
+	"strings"
 	"testing"
+
+	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
 // TestBuildVersionFilter verifies that the filter is built correctly from flags
@@ -195,5 +199,45 @@ func TestListVersionsCommandNoTreeFlag(t *testing.T) {
 	flag := versionsCmd.Flags().Lookup("tree")
 	if flag != nil {
 		t.Error("list versions command should NOT have --tree flag (use 'ghcrctl list images' instead)")
+	}
+}
+
+// TestOutputListVersionsTableQuietMode verifies quiet mode suppresses informational output
+func TestOutputListVersionsTableQuietMode(t *testing.T) {
+	t.Parallel()
+	versions := []gh.PackageVersionInfo{
+		{ID: 123, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01"},
+	}
+
+	// Normal mode should include header and summary
+	var normalBuf bytes.Buffer
+	err := OutputVersionsTable(&normalBuf, versions, "testpkg", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	normalOutput := normalBuf.String()
+	if !strings.Contains(normalOutput, "Versions for testpkg") {
+		t.Error("normal mode should include 'Versions for' header")
+	}
+	if !strings.Contains(normalOutput, "Total:") {
+		t.Error("normal mode should include 'Total:' summary")
+	}
+
+	// Quiet mode should NOT include header or summary
+	var quietBuf bytes.Buffer
+	err = OutputVersionsTable(&quietBuf, versions, "testpkg", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	quietOutput := quietBuf.String()
+	if strings.Contains(quietOutput, "Versions for testpkg") {
+		t.Error("quiet mode should NOT include 'Versions for' header")
+	}
+	if strings.Contains(quietOutput, "Total:") {
+		t.Error("quiet mode should NOT include 'Total:' summary")
+	}
+	// But should still have data
+	if !strings.Contains(quietOutput, "123") {
+		t.Error("quiet mode should still include version ID")
 	}
 }

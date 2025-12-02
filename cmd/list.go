@@ -10,6 +10,7 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/filter"
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/quiet"
 	"github.com/spf13/cobra"
 )
 
@@ -105,7 +106,7 @@ Examples:
 			if jsonOutput {
 				return display.OutputJSON(cmd.OutOrStdout(), packages)
 			}
-			return outputListPackagesTable(cmd.OutOrStdout(), packages, owner)
+			return outputListPackagesTable(cmd.OutOrStdout(), packages, owner, quiet.IsQuiet(cmd.Context()))
 		},
 	}
 
@@ -115,17 +116,23 @@ Examples:
 	return cmd
 }
 
-func outputListPackagesTable(w io.Writer, packages []string, owner string) error {
+func outputListPackagesTable(w io.Writer, packages []string, owner string, quietMode bool) error {
 	if len(packages) == 0 {
-		fmt.Fprintf(w, "No packages found for %s\n", owner)
+		if !quietMode {
+			fmt.Fprintf(w, "No packages found for %s\n", owner)
+		}
 		return nil
 	}
 
-	fmt.Fprintf(w, "Packages for %s:\n\n", owner)
+	if !quietMode {
+		fmt.Fprintf(w, "Packages for %s:\n\n", owner)
+	}
 	for _, pkg := range packages {
 		fmt.Fprintf(w, "  %s\n", pkg)
 	}
-	fmt.Fprintf(w, "\nTotal: %s package(s)\n", display.ColorCount(len(packages)))
+	if !quietMode {
+		fmt.Fprintf(w, "\nTotal: %s package(s)\n", display.ColorCount(len(packages)))
+	}
 
 	return nil
 }
@@ -267,7 +274,7 @@ Examples:
 			}
 
 			// Table output (default)
-			return outputListVersionsTable(cmd.OutOrStdout(), filteredVersions, packageName)
+			return OutputVersionsTable(cmd.OutOrStdout(), filteredVersions, packageName, quiet.IsQuiet(cmd.Context()))
 		},
 	}
 
@@ -292,14 +299,19 @@ Examples:
 	return cmd
 }
 
-// outputListVersionsTable outputs a flat list of versions
-func outputListVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageName string) error {
+// OutputVersionsTable outputs a flat list of versions (exported for testing).
+// If quiet is true, informational headers and summaries are suppressed.
+func OutputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageName string, quiet bool) error {
 	if len(versions) == 0 {
-		fmt.Fprintf(w, "No versions found for %s\n", packageName)
+		if !quiet {
+			fmt.Fprintf(w, "No versions found for %s\n", packageName)
+		}
 		return nil
 	}
 
-	fmt.Fprintf(w, "Versions for %s:\n\n", packageName)
+	if !quiet {
+		fmt.Fprintf(w, "Versions for %s:\n\n", packageName)
+	}
 
 	// Find column widths
 	maxIDLen := len("VERSION ID")
@@ -344,12 +356,14 @@ func outputListVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, pack
 			ver.CreatedAt)
 	}
 
-	// Summary
-	versionWord := "versions"
-	if len(versions) == 1 {
-		versionWord = "version"
+	// Summary (only in non-quiet mode)
+	if !quiet {
+		versionWord := "versions"
+		if len(versions) == 1 {
+			versionWord = "version"
+		}
+		fmt.Fprintf(w, "\nTotal: %s %s.\n", display.ColorCount(len(versions)), versionWord)
 	}
-	fmt.Fprintf(w, "\nTotal: %s %s.\n", display.ColorCount(len(versions)), versionWord)
 
 	return nil
 }
@@ -620,8 +634,8 @@ Examples:
 // =============================================================================
 
 // OutputPackagesTable is exported for testing - wraps outputListPackagesTable
-func OutputPackagesTable(w io.Writer, packages []string, owner string) error {
-	return outputListPackagesTable(w, packages, owner)
+func OutputPackagesTable(w io.Writer, packages []string, owner string, quietMode bool) error {
+	return outputListPackagesTable(w, packages, owner, quietMode)
 }
 
 // BuildVersionFilter is exported for testing - wraps buildListVersionFilter

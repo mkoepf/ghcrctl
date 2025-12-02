@@ -188,7 +188,7 @@ func TestPackagesOutputTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output in buffer
 			buf := &bytes.Buffer{}
-			err := OutputPackagesTable(buf, tt.packages, tt.owner)
+			err := OutputPackagesTable(buf, tt.packages, tt.owner, false)
 
 			if tt.wantErr {
 				if err == nil {

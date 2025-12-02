@@ -114,3 +114,20 @@ func TestRootCommandOutputIncludesVersion(t *testing.T) {
 		t.Errorf("Expected root command output to contain version, got:\n%s", output)
 	}
 }
+
+func TestRootCommandHasQuietFlag(t *testing.T) {
+	t.Parallel()
+	cmd := NewRootCmd()
+
+	// Check that --quiet flag exists
+	quietFlag := cmd.PersistentFlags().Lookup("quiet")
+	if quietFlag == nil {
+		t.Error("Expected --quiet persistent flag to exist")
+	}
+
+	// Check shorthand
+	qFlag := cmd.PersistentFlags().ShorthandLookup("q")
+	if qFlag == nil {
+		t.Error("Expected -q shorthand for --quiet flag")
+	}
+}

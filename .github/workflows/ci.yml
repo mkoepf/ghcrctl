@@ -109,7 +109,7 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ vars.COVERAGE_GIST_ID }}
-          filename: coverage.json
+          filename: ghcrctl-coverage.json
           label: coverage
           message: ${{ steps.coverage.outputs.coverage }}%
           valColorRange: ${{ steps.coverage.outputs.coverage }}

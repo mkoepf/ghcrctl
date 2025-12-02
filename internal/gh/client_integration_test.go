@@ -1,3 +1,5 @@
+//go:build !mutating
+
 package gh
 
 import (

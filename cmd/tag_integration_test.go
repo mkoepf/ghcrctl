@@ -1,3 +1,5 @@
+//go:build !mutating
+
 package cmd
 
 import (
@@ -13,9 +15,7 @@ func TestTagCommandIntegration(t *testing.T) {
 		t.Skip("GITHUB_TOKEN not set, skipping integration test")
 	}
 
-	// Note: This test requires write:packages permission which the integration test token doesn't have
-	// We verify the command structure and error handling, but can't test actual tag creation
-	// without a token with write permissions
+	// TODO: Add integration tests for actual tag creation (token has write:packages permission)
 
 	tests := []struct {
 		name          string

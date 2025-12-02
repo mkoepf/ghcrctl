@@ -37,6 +37,9 @@ jobs:
     name: Test
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: write
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -140,6 +143,9 @@ jobs:
     name: Mutating Tests
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: write
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

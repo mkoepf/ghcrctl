@@ -333,6 +333,29 @@ This command creates a new tag reference pointing to the same image digest as th
 - Add semantic version alias: `ghcrctl tag add mkoepf/myapp v1.2 --tag v1.2.3`
 - Tag for environment: `ghcrctl tag add mkoepf/myapp production --tag v2.1.0`
 
+### Why There Is No Tag Delete Command
+
+GHCR does not support deleting individual tags. The standard OCI Distribution Spec
+`DELETE /v2/<name>/manifests/<tag>` endpoint returns `UNSUPPORTED` on ghcr.io.
+
+The only deletion method available is via GitHub's REST API, which deletes **entire
+package versions** (the manifest and all tags pointing to it). If an image has multiple
+tags (e.g., `v1.0.0` and `latest`), you cannot remove just one tag while keeping the
+other - deleting removes both because they reference the same digest.
+
+**Workaround:** To "move" a tag like `latest` from an old version to a new one, use
+`ghcrctl tag add` to point the tag at the new digest. The old reference is implicitly
+overwritten:
+
+```bash
+# "Move" latest from v1.0.0 to v2.0.0
+ghcrctl tag add mkoepf/myapp latest --tag v2.0.0
+```
+
+For more details, see:
+- [GitHub Community Discussion #26267](https://github.com/orgs/community/discussions/26267)
+- [GitHub Docs - Working with Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+
 ### Delete Package Versions
 
 Safely delete package versions or complete OCI images from GHCR.

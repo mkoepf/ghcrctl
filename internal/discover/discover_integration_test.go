@@ -269,3 +269,100 @@ func TestResolveTag_Integration_NonExistent(t *testing.T) {
 		t.Error("Expected error for non-existent tag")
 	}
 }
+
+// =============================================================================
+// FetchImageConfig Integration Tests
+// =============================================================================
+
+func TestFetchImageConfig_Integration_MultiArch(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
+
+	// Resolve the "latest" tag to get the index digest
+	digest, err := ResolveTag(ctx, image, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve tag: %v", err)
+	}
+
+	// Fetch the image config - this exercises the Image Index code path
+	config, err := FetchImageConfig(ctx, image, digest)
+	if err != nil {
+		t.Fatalf("FetchImageConfig failed: %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("Expected non-nil config")
+	}
+
+	// Verify config has expected fields
+	if config.OS == "" {
+		t.Error("Expected config.OS to be set")
+	}
+	if config.Architecture == "" {
+		t.Error("Expected config.Architecture to be set")
+	}
+
+	t.Logf("Multi-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
+}
+
+func TestFetchImageConfig_Integration_SingleArch(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	image := "ghcr.io/mkoepf/ghcrctl-test-no-sbom"
+
+	// Resolve the "latest" tag
+	digest, err := ResolveTag(ctx, image, "latest")
+	if err != nil {
+		t.Fatalf("Failed to resolve tag: %v", err)
+	}
+
+	// Fetch the image config - this exercises the simple manifest code path
+	config, err := FetchImageConfig(ctx, image, digest)
+	if err != nil {
+		t.Fatalf("FetchImageConfig failed: %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("Expected non-nil config")
+	}
+
+	// Verify config has expected fields
+	if config.OS == "" {
+		t.Error("Expected config.OS to be set")
+	}
+	if config.Architecture == "" {
+		t.Error("Expected config.Architecture to be set")
+	}
+
+	t.Logf("Single-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
+}
+
+func TestFetchImageConfig_Integration_NonExistent(t *testing.T) {
+	t.Parallel()
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	ctx := context.Background()
+	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
+	// Valid format but non-existent digest
+	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+	_, err := FetchImageConfig(ctx, image, invalidDigest)
+	if err == nil {
+		t.Error("Expected error for non-existent digest")
+	}
+
+	if !strings.Contains(err.Error(), "failed to resolve digest") {
+		t.Errorf("Expected error to contain 'failed to resolve digest', got: %v", err)
+	}
+}

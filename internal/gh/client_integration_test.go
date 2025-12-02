@@ -373,3 +373,114 @@ func TestVersionIDNotFound(t *testing.T) {
 
 	t.Logf("✓ Correctly handled non-existent digest")
 }
+
+// ===[ ListPackages Tests ]===
+
+// TestListPackages_Integration_User tests listing packages for a user
+func TestListPackages_Integration_User(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	owner := "mkoepf"
+	ownerType := "user"
+
+	packages, err := client.ListPackages(ctx, owner, ownerType)
+	if err != nil {
+		t.Fatalf("ListPackages() error = %v", err)
+	}
+
+	// Should have at least the test packages
+	if len(packages) == 0 {
+		t.Skip("No packages found - integration test images may not be created yet")
+	}
+
+	t.Logf("Found %d packages for user %s", len(packages), owner)
+
+	// Verify results are sorted alphabetically
+	for i := 1; i < len(packages); i++ {
+		if packages[i-1] > packages[i] {
+			t.Errorf("Packages not sorted: %s > %s", packages[i-1], packages[i])
+		}
+	}
+
+	// Log first few packages
+	for i, pkg := range packages {
+		if i < 5 {
+			t.Logf("  Package %d: %s", i+1, pkg)
+		}
+	}
+}
+
+// TestListPackages_Integration_Org tests listing packages for an organization
+func TestListPackages_Integration_Org(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	// Use github org which has public container packages
+	owner := "github"
+	ownerType := "org"
+
+	packages, err := client.ListPackages(ctx, owner, ownerType)
+	if err != nil {
+		// Some tokens may not have access to org packages, or org may not have public packages
+		if strings.Contains(err.Error(), "cannot list packages") ||
+			strings.Contains(err.Error(), "404") {
+			t.Skipf("Token does not have access to list packages for org %s: %v", owner, err)
+		}
+		t.Fatalf("ListPackages() error = %v", err)
+	}
+
+	t.Logf("Found %d packages for org %s", len(packages), owner)
+
+	// Verify results are sorted if we got any
+	if len(packages) > 1 {
+		for i := 1; i < len(packages); i++ {
+			if packages[i-1] > packages[i] {
+				t.Errorf("Packages not sorted: %s > %s", packages[i-1], packages[i])
+			}
+		}
+	}
+}
+
+// TestListPackages_Integration_NonExistentOwner tests error handling for non-existent owner
+func TestListPackages_Integration_NonExistentOwner(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
+	}
+
+	client, err := NewClient(token)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+	owner := "this-user-definitely-does-not-exist-12345"
+	ownerType := "user"
+
+	_, err = client.ListPackages(ctx, owner, ownerType)
+	if err == nil {
+		t.Error("Expected error for non-existent owner, got none")
+	}
+
+	t.Logf("Got expected error for non-existent owner: %v", err)
+}

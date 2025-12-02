@@ -76,23 +76,40 @@ jobs:
 
       - name: Report test coverage
         if: matrix.os == 'ubuntu-latest'
+        id: coverage
         run: |
           coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${coverage}%"
-          echo "Note: Coverage is measured but does not fail CI"
+          echo "coverage=${coverage}" >> $GITHUB_OUTPUT
 
           echo ""
           echo "Coverage by package:"
           go tool cover -func=coverage.out
 
-      - name: Upload coverage to Codecov
+      - name: Generate HTML coverage report
         if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v5
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage HTML report
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v5
         with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+          name: coverage-report
+          path: coverage.html
+          retention-days: 30
+
+      - name: Update coverage badge
+        if: matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.COVERAGE_GIST_ID }}
+          filename: coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.coverage }}%
+          valColorRange: ${{ steps.coverage.outputs.coverage }}
+          maxColorRange: 100
+          minColorRange: 0
 
   security:
     name: Security Scan

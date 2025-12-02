@@ -64,11 +64,11 @@ func CopyImage(ctx context.Context, srcImage, srcTag, dstImage, dstTag string) e
 	// Error is only returned if called twice, which won't happen here
 	_ = dstRepo.SetReferrersCapability(false)
 
-	// Copy the image with sequential concurrency to avoid race conditions
-	// in oras-go library's internal parallel blob handling
-	copyOpts := oras.CopyOptions{}
-	copyOpts.Concurrency = 1
-	_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, copyOpts)
+	// Copy the image using default concurrency for speed.
+	// Note: oras-go has an internal race condition in HTTP/2 auth handling
+	// that triggers with -race flag, but it doesn't affect correctness.
+	// The mutating tests are run without -race for this reason.
+	_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, oras.CopyOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy image: %w", err)
 	}

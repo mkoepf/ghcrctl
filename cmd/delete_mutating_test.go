@@ -16,8 +16,7 @@ import (
 )
 
 func TestDeletePackage_Mutating(t *testing.T) {
-	// Note: t.Parallel() is disabled due to race conditions in oras-go library
-	// when multiple copies run concurrently (internal http2PusherState race)
+	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -59,7 +58,7 @@ func TestDeletePackage_Mutating(t *testing.T) {
 }
 
 func TestDeletePackageVersion_Mutating(t *testing.T) {
-	// Note: t.Parallel() is disabled due to race conditions in oras-go library
+	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -135,7 +134,7 @@ func TestDeletePackageVersion_Mutating(t *testing.T) {
 
 // TestDeleteVersionCmd_ByVersionID tests delete version --version <id>
 func TestDeleteVersionCmd_ByVersionID(t *testing.T) {
-	// Note: t.Parallel() is disabled due to race conditions in oras-go library
+	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -217,6 +216,8 @@ func TestDeleteVersionCmd_ByVersionID(t *testing.T) {
 
 // TestDeleteVersionCmd_ByDigest tests delete version --digest <digest>
 func TestDeleteVersionCmd_ByDigest(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -274,6 +275,8 @@ func TestDeleteVersionCmd_ByDigest(t *testing.T) {
 
 // TestDeleteVersionCmd_ByTag tests delete version --tag <tag>
 func TestDeleteVersionCmd_ByTag(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -328,6 +331,8 @@ func TestDeleteVersionCmd_ByTag(t *testing.T) {
 
 // TestDeleteImageCmd_ByTag tests delete image --tag <tag>
 func TestDeleteImageCmd_ByTag(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -383,6 +388,8 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 
 // TestDeleteImageCmd_ByDigest tests delete image --digest <digest>
 func TestDeleteImageCmd_ByDigest(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -440,6 +447,8 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 
 // TestDeletePackageCmd tests delete package command
 func TestDeletePackageCmd(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -499,6 +508,8 @@ func TestDeletePackageCmd(t *testing.T) {
 
 // TestDeleteVersionCmd_BulkUntagged tests delete version --untagged
 func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")
@@ -566,6 +577,8 @@ func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
 
 // TestDeleteImageCmd_ActualDelete tests actual deletion (not just dry-run)
 func TestDeleteImageCmd_ActualDelete(t *testing.T) {
+	t.Parallel()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		t.Fatal("GITHUB_TOKEN not set")

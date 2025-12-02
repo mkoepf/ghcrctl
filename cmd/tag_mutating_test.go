@@ -19,8 +19,7 @@ const (
 )
 
 func TestAddTag_Mutating(t *testing.T) {
-	// Note: t.Parallel() is disabled due to race conditions in oras-go library
-	// when multiple copies run concurrently (internal http2PusherState race)
+	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -78,7 +77,7 @@ func TestAddTag_Mutating(t *testing.T) {
 }
 
 func TestAddTagFromTag_Mutating(t *testing.T) {
-	// Note: t.Parallel() is disabled due to race conditions in oras-go library
+	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {

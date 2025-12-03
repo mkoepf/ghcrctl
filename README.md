@@ -68,7 +68,7 @@ go build -o ghcrctl .
 
 ## Usage
 
-All commands use the `owner/image[:tag]` format, where owner is automatically detected as user or organization.
+Most commands use the `owner/package` format, where owner is automatically detected as user or organization. Some commands like `list packages` take just `owner`.
 
 ### Authentication
 
@@ -723,8 +723,6 @@ This project is under active development following an iterative approach:
 - ✅ **Iteration 9**: Advanced Deletion Operations (Graph deletion)
 - ⏳ **Iteration 10**: Interactive Mode & Polish
 
-See [spec/plan.md](spec/plan.md) for the detailed development plan.
-
 ## Testing
 
 ### Quick Test
@@ -748,8 +746,8 @@ GitHub Container Registry images.
 #### How Integration Tests Work
 
 Integration tests require real GHCR images with attestations. These are built
-and pushed to ghcr by the [prepare-integration-test
-workflow](.github/workflows/prepare-integration-test.yml). The workflow is
+and pushed to ghcr by the [prepare_integration_test
+workflow](.github/workflows/prepare_integration_test.yml). The workflow is
 triggered manually and does not need to be re-run, unless new tests require 
 more or different images.
 
@@ -771,7 +769,7 @@ packages within the repository scope.
 **For Local Development:**
 
 Since the test images are packages of the ghcrctl repository, you need a token
-with `read:packages` scope for the repo `https://github.com/mkoepf/ghcrct`:
+with `read:packages` scope for the repo `https://github.com/mkoepf/ghcrctl`:
 
 **Option 1: Fine-Grained Personal Access Token (Recommended)**
 1. Create a fine-grained PAT at https://github.com/settings/tokens?type=beta

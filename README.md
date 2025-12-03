@@ -11,13 +11,14 @@ A command-line tool for interacting with GitHub Container Registry (GHCR).
 ghcrctl provides functionality for:
 
 - **Exploring packages** and their versions (multi-arch platforms, SBOM, provenance, signatures)
+- **Package statistics** (version counts, date ranges)
 - **Viewing images** with their OCI artifact relationships (platforms, attestations)
 - **Viewing labels** (OCI annotations) embedded in container images
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Discovering signatures** and attestations from both Docker buildx and cosign
 - **Managing GHCR version metadata** (labels, tags)
-- **Safe deletion** of package versions and complete OCI graphs
+- **Safe deletion** of package versions, images, and entire packages
 - **Shell completion** with dynamic package name suggestions
 
 ## Installation
@@ -54,6 +55,19 @@ export GITHUB_TOKEN=ghp_your_token_here
 - `write:packages` - for write operations (tag command)
 
 **Note:** GitHub App installation tokens (`ghs_*` prefix) are not supported for write operations to GHCR via the OCI registry API.
+
+### Global Flags
+
+These flags are available on all commands:
+
+```bash
+# Suppress informational output (for scripting)
+ghcrctl list versions mkoepf/myimage --quiet
+ghcrctl list versions mkoepf/myimage -q
+
+# Log all API calls with timing (for debugging/performance analysis)
+ghcrctl list images mkoepf/myimage --log-api-calls
+```
 
 ### List Packages
 
@@ -195,6 +209,31 @@ ghcrctl list versions mkoepf/myimage -o json
 - Understand which versions are tagged vs untagged
 - Find orphaned versions for cleanup
 - Quick lookup of version IDs for deletion
+
+### Package Statistics
+
+Display statistics for a container package:
+
+```bash
+ghcrctl stats mkoepf/myimage
+```
+
+This command shows an overview including:
+- Total number of versions
+- Number of tagged vs untagged versions
+- Date range (oldest and newest versions)
+
+**Options:**
+
+```bash
+# Output as JSON
+ghcrctl stats mkoepf/myimage --json
+```
+
+**Use cases:**
+- Quick overview of package size and age
+- Identify packages with many untagged versions for cleanup
+- Audit package activity over time
 
 ### Get Image Labels
 
@@ -375,8 +414,9 @@ ghcrctl delete version mkoepf/myimage --digest abc123
 # Delete by tag
 ghcrctl delete version mkoepf/myimage --tag v1.0.0
 
-# Skip confirmation prompt
+# Skip confirmation prompt (--force or -y)
 ghcrctl delete version mkoepf/myimage --version 12345678 --force
+ghcrctl delete version mkoepf/myimage --version 12345678 -y
 
 # Preview what would be deleted (dry-run)
 ghcrctl delete version mkoepf/myimage --version 12345678 --dry-run
@@ -451,8 +491,9 @@ ghcrctl delete image mkoepf/myimage --digest sha256:abc123...
 # Delete image containing a specific version
 ghcrctl delete image mkoepf/myimage --version 12345678
 
-# Skip confirmation
+# Skip confirmation (--force or -y)
 ghcrctl delete image mkoepf/myimage --tag v1.0.0 --force
+ghcrctl delete image mkoepf/myimage --tag v1.0.0 -y
 
 # Preview what would be deleted
 ghcrctl delete image mkoepf/myimage --tag v1.0.0 --dry-run
@@ -485,6 +526,35 @@ For a multi-arch image with attestations, this command discovers and deletes:
 - Must use Personal Access Token (not GitHub App installation token)
 
 **IMPORTANT:** Deletion is permanent and cannot be undone (except within 30 days via the GitHub web UI if the package namespace is still available).
+
+#### Delete an Entire Package
+
+Delete a complete package including all versions:
+
+```bash
+# Delete a package (will prompt for confirmation)
+ghcrctl delete package mkoepf/myimage
+
+# Skip confirmation
+ghcrctl delete package mkoepf/myimage --force
+```
+
+This command deletes the package and ALL its versions permanently. Use this when you need to remove an entire package or when you cannot delete the last tagged version individually.
+
+**Use cases:**
+- Remove an entire package that is no longer needed
+- Clean up test or temporary packages
+- Delete packages when individual version deletion fails
+
+**Safety features:**
+- Confirmation prompt (unless `--force` or `-y`)
+- Clear warning about permanent deletion
+
+**Requirements:**
+- GITHUB_TOKEN with `write:packages` and `delete:packages` scope
+- Must use Personal Access Token (not GitHub App installation token)
+
+**IMPORTANT:** This deletes the entire package and all versions. This action is permanent and cannot be undone (except within 30 days via the GitHub web UI if the package namespace is still available).
 
 ### Shell Completion
 
@@ -531,6 +601,7 @@ ghcrctl list --help
 ghcrctl list packages --help
 ghcrctl list images --help
 ghcrctl list versions --help
+ghcrctl stats --help
 ghcrctl get --help
 ghcrctl get labels --help
 ghcrctl get sbom --help
@@ -540,6 +611,7 @@ ghcrctl tag add --help
 ghcrctl delete --help
 ghcrctl delete version --help
 ghcrctl delete image --help
+ghcrctl delete package --help
 ghcrctl completion --help
 ```
 

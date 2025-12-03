@@ -52,7 +52,7 @@ func TestCountIncomingRefsRootVersion(t *testing.T) {
 	t.Logf("Root version ID: %d, digest: %s", rootVersionID, rootDigest)
 
 	// Count incoming refs (versions that reference this version)
-	count := CountIncomingRefs(ctx, client, owner, ownerType, imageName, rootVersionID)
+	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, rootVersionID)
 
 	t.Logf("Root version incoming ref count: %d", count)
 
@@ -86,7 +86,7 @@ func TestCountIncomingRefsNonexistentVersion(t *testing.T) {
 	nonexistentVersionID := int64(999999999)
 
 	// Count membership
-	count := CountIncomingRefs(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
+	count := countIncomingRefs(ctx, client, owner, ownerType, imageName, nonexistentVersionID)
 
 	t.Logf("Nonexistent version membership count: %d", count)
 

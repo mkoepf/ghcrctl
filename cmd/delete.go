@@ -550,7 +550,7 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 	}
 
 	// Count how many other versions reference this one
-	imageCount := countIncomingRefsForVersion(ctx, client, owner, ownerType, packageName, targetVersionID)
+	imageCount := countIncomingRefs(ctx, client, owner, ownerType, packageName, targetVersionID)
 
 	// Show what will be deleted
 	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
@@ -1057,13 +1057,8 @@ func deleteVersionsInOrder(ctx context.Context, client *gh.Client, owner, ownerT
 	return nil
 }
 
-// CountIncomingRefs is exported for testing - returns how many other versions reference the given version ID.
-func CountIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionID int64) int {
-	return countIncomingRefsForVersion(ctx, client, owner, ownerType, packageName, versionID)
-}
-
-// countIncomingRefsForVersion returns how many other versions reference the given version ID.
-func countIncomingRefsForVersion(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionID int64) int {
+// countIncomingRefs returns how many other versions reference the given version ID.
+func countIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType, packageName string, versionID int64) int {
 	// Get all versions for this package
 	allVersions, err := client.ListPackageVersions(ctx, owner, ownerType, packageName)
 	if err != nil {

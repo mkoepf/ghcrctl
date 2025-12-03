@@ -337,7 +337,7 @@ func TestBuildDeleteFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter, err := BuildDeleteFilterWithFlags(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
+			filter, err := buildDeleteVersionFilter(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
 				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays)
 
 			if tt.wantErr {
@@ -559,7 +559,7 @@ func TestDisplayImageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			DisplayImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
+			displayDeleteImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
 			output := buf.String()
 
 			for _, want := range tt.wantContains {

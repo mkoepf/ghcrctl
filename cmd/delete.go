@@ -774,6 +774,10 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 // buildDeleteVersionFilter creates a VersionFilter from command-line flags
 func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
+	// Check for conflicting flags
+	if onlyTagged && onlyUntagged {
+		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
+	}
 
 	vf := &filter.VersionFilter{
 		OnlyTagged:    onlyTagged,
@@ -895,21 +899,6 @@ type BulkDeleteParams struct {
 	Versions  []gh.PackageVersionInfo
 	Force     bool
 	DryRun    bool
-}
-
-// BuildDeleteFilterWithFlags is exported for testing - wraps buildDeleteVersionFilter
-func BuildDeleteFilterWithFlags(tagPattern string, onlyTagged, onlyUntagged bool,
-	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
-	// Check for conflicting flags - this validation was in older code
-	if onlyTagged && onlyUntagged {
-		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
-	}
-	return buildDeleteVersionFilter(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
-}
-
-// DisplayImageVersions is exported for testing - wraps displayDeleteImageVersions
-func DisplayImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
-	displayDeleteImageVersions(w, toDelete, shared, imageVersions)
 }
 
 // DeleteGraphWithDeleter deletes versions using a deleter interface (for testing)

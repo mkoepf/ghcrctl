@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/google/go-github/v58/github"
@@ -143,22 +144,9 @@ func (c *Client) ListPackages(ctx context.Context, owner string, ownerType strin
 	}
 
 	// Sort packages alphabetically
-	sortPackages(allPackages)
+	sort.Strings(allPackages)
 
 	return allPackages, nil
-}
-
-// sortPackages sorts a slice of package names alphabetically
-func sortPackages(packages []string) {
-	// Simple bubble sort (good enough for small lists)
-	n := len(packages)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if packages[j] > packages[j+1] {
-				packages[j], packages[j+1] = packages[j+1], packages[j]
-			}
-		}
-	}
 }
 
 // GetVersionIDByDigest finds the GHCR version ID for a specific OCI digest

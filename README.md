@@ -579,8 +579,9 @@ This command deletes the package and ALL its versions permanently. Use this when
 - Delete packages when individual version deletion fails
 
 **Safety features:**
-- Confirmation prompt (unless `--force` or `-y`)
-- Clear warning about permanent deletion
+- Shows version count before deletion (total, tagged, untagged)
+- Requires typing the package name to confirm (not just y/n)
+- Use `--force` only for automated scripts where you accept the risk
 
 **Requirements:**
 - GITHUB_TOKEN with `write:packages` and `delete:packages` scope

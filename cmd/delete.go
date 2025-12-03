@@ -467,23 +467,41 @@ Examples:
 				return fmt.Errorf("failed to determine owner type: %w", err)
 			}
 
+			// Fetch version count to show the user what they're deleting
+			versions, err := client.ListPackageVersions(ctx, owner, ownerType, packageName)
+			if err != nil {
+				cmd.SilenceUsage = true
+				return fmt.Errorf("failed to list package versions: %w", err)
+			}
+
+			// Count tagged vs untagged
+			taggedCount := 0
+			for _, v := range versions {
+				if len(v.Tags) > 0 {
+					taggedCount++
+				}
+			}
+			untaggedCount := len(versions) - taggedCount
+
 			// Show what will be deleted
 			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete entire package:\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "  Package: %s/%s\n", owner, packageName)
-			fmt.Fprintf(cmd.OutOrStdout(), "  Owner:   %s (%s)\n\n", owner, ownerType)
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n", display.ColorWarning("WARNING: This will delete ALL versions of this package!"))
+			fmt.Fprintf(cmd.OutOrStdout(), "  Package:  %s/%s\n", owner, packageName)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Owner:    %s (%s)\n", owner, ownerType)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Versions: %s (%d tagged, %d untagged)\n\n",
+				display.ColorWarning(fmt.Sprintf("%d total", len(versions))), taggedCount, untaggedCount)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n", display.ColorError("WARNING: This will permanently delete ALL versions of this package!"))
 
 			// Confirm deletion unless --force or --yes is used
 			skipConfirm := force || yes
 			if !skipConfirm {
-				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(),
-					display.ColorError("Are you sure you want to delete the entire package?"))
+				confirmed, err := prompts.ConfirmWithInput(os.Stdin, cmd.OutOrStdout(),
+					"To confirm, type the package name", packageName)
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
 
 				if !confirmed {
-					fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled")
+					fmt.Fprintln(cmd.OutOrStdout(), "Deletion cancelled (input did not match package name)")
 					return nil
 				}
 			}

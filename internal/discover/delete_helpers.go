@@ -148,6 +148,16 @@ func FindDigestByShortDigest(versions map[string]VersionInfo, input string) (str
 	return matches[0], nil
 }
 
+// FindDigestByVersionID finds a full digest from a version ID.
+func FindDigestByVersionID(versions map[string]VersionInfo, versionID int64) (string, error) {
+	for _, v := range versions {
+		if v.ID == versionID {
+			return v.Digest, nil
+		}
+	}
+	return "", fmt.Errorf("version ID %d not found", versionID)
+}
+
 // canReach checks if we can reach targetDigest starting from startDigest via OutgoingRefs.
 func canReach(versions map[string]VersionInfo, startDigest, targetDigest string) bool {
 	if startDigest == targetDigest {

@@ -227,7 +227,7 @@ func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string,
 // listArtifacts lists available artifacts without fetching their content
 func listArtifacts(w io.Writer, artifacts []discover.VersionInfo, imageName, artifactType string) error {
 	fmt.Fprintf(w, "Multiple %s documents found for %s\n\n", artifactType, imageName)
-	fmt.Fprintf(w, "Use --digest <digest> to select one, or --all to show all:\n\n")
+	fmt.Fprintf(w, "Select one by digest, or use --all to show all:\n\n")
 
 	for i, artifact := range artifacts {
 		fmt.Fprintf(w, "  %d. %s\n", i+1, artifact.Digest)

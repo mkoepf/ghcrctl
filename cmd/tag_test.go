@@ -91,7 +91,7 @@ func TestTagAddCommandHasFlags(t *testing.T) {
 	}
 
 	// Check for selector flags
-	flags := []string{"tag", "digest"}
+	flags := []string{"tag", "digest", "version"}
 	for _, flagName := range flags {
 		flag := tagAddCmd.Flags().Lookup(flagName)
 		if flag == nil {

@@ -80,7 +80,7 @@ func TestGetProvenanceCommandHasFlags(t *testing.T) {
 	provenanceCmd, _, _ := cmd.Find([]string{"get", "provenance"})
 
 	// Check for required flags
-	flags := []string{"tag", "digest", "provenance-digest", "all", "json"}
+	flags := []string{"tag", "digest", "version", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := provenanceCmd.Flags().Lookup(flagName)

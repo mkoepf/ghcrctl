@@ -390,3 +390,42 @@ func TestFindDigestByShortDigest(t *testing.T) {
 		t.Error("Expected error for ambiguous short digest")
 	}
 }
+
+func TestFindDigestByVersionID(t *testing.T) {
+	t.Parallel()
+
+	versions := map[string]VersionInfo{
+		"sha256:abcdef123456789012345678901234567890123456789012345678901234": {
+			ID:     12345,
+			Digest: "sha256:abcdef123456789012345678901234567890123456789012345678901234",
+		},
+		"sha256:123456abcdef789012345678901234567890123456789012345678901234": {
+			ID:     67890,
+			Digest: "sha256:123456abcdef789012345678901234567890123456789012345678901234",
+		},
+	}
+
+	// Find by existing version ID
+	result, err := FindDigestByVersionID(versions, 12345)
+	if err != nil {
+		t.Errorf("Expected no error for existing version ID, got %v", err)
+	}
+	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
+		t.Errorf("Expected first digest, got %s", result)
+	}
+
+	// Find second version ID
+	result, err = FindDigestByVersionID(versions, 67890)
+	if err != nil {
+		t.Errorf("Expected no error for second version ID, got %v", err)
+	}
+	if result != "sha256:123456abcdef789012345678901234567890123456789012345678901234" {
+		t.Errorf("Expected second digest, got %s", result)
+	}
+
+	// Error for nonexistent version ID
+	_, err = FindDigestByVersionID(versions, 99999)
+	if err == nil {
+		t.Error("Expected error for nonexistent version ID")
+	}
+}

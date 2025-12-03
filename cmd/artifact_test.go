@@ -120,7 +120,7 @@ func TestListArtifacts_OutputFormat(t *testing.T) {
 	}
 
 	// Should show usage hint
-	if !strings.Contains(output, "Use --digest <digest> to select one") {
+	if !strings.Contains(output, "Select one by digest") {
 		t.Errorf("Expected usage hint, got:\n%s", output)
 	}
 }

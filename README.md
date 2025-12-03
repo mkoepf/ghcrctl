@@ -241,10 +241,11 @@ Display OCI labels (annotations/metadata) from a container image:
 
 ```bash
 ghcrctl get labels mkoepf/myimage --tag v1.0.0
-ghcrctl get labels mkoepf/myimage --digest sha256:abc123...
+ghcrctl get labels mkoepf/myimage --version 12345678
+ghcrctl get labels mkoepf/myimage --digest abc123
 ```
 
-Requires a selector: `--tag` or `--digest` to specify which version.
+Requires a selector: `--tag`, `--digest`, or `--version` to specify which version. The `--digest` flag supports short form (first 12 characters).
 
 Labels are key-value pairs embedded in the image config at build time using Docker LABEL instructions. Common labels include:
 - `org.opencontainers.image.source` - Source repository URL
@@ -264,27 +265,27 @@ ghcrctl get labels mkoepf/myimage --tag latest --json
 
 ### Get SBOM (Software Bill of Materials)
 
-Display the SBOM attestation for a container image:
+Display the SBOM attestation for a container image or version:
 
 ```bash
 ghcrctl get sbom mkoepf/myimage --tag v1.0.0
-ghcrctl get sbom mkoepf/myimage --digest sha256:abc123...
+ghcrctl get sbom mkoepf/myimage --version 12345678
+ghcrctl get sbom mkoepf/myimage --digest abc123
 ```
 
-Requires a selector: `--tag` or `--digest` to specify which version.
+Requires a selector: `--tag`, `--digest`, or `--version`. The `--digest` flag supports short form.
+
+If the selected version is itself an SBOM, it is displayed directly. Otherwise, the command finds SBOMs in the image containing that version.
 
 The command automatically handles multiple SBOMs:
 - **One SBOM found**: Displays it automatically
-- **Multiple SBOMs found**: Lists them and prompts you to select one
+- **Multiple SBOMs found**: Lists them so you can select a specific one
 - **No SBOM found**: Clear error message
 
 **Options:**
 
 ```bash
-# Select a specific SBOM by its digest
-ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --sbom-digest abc123def456
-
-# Show all SBOMs
+# Show all SBOMs for an image
 ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
@@ -295,7 +296,7 @@ ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --json
 ```
 Multiple sbom documents found for myimage
 
-Use --digest <digest> to select one, or --all to show all:
+Select one by digest, or use --all to show all:
 
   1. sha256:abc123def456...
   2. sha256:789xyz123456...
@@ -311,14 +312,17 @@ Example: ghcrctl get sbom myimage --digest abc123def456
 
 ### Get Provenance Attestation
 
-Display the provenance attestation for a container image:
+Display the provenance attestation for a container image or version:
 
 ```bash
 ghcrctl get provenance mkoepf/myimage --tag v1.0.0
-ghcrctl get provenance mkoepf/myimage --digest sha256:abc123...
+ghcrctl get provenance mkoepf/myimage --version 12345678
+ghcrctl get provenance mkoepf/myimage --digest abc123
 ```
 
-Requires a selector: `--tag` or `--digest` to specify which version.
+Requires a selector: `--tag`, `--digest`, or `--version`. The `--digest` flag supports short form.
+
+If the selected version is itself a provenance attestation, it is displayed directly. Otherwise, the command finds provenance in the image containing that version.
 
 Provenance attestations contain build information including:
 - Builder details (GitHub Actions, GitLab CI, etc.)
@@ -329,10 +333,7 @@ Provenance attestations contain build information including:
 **Options:**
 
 ```bash
-# Select specific provenance by its digest
-ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --provenance-digest abc123def456
-
-# Show all provenance documents
+# Show all provenance documents for an image
 ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
@@ -356,10 +357,11 @@ Add a new tag to an existing image version:
 
 ```bash
 ghcrctl tag add mkoepf/myimage latest --tag v1.0.0
-ghcrctl tag add mkoepf/myimage stable --digest sha256:abc123...
+ghcrctl tag add mkoepf/myimage stable --version 12345678
+ghcrctl tag add mkoepf/myimage stable --digest abc123
 ```
 
-Requires a selector: `--tag` or `--digest` to specify the source version.
+Requires a selector: `--tag`, `--digest`, or `--version` to specify the source version. The `--digest` flag supports short form.
 
 This command creates a new tag reference pointing to the same image digest as the source, using the OCI registry API. It works like `docker tag` but operates directly on GHCR.
 
@@ -371,6 +373,7 @@ This command creates a new tag reference pointing to the same image digest as th
 - Promote a version to `latest`: `ghcrctl tag add mkoepf/myapp latest --tag v2.1.0`
 - Add semantic version alias: `ghcrctl tag add mkoepf/myapp v1.2 --tag v1.2.3`
 - Tag for environment: `ghcrctl tag add mkoepf/myapp production --tag v2.1.0`
+- Tag by version ID: `ghcrctl tag add mkoepf/myapp release --version 12345678`
 
 ### Why There Is No Tag Delete Command
 

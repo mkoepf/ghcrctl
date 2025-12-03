@@ -76,7 +76,7 @@ func TestLabelsCommandHasFlags(t *testing.T) {
 	}
 
 	// Check for selector flags
-	flags := []string{"tag", "digest", "key", "json"}
+	flags := []string{"tag", "digest", "version", "key", "json"}
 	for _, flagName := range flags {
 		flag := labelsCmd.Flags().Lookup(flagName)
 		if flag == nil {

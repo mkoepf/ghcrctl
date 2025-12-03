@@ -6,6 +6,8 @@ import (
 	"io"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
+	"github.com/mkoepf/ghcrctl/internal/display"
+	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/spf13/cobra"
 )
 
@@ -72,8 +74,9 @@ func ExecuteTagAdd(ctx context.Context, adder TagAdder, params TagAddParams, out
 // newTagAddCmd creates the tag add subcommand.
 func newTagAddCmd() *cobra.Command {
 	var (
-		sourceTag    string
-		sourceDigest string
+		sourceTag       string
+		sourceDigest    string
+		sourceVersionID int64
 	)
 
 	cmd := &cobra.Command{
@@ -84,7 +87,7 @@ func newTagAddCmd() *cobra.Command {
 This command uses the OCI registry API to copy a tag, creating a new tag
 reference that points to the same image digest as the source.
 
-Requires a selector to identify the source version: --tag or --digest.
+Requires a selector to identify the source version: --tag, --digest, or --version.
 
 Examples:
   # Promote version to latest
@@ -96,8 +99,11 @@ Examples:
   # Tag for environment deployment
   ghcrctl tag add mkoepf/myimage production --tag v2.1.0
 
-  # Tag by digest
-  ghcrctl tag add mkoepf/myimage stable --digest sha256:abc123...`,
+  # Tag by version ID
+  ghcrctl tag add mkoepf/myimage stable --version 12345678
+
+  # Tag by digest (short form supported)
+  ghcrctl tag add mkoepf/myimage stable --digest abc123`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/package reference (reject inline tags)
@@ -110,9 +116,9 @@ Examples:
 			newTag := args[1]
 
 			// Require at least one selector
-			if sourceTag == "" && sourceDigest == "" {
+			if sourceTag == "" && sourceDigest == "" && sourceVersionID == 0 {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("selector required: use --tag or --digest to specify the source version")
+				return fmt.Errorf("selector required: use --tag, --digest, or --version to specify the source version")
 			}
 
 			// Construct full image reference
@@ -120,14 +126,65 @@ Examples:
 
 			ctx := cmd.Context()
 
-			// Resolve source to digest if tag was provided
-			targetDigest := sourceDigest
+			var targetDigest string
+			var selectorDesc string
+
 			if sourceTag != "" {
-				var err error
 				targetDigest, err = discover.ResolveTag(ctx, fullImage, sourceTag)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to resolve source tag '%s': %w", sourceTag, err)
+				}
+				selectorDesc = sourceTag
+			} else if sourceVersionID != 0 || sourceDigest != "" {
+				// Need to fetch versions to resolve version ID or short digest
+				token, err := gh.GetToken()
+				if err != nil {
+					cmd.SilenceUsage = true
+					return err
+				}
+
+				ghClient, err := gh.NewClient(token)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to create GitHub client: %w", err)
+				}
+
+				ownerType, err := ghClient.GetOwnerType(ctx, owner)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to determine owner type: %w", err)
+				}
+
+				allVersions, err := ghClient.ListPackageVersions(ctx, owner, ownerType, packageName)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to list package versions: %w", err)
+				}
+
+				discoverer := discover.NewPackageDiscoverer()
+				versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+				if err != nil {
+					cmd.SilenceUsage = true
+					return fmt.Errorf("failed to discover package: %w", err)
+				}
+
+				versionMap := discover.ToMap(versions)
+
+				if sourceVersionID != 0 {
+					targetDigest, err = discover.FindDigestByVersionID(versionMap, sourceVersionID)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("failed to find version ID %d: %w", sourceVersionID, err)
+					}
+					selectorDesc = fmt.Sprintf("version %d", sourceVersionID)
+				} else {
+					targetDigest, err = discover.FindDigestByShortDigest(versionMap, sourceDigest)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("failed to find digest '%s': %w", sourceDigest, err)
+					}
+					selectorDesc = display.ShortDigest(targetDigest)
 				}
 			}
 
@@ -139,18 +196,15 @@ Examples:
 			}
 
 			// Display success message
-			if sourceTag != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "Successfully added tag '%s' to %s (source: %s)\n", newTag, packageName, sourceTag)
-			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "Successfully added tag '%s' to %s (source: %s)\n", newTag, packageName, sourceDigest[:19])
-			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Successfully added tag '%s' to %s (source: %s)\n", newTag, packageName, selectorDesc)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&sourceTag, "tag", "", "Source version by tag")
-	cmd.Flags().StringVar(&sourceDigest, "digest", "", "Source version by digest")
-	cmd.MarkFlagsMutuallyExclusive("tag", "digest")
+	cmd.Flags().StringVar(&sourceDigest, "digest", "", "Source version by digest (supports short form)")
+	cmd.Flags().Int64Var(&sourceVersionID, "version", 0, "Source version by ID")
+	cmd.MarkFlagsMutuallyExclusive("tag", "digest", "version")
 
 	return cmd
 }

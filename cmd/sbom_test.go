@@ -82,7 +82,7 @@ func TestGetSBOMCommandHasFlags(t *testing.T) {
 	sbomCmd, _, _ := cmd.Find([]string{"get", "sbom"})
 
 	// Check for required flags
-	flags := []string{"tag", "digest", "sbom-digest", "all", "json"}
+	flags := []string{"tag", "digest", "version", "all", "json"}
 
 	for _, flagName := range flags {
 		flag := sbomCmd.Flags().Lookup(flagName)

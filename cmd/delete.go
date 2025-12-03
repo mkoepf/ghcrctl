@@ -865,11 +865,6 @@ func formatTagsForDisplay(tags []string) string {
 	return strings.Join(tags, ", ")
 }
 
-// FormatTagsForDisplay is the exported version for testing
-func FormatTagsForDisplay(tags []string) string {
-	return formatTagsForDisplay(tags)
-}
-
 // =============================================================================
 // Exported types and functions for testing
 // =============================================================================

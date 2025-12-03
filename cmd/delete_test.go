@@ -449,9 +449,9 @@ func TestFormatTagsForDisplay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FormatTagsForDisplay(tt.tags)
+			got := formatTagsForDisplay(tt.tags)
 			if got != tt.want {
-				t.Errorf("FormatTagsForDisplay() = %q, want %q", got, tt.want)
+				t.Errorf("formatTagsForDisplay() = %q, want %q", got, tt.want)
 			}
 		})
 	}

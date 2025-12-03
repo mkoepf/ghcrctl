@@ -371,6 +371,11 @@ func OutputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged bool,
 	olderThan, newerThan string, olderThanDays, newerThanDays int,
 	versionID int64, digest string) (*filter.VersionFilter, error) {
+	// Check for conflicting flags
+	if onlyTagged && onlyUntagged {
+		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
+	}
+
 	vf := &filter.VersionFilter{
 		OnlyTagged:    onlyTagged,
 		OnlyUntagged:  onlyUntagged,
@@ -606,24 +611,4 @@ Examples:
 	cmd.MarkFlagsMutuallyExclusive("version", "digest", "tag")
 
 	return cmd
-}
-
-// =============================================================================
-// Exported functions for testing
-// =============================================================================
-
-// OutputPackagesTable is exported for testing - wraps outputListPackagesTable
-func OutputPackagesTable(w io.Writer, packages []string, owner string, quietMode bool) error {
-	return outputListPackagesTable(w, packages, owner, quietMode)
-}
-
-// BuildVersionFilter is exported for testing - wraps buildListVersionFilter
-func BuildVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged bool,
-	olderThan, newerThan string, olderThanDays, newerThanDays int,
-	versionID int64, digest string) (*filter.VersionFilter, error) {
-	// Check for conflicting flags - this validation was in older code
-	if onlyTagged && onlyUntagged {
-		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
-	}
-	return buildListVersionFilter(tag, tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays, versionID, digest)
 }

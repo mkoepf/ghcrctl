@@ -72,7 +72,7 @@ func TestBuildVersionFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter, err := BuildVersionFilter(
+			filter, err := buildListVersionFilter(
 				tt.tag, tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
 				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays,
 				tt.versionID, tt.digest,

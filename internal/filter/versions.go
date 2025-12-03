@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -127,7 +128,7 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 
 	if needsDateCheck {
 		// Parse creation time - try multiple formats
-		createdAt, err := parseDate(ver.CreatedAt)
+		createdAt, err := ParseDate(ver.CreatedAt)
 		if err != nil {
 			// Skip versions with invalid dates only when date filtering is active
 			return false
@@ -153,28 +154,34 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 	return true
 }
 
-// parseDate attempts to parse a date string in multiple formats
-// GitHub API returns dates in format "2006-01-02 15:04:05"
-func parseDate(dateStr string) (time.Time, error) {
-	// Try GitHub format first (most common)
-	t, err := time.Parse("2006-01-02 15:04:05", dateStr)
-	if err == nil {
-		return t, nil
+// ParseDate attempts to parse a date string in multiple formats.
+// Supported formats:
+//   - "2006-01-02" (date only, most convenient for CLI)
+//   - "2006-01-02T15:04:05Z07:00" (RFC3339)
+//   - "2006-01-02T15:04:05.999999999Z07:00" (RFC3339Nano)
+//   - "2006-01-02 15:04:05" (GitHub API format)
+//   - "2006-01-02T15:04:05" (datetime without timezone)
+func ParseDate(dateStr string) (time.Time, error) {
+	if dateStr == "" {
+		return time.Time{}, fmt.Errorf("date string cannot be empty")
 	}
 
-	// Try RFC3339 format (for tests and potential API changes)
-	t, err = time.Parse(time.RFC3339, dateStr)
-	if err == nil {
-		return t, nil
+	formats := []string{
+		"2006-01-02",          // Date only (most convenient for CLI)
+		time.RFC3339,          // 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano,      // With fractional seconds
+		"2006-01-02 15:04:05", // GitHub API format
+		"2006-01-02T15:04:05", // Without timezone
 	}
 
-	// Try RFC3339 with fractional seconds
-	t, err = time.Parse(time.RFC3339Nano, dateStr)
-	if err == nil {
-		return t, nil
+	for _, format := range formats {
+		t, err := time.Parse(format, dateStr)
+		if err == nil {
+			return t, nil
+		}
 	}
 
-	return time.Time{}, err
+	return time.Time{}, fmt.Errorf("unable to parse date %q (supported formats: YYYY-MM-DD, RFC3339)", dateStr)
 }
 
 // hasMatchingTag checks if any version tag matches any filter tag (exact match)

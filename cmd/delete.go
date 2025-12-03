@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/display"
@@ -786,7 +785,7 @@ func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 
 	// Parse older-than date
 	if olderThan != "" {
-		t, err := parseDeleteDate(olderThan)
+		t, err := filter.ParseDate(olderThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --older-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
 		}
@@ -795,7 +794,7 @@ func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 
 	// Parse newer-than date
 	if newerThan != "" {
-		t, err := parseDeleteDate(newerThan)
+		t, err := filter.ParseDate(newerThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --newer-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
 		}
@@ -803,31 +802,6 @@ func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 	}
 
 	return vf, nil
-}
-
-// parseDeleteDate attempts to parse a date string in multiple user-friendly formats
-func parseDeleteDate(dateStr string) (time.Time, error) {
-	if dateStr == "" {
-		return time.Time{}, nil
-	}
-
-	formats := []string{
-		"2006-01-02",          // Date only (most convenient)
-		time.RFC3339,          // Full datetime with timezone
-		"2006-01-02T15:04:05", // Datetime without timezone
-		time.RFC3339Nano,      // With fractional seconds
-	}
-
-	var lastErr error
-	for _, format := range formats {
-		t, err := time.Parse(format, dateStr)
-		if err == nil {
-			return t, nil
-		}
-		lastErr = err
-	}
-
-	return time.Time{}, lastErr
 }
 
 // displayDeleteImageVersions displays versions to delete and shared versions.

@@ -498,6 +498,75 @@ func TestVersionFilter_Apply_OnlyUntagged_WithNilTaggedGraphMembers(t *testing.T
 	assert.Equal(t, int64(3), result[1].ID)
 }
 
+func TestParseDate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{
+			name:    "date only YYYY-MM-DD",
+			input:   "2025-01-15",
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339 with timezone",
+			input:   "2025-01-15T10:30:00Z",
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339 with offset",
+			input:   "2025-01-15T10:30:00+01:00",
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339Nano",
+			input:   "2025-01-15T10:30:00.123456789Z",
+			wantErr: false,
+		},
+		{
+			name:    "space-separated datetime (GitHub API format)",
+			input:   "2025-01-15 10:30:00",
+			wantErr: false,
+		},
+		{
+			name:    "datetime without timezone",
+			input:   "2025-01-15T10:30:00",
+			wantErr: false,
+		},
+		{
+			name:    "invalid format",
+			input:   "01/15/2025",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "garbage",
+			input:   "not-a-date",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseDate(tt.input)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.False(t, result.IsZero(), "parsed date should not be zero")
+			}
+		})
+	}
+}
+
 func TestVersionFilter_Apply_OnlyUntagged_AllInTaggedGraph(t *testing.T) {
 	// Edge case: All untagged versions are children of tagged versions
 	versions := []gh.PackageVersionInfo{

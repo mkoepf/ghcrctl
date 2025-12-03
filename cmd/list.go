@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/display"
@@ -389,7 +388,7 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 
 	// Parse absolute date filters
 	if olderThan != "" {
-		t, err := parseListDate(olderThan)
+		t, err := filter.ParseDate(olderThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --older-than date format: %w", err)
 		}
@@ -397,7 +396,7 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 	}
 
 	if newerThan != "" {
-		t, err := parseListDate(newerThan)
+		t, err := filter.ParseDate(newerThan)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --newer-than date format: %w", err)
 		}
@@ -405,26 +404,6 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 	}
 
 	return vf, nil
-}
-
-// parseListDate parses a date string in multiple user-friendly formats
-func parseListDate(dateStr string) (time.Time, error) {
-	formats := []string{
-		"2006-01-02",          // Date only (most convenient)
-		time.RFC3339,          // 2006-01-02T15:04:05Z07:00
-		time.RFC3339Nano,      // With fractional seconds
-		"2006-01-02 15:04:05", // Space-separated
-		"2006-01-02T15:04:05", // Without timezone
-	}
-
-	for _, format := range formats {
-		t, err := time.Parse(format, dateStr)
-		if err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("unable to parse date %q (supported formats: YYYY-MM-DD, RFC3339)", dateStr)
 }
 
 // newListImagesCmd creates the list images subcommand.

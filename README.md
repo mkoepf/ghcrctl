@@ -6,6 +6,35 @@
 
 A command-line tool for interacting with GitHub Container Registry (GHCR).
 
+## Why ghcrctl?
+
+GitHub Container Registry (GHCR) leaves you flying blind.
+
+**The problem:** When you look at your container packages on GitHub, you see a list of "versions" — but what *are* they? An image index? A platform manifest? An SBOM? A signature? GHCR's UI and API don't tell you how these pieces fit together.
+
+**It gets worse.** You might try using standard OCI tools like ORAS to explore and manage your images. You can *discover* artifacts just fine:
+
+```bash
+oras discover ghcr.io/myorg/myimage:latest
+```
+
+But when you try to delete:
+
+```bash
+oras manifest delete ghcr.io/myorg/myimage@sha256:abc123...
+# Error: unsupported: The operation is unsupported.
+```
+
+GHCR doesn't support deletion via the OCI API. Your only option is GitHub's REST API, which deletes package *versions* — opaque numeric IDs with no visibility into what you're actually removing.
+
+**ghcrctl bridges this gap.** It combines OCI-level transparency with GitHub API access:
+
+- **See the full picture:** View your images as OCI artifact graphs — indexes, platform manifests, attestations, signatures — all in context
+- **Delete with confidence:** Know exactly what you're removing before you remove it
+- **Work efficiently:** Bulk operations, filters, dry-run mode, and scripting-friendly JSON output
+
+Think of ghcrctl as the container registry CLI that GHCR should have shipped with.
+
 ## Features
 
 ghcrctl provides functionality for:

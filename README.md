@@ -623,8 +623,6 @@ See [spec/plan.md](spec/plan.md) for the detailed development plan.
 
 ## Testing
 
-See [TESTING.md](TESTING.md) for comprehensive testing instructions.
-
 ### Quick Test
 
 ```bash
@@ -634,8 +632,8 @@ go test ./...
 # Run tests with coverage
 go test ./... -cover
 
-# Run linters
-golangci-lint run ./...
+# Run code quality checks (format, vet, tests, security scans)
+./scripts/code_quality.sh
 ```
 
 ### Integration Testing

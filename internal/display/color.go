@@ -86,11 +86,6 @@ func ColorTags(tags []string) string {
 	return result
 }
 
-// ColorTreeIndicator applies dim styling to tree structure characters.
-func ColorTreeIndicator(indicator string) string {
-	return colorTree.Sprint(indicator)
-}
-
 // ColorDigest applies dim styling to digest strings.
 func ColorDigest(digest string) string {
 	return colorDigest.Sprint(digest)

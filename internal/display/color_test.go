@@ -127,54 +127,6 @@ func TestColorTags(t *testing.T) {
 	}
 }
 
-func TestColorTreeIndicator(t *testing.T) {
-	tests := []struct {
-		name      string
-		indicator string
-		expected  string
-	}{
-		{
-			name:      "root indicator",
-			indicator: "┌",
-			expected:  "┌",
-		},
-		{
-			name:      "mid indicator",
-			indicator: "├",
-			expected:  "├",
-		},
-		{
-			name:      "last indicator",
-			indicator: "└",
-			expected:  "└",
-		},
-		{
-			name:      "vertical line",
-			indicator: "│",
-			expected:  "│",
-		},
-		{
-			name:      "space",
-			indicator: " ",
-			expected:  " ",
-		},
-		{
-			name:      "horizontal line",
-			indicator: "─",
-			expected:  "─",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ColorTreeIndicator(tt.indicator)
-			if result != tt.expected {
-				t.Errorf("ColorTreeIndicator(%q) = %q, expected %q", tt.indicator, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestColorDigest(t *testing.T) {
 	tests := []struct {
 		name     string

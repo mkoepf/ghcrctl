@@ -365,52 +365,6 @@ func AddTagByDigest(ctx context.Context, image, digest, destTag string) error {
 	return nil
 }
 
-// AddTag creates a new tag pointing to the same digest as an existing tag
-func AddTag(ctx context.Context, image, sourceTag, destTag string) error {
-	// Validate inputs
-	if image == "" {
-		return fmt.Errorf("image cannot be empty")
-	}
-	if sourceTag == "" {
-		return fmt.Errorf("source tag cannot be empty")
-	}
-	if destTag == "" {
-		return fmt.Errorf("destination tag cannot be empty")
-	}
-
-	// Parse image reference
-	registry, path, err := ParseImageReference(image)
-	if err != nil {
-		return err
-	}
-
-	// Create repository reference
-	repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", registry, path))
-	if err != nil {
-		return fmt.Errorf("failed to create repository reference: %w", err)
-	}
-
-	// Configure authentication
-	if err := configureAuth(ctx, repo); err != nil {
-		return fmt.Errorf("failed to configure authentication: %w", err)
-	}
-
-	// Resolve the source tag to get its descriptor
-	sourceDesc, err := repo.Resolve(ctx, sourceTag)
-	if err != nil {
-		return fmt.Errorf("failed to resolve source tag '%s': %w", sourceTag, err)
-	}
-
-	// Tag the descriptor with the destination tag
-	// This creates a new tag reference pointing to the same digest
-	err = repo.Tag(ctx, sourceDesc, destTag)
-	if err != nil {
-		return fmt.Errorf("failed to tag with '%s': %w", destTag, err)
-	}
-
-	return nil
-}
-
 // getOrCreateAuthClient returns a cached auth client or creates a new one
 // This ensures token caching across multiple ORAS operations, avoiding redundant auth cycles
 func getOrCreateAuthClient(ctx context.Context) *auth.Client {

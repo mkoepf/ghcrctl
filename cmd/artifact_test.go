@@ -55,7 +55,7 @@ func TestListArtifacts_ExampleShowsGetCommand(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := listArtifacts(&buf, artifacts, "myimage", "sbom")
+	err := listArtifacts(&buf, artifacts, "myimage", "sbom", "tag", "latest")
 	if err != nil {
 		t.Fatalf("listArtifacts returned error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestListArtifacts_ExampleShowsGetProvenance(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := listArtifacts(&buf, artifacts, "myimage", "provenance")
+	err := listArtifacts(&buf, artifacts, "myimage", "provenance", "tag", "latest")
 	if err != nil {
 		t.Fatalf("listArtifacts returned error: %v", err)
 	}
@@ -99,16 +99,16 @@ func TestListArtifacts_OutputFormat(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := listArtifacts(&buf, artifacts, "test-image", "sbom")
+	err := listArtifacts(&buf, artifacts, "test-image", "sbom", "tag", "v1.0.0")
 	if err != nil {
 		t.Fatalf("listArtifacts returned error: %v", err)
 	}
 
 	output := buf.String()
 
-	// Should show header
-	if !strings.Contains(output, "Multiple sbom documents found for test-image") {
-		t.Errorf("Expected header with image name, got:\n%s", output)
+	// Should show header with image context
+	if !strings.Contains(output, "Multiple sbom documents found in image tagged 'v1.0.0'") {
+		t.Errorf("Expected header with tag context, got:\n%s", output)
 	}
 
 	// Should list both digests
@@ -122,5 +122,43 @@ func TestListArtifacts_OutputFormat(t *testing.T) {
 	// Should show usage hint
 	if !strings.Contains(output, "Select one by digest") {
 		t.Errorf("Expected usage hint, got:\n%s", output)
+	}
+}
+
+func TestListArtifacts_DigestSelector(t *testing.T) {
+	artifacts := []discover.VersionInfo{
+		{Digest: "sha256:abc123def456789012345678901234567890123456789012345678901234"},
+	}
+
+	var buf bytes.Buffer
+	err := listArtifacts(&buf, artifacts, "test-image", "provenance", "digest", "abc123def456")
+	if err != nil {
+		t.Fatalf("listArtifacts returned error: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should show header with digest context
+	if !strings.Contains(output, "image containing digest abc123def456") {
+		t.Errorf("Expected header with digest context, got:\n%s", output)
+	}
+}
+
+func TestListArtifacts_VersionSelector(t *testing.T) {
+	artifacts := []discover.VersionInfo{
+		{Digest: "sha256:abc123def456789012345678901234567890123456789012345678901234"},
+	}
+
+	var buf bytes.Buffer
+	err := listArtifacts(&buf, artifacts, "test-image", "sbom", "version", "12345678")
+	if err != nil {
+		t.Fatalf("listArtifacts returned error: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should show header with version context
+	if !strings.Contains(output, "image containing version 12345678") {
+		t.Errorf("Expected header with version context, got:\n%s", output)
 	}
 }

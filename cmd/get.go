@@ -9,6 +9,7 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/display"
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/mkoepf/ghcrctl/internal/quiet"
 	"github.com/spf13/cobra"
 )
 
@@ -414,7 +415,8 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 
 			// Resolve the selector to a full digest
 			var resolvedDigest string
-			var selectorDesc string // For user-friendly messages
+			var selectorType string  // "tag", "digest", or "version"
+			var selectorValue string // The actual value used
 
 			if tag != "" {
 				resolvedDigest, err = discover.ResolveTag(ctx, fullImage, tag)
@@ -422,14 +424,16 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
 				}
-				selectorDesc = tag
+				selectorType = "tag"
+				selectorValue = tag
 			} else if versionID != 0 {
 				resolvedDigest, err = discover.FindDigestByVersionID(versionMap, versionID)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to find version ID %d: %w", versionID, err)
 				}
-				selectorDesc = fmt.Sprintf("version %d", versionID)
+				selectorType = "version"
+				selectorValue = fmt.Sprintf("%d", versionID)
 			} else {
 				// Resolve short digest to full digest
 				resolvedDigest, err = discover.FindDigestByShortDigest(versionMap, digest)
@@ -437,7 +441,8 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to find digest '%s': %w", digest, err)
 				}
-				selectorDesc = display.ShortDigest(resolvedDigest)
+				selectorType = "digest"
+				selectorValue = display.ShortDigest(resolvedDigest)
 			}
 
 			// Check if the selected version is itself an artifact of the requested type
@@ -452,6 +457,11 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 			}
 
 			// The selected version is not an artifact of this type
+			// Print informational message about searching in the containing image
+			if !quiet.IsQuiet(ctx) && !jsonOutput {
+				fmt.Fprintf(cmd.OutOrStdout(), "Version %s is not a %s. Searching in containing image...\n\n", selectorValue, cfg.Name)
+			}
+
 			// Find the image it belongs to and look for artifacts there
 			imageVersions := discover.FindImagesContainingVersion(versionMap, resolvedDigest)
 			if len(imageVersions) == 0 {
@@ -478,7 +488,7 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 			// Check if no artifacts found
 			if len(artifacts) == 0 {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("%s for %s (%s)", cfg.NoFoundMsg, packageName, selectorDesc)
+				return fmt.Errorf("%s for %s (%s)", cfg.NoFoundMsg, packageName, selectorValue)
 			}
 
 			// If --all flag, show all artifacts
@@ -496,7 +506,7 @@ func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
 				return fetchAndDisplayAllArtifacts(cmd.OutOrStdout(), ctx, fullImage, artifacts, jsonOutput, cfg.Name)
 			}
 
-			return listArtifacts(cmd.OutOrStdout(), artifacts, packageName, cfg.Name)
+			return listArtifacts(cmd.OutOrStdout(), artifacts, packageName, cfg.Name, selectorType, selectorValue)
 		},
 	}
 

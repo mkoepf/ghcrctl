@@ -159,7 +159,7 @@ func newArtifactCmd(cfg artifactConfig) *cobra.Command {
 				return fetchAndDisplayAllArtifacts(cmd.OutOrStdout(), ctx, fullImage, artifacts, jsonOutput, cfg.Name)
 			}
 
-			return listArtifacts(cmd.OutOrStdout(), artifacts, imageName, cfg.Name)
+			return listArtifacts(cmd.OutOrStdout(), artifacts, imageName, cfg.Name, "tag", tag)
 		},
 	}
 
@@ -225,8 +225,21 @@ func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string,
 }
 
 // listArtifacts lists available artifacts without fetching their content
-func listArtifacts(w io.Writer, artifacts []discover.VersionInfo, imageName, artifactType string) error {
-	fmt.Fprintf(w, "Multiple %s documents found for %s\n\n", artifactType, imageName)
+// selectorType is "tag", "digest", or "version" to describe how the image was selected
+// selectorValue is the actual value used (e.g., "v1.0.0", "abc123", "12345678")
+func listArtifacts(w io.Writer, artifacts []discover.VersionInfo, imageName, artifactType, selectorType, selectorValue string) error {
+	// Build context-aware message
+	var imageDesc string
+	switch selectorType {
+	case "tag":
+		imageDesc = fmt.Sprintf("image tagged '%s'", selectorValue)
+	case "version":
+		imageDesc = fmt.Sprintf("image containing version %s", selectorValue)
+	default: // digest
+		imageDesc = fmt.Sprintf("image containing digest %s", selectorValue)
+	}
+
+	fmt.Fprintf(w, "Multiple %s documents found in %s\n\n", artifactType, imageDesc)
 	fmt.Fprintf(w, "Select one by digest, or use --all to show all:\n\n")
 
 	for i, artifact := range artifacts {

@@ -21,7 +21,7 @@ func TestCommandExamples(t *testing.T) {
 		{"get labels command", "get labels", true},
 		{"get sbom command", "get sbom", true},
 		{"get provenance command", "get provenance", true},
-		{"tag add command", "tag add", true},
+		{"tag command", "tag", true},
 		{"delete version command", "delete version", true},
 		{"delete image command", "delete image", true},
 	}
@@ -53,7 +53,7 @@ func TestExampleFormat(t *testing.T) {
 		{"get labels command", "get labels"},
 		{"get sbom command", "get sbom"},
 		{"get provenance command", "get provenance"},
-		{"tag add command", "tag add"},
+		{"tag command", "tag"},
 		{"delete version command", "delete version"},
 		{"delete image command", "delete image"},
 	}

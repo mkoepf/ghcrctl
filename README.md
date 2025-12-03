@@ -43,10 +43,10 @@ ghcrctl provides functionality for:
 - **Package statistics** (version counts, date ranges)
 - **Viewing images** with their OCI artifact relationships (platforms, attestations)
 - **Viewing labels** (OCI annotations) embedded in container images
+- **Viewing and adding tags** (tag deletion is not supported by GHCR)
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Discovering signatures** and attestations from both Docker buildx and cosign
-- **Managing GHCR version metadata** (labels, tags)
 - **Safe deletion** of package versions, images, and entire packages
 - **Shell completion** with dynamic package name suggestions
 
@@ -385,9 +385,9 @@ ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --json
 Add a new tag to an existing image version:
 
 ```bash
-ghcrctl tag add mkoepf/myimage latest --tag v1.0.0
-ghcrctl tag add mkoepf/myimage stable --version 12345678
-ghcrctl tag add mkoepf/myimage stable --digest abc123
+ghcrctl tag mkoepf/myimage latest --tag v1.0.0
+ghcrctl tag mkoepf/myimage stable --version 12345678
+ghcrctl tag mkoepf/myimage stable --digest abc123
 ```
 
 Requires a selector: `--tag`, `--digest`, or `--version` to specify the source version. The `--digest` flag supports short form.
@@ -399,10 +399,10 @@ This command creates a new tag reference pointing to the same image digest as th
 - Must use Personal Access Token (not GitHub App installation token)
 
 **Example use cases:**
-- Promote a version to `latest`: `ghcrctl tag add mkoepf/myapp latest --tag v2.1.0`
-- Add semantic version alias: `ghcrctl tag add mkoepf/myapp v1.2 --tag v1.2.3`
-- Tag for environment: `ghcrctl tag add mkoepf/myapp production --tag v2.1.0`
-- Tag by version ID: `ghcrctl tag add mkoepf/myapp release --version 12345678`
+- Promote a version to `latest`: `ghcrctl tag mkoepf/myapp latest --tag v2.1.0`
+- Add semantic version alias: `ghcrctl tag mkoepf/myapp v1.2 --tag v1.2.3`
+- Tag for environment: `ghcrctl tag mkoepf/myapp production --tag v2.1.0`
+- Tag by version ID: `ghcrctl tag mkoepf/myapp release --version 12345678`
 
 ### Why There Is No Tag Delete Command
 
@@ -415,12 +415,12 @@ tags (e.g., `v1.0.0` and `latest`), you cannot remove just one tag while keeping
 other - deleting removes both because they reference the same digest.
 
 **Workaround:** To "move" a tag like `latest` from an old version to a new one, use
-`ghcrctl tag add` to point the tag at the new digest. The old reference is implicitly
+`ghcrctl tag` to point the tag at the new digest. The old reference is implicitly
 overwritten:
 
 ```bash
 # "Move" latest from v1.0.0 to v2.0.0
-ghcrctl tag add mkoepf/myapp latest --tag v2.0.0
+ghcrctl tag mkoepf/myapp latest --tag v2.0.0
 ```
 
 For more details, see:
@@ -639,7 +639,6 @@ ghcrctl get labels --help
 ghcrctl get sbom --help
 ghcrctl get provenance --help
 ghcrctl tag --help
-ghcrctl tag add --help
 ghcrctl delete --help
 ghcrctl delete version --help
 ghcrctl delete image --help

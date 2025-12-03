@@ -25,19 +25,19 @@ func TestTagCommandIntegration(t *testing.T) {
 	}{
 		{
 			name:          "missing arguments",
-			args:          []string{"tag", "add", "mkoepf/myimage"},
+			args:          []string{"tag", "mkoepf/myimage"},
 			wantError:     true,
 			errorContains: "accepts 2 arg",
 		},
 		{
 			name:          "too many arguments",
-			args:          []string{"tag", "add", "mkoepf/myimage", "v2.0", "extra"},
+			args:          []string{"tag", "mkoepf/myimage", "v2.0", "extra"},
 			wantError:     true,
 			errorContains: "accepts 2 arg",
 		},
 		{
 			name:          "missing selector",
-			args:          []string{"tag", "add", "mkoepf/ghcrctl-test-no-sbom", "new-tag"},
+			args:          []string{"tag", "mkoepf/ghcrctl-test-no-sbom", "new-tag"},
 			wantError:     true,
 			errorContains: "selector required",
 		},
@@ -70,15 +70,15 @@ func TestTagCommandIntegration(t *testing.T) {
 	}
 }
 
-// TestTagAdd_SourceTagNotFound tests error when source tag doesn't exist
-func TestTagAdd_SourceTagNotFound(t *testing.T) {
+// TestTag_SourceTagNotFound tests error when source tag doesn't exist
+func TestTag_SourceTagNotFound(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Fatal("GITHUB_TOKEN not set")
 	}
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"tag", "add", "mkoepf/ghcrctl-test-no-sbom", "new-tag", "--tag", "nonexistent-tag-12345"})
+	cmd.SetArgs([]string{"tag", "mkoepf/ghcrctl-test-no-sbom", "new-tag", "--tag", "nonexistent-tag-12345"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -101,15 +101,15 @@ func TestTagAdd_SourceTagNotFound(t *testing.T) {
 	}
 }
 
-// TestTagAdd_InvalidPackage tests error for nonexistent package
-func TestTagAdd_InvalidPackage(t *testing.T) {
+// TestTag_InvalidPackage tests error for nonexistent package
+func TestTag_InvalidPackage(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Fatal("GITHUB_TOKEN not set")
 	}
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"tag", "add", "mkoepf/nonexistent-package-12345", "new-tag", "--tag", "v1.0"})
+	cmd.SetArgs([]string{"tag", "mkoepf/nonexistent-package-12345", "new-tag", "--tag", "v1.0"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -127,8 +127,8 @@ func TestTagAdd_InvalidPackage(t *testing.T) {
 	}
 }
 
-// TestTagCommand_ParentHelp tests that tag command shows help with subcommands
-func TestTagCommand_ParentHelp(t *testing.T) {
+// TestTagCommand_Help tests that tag command shows help
+func TestTagCommand_Help(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewRootCmd()
@@ -146,13 +146,13 @@ func TestTagCommand_ParentHelp(t *testing.T) {
 
 	output := stdout.String()
 
-	// Should show subcommand info
-	if !strings.Contains(output, "add") {
-		t.Error("Expected help to mention 'add' subcommand")
+	// Should show usage with arguments
+	if !strings.Contains(output, "<owner/package>") {
+		t.Error("Expected help to show <owner/package> argument")
 	}
 
-	// Should show description
-	if !strings.Contains(output, "Manage tags") {
-		t.Error("Expected help to contain 'Manage tags'")
+	// Should show flag descriptions
+	if !strings.Contains(output, "Source version by tag") {
+		t.Error("Expected help to contain 'Source version by tag'")
 	}
 }

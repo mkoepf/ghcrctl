@@ -7,28 +7,24 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// MockResolver implements TypeResolver for testing
-type MockResolver struct {
+// mockResolver implements typeResolver for testing
+type mockResolver struct {
 	resolveFunc func(ctx context.Context, image, digest string) ([]string, error)
 }
 
-func (m *MockResolver) ResolveVersionType(ctx context.Context, image, digest string) ([]string, error) {
-	return m.resolveFunc(ctx, image, digest)
-}
-
-func (m *MockResolver) ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
+func (m *mockResolver) resolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
 	types, err := m.resolveFunc(ctx, image, digest)
 	return types, 1024, err // Return a default size of 1024 for testing
 }
 
-func TestResolveVersionType_Index(t *testing.T) {
-	resolver := &MockResolver{
+func TestResolveVersionInfo_Index(t *testing.T) {
+	resolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			return []string{"index"}, nil
 		},
 	}
 
-	types, err := resolver.ResolveVersionType(context.Background(), "ghcr.io/test/image", "sha256:abc123")
+	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,14 +33,14 @@ func TestResolveVersionType_Index(t *testing.T) {
 	}
 }
 
-func TestResolveVersionType_Platform(t *testing.T) {
-	resolver := &MockResolver{
+func TestResolveVersionInfo_Platform(t *testing.T) {
+	resolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			return []string{"linux/amd64"}, nil
 		},
 	}
 
-	types, err := resolver.ResolveVersionType(context.Background(), "ghcr.io/test/image", "sha256:abc123")
+	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -53,14 +49,14 @@ func TestResolveVersionType_Platform(t *testing.T) {
 	}
 }
 
-func TestResolveVersionType_MultipleAttestations(t *testing.T) {
-	resolver := &MockResolver{
+func TestResolveVersionInfo_MultipleAttestations(t *testing.T) {
+	resolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			return []string{"sbom", "provenance"}, nil
 		},
 	}
 
-	types, err := resolver.ResolveVersionType(context.Background(), "ghcr.io/test/image", "sha256:abc123")
+	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

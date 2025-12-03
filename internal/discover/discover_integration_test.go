@@ -23,7 +23,7 @@ func TestResolveVersionInfo_Integration_Index(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resolver := NewOrasResolver()
+	resolver := newOrasResolver()
 
 	// Use the test image with SBOM - it's a multi-arch index
 	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
@@ -35,7 +35,7 @@ func TestResolveVersionInfo_Integration_Index(t *testing.T) {
 	}
 
 	// Now resolve the version info for the index
-	types, size, err := resolver.ResolveVersionInfo(ctx, image, digest)
+	types, size, err := resolver.resolveVersionInfo(ctx, image, digest)
 	if err != nil {
 		t.Fatalf("ResolveVersionInfo failed: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestResolveVersionInfo_Integration_Platform(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resolver := NewOrasResolver()
+	resolver := newOrasResolver()
 
 	// Use the single-platform test image (no SBOM)
 	image := "ghcr.io/mkoepf/ghcrctl-test-no-sbom"
@@ -81,7 +81,7 @@ func TestResolveVersionInfo_Integration_Platform(t *testing.T) {
 		t.Fatalf("Failed to resolve tag: %v", err)
 	}
 
-	types, size, err := resolver.ResolveVersionInfo(ctx, image, digest)
+	types, size, err := resolver.resolveVersionInfo(ctx, image, digest)
 	if err != nil {
 		t.Fatalf("ResolveVersionInfo failed: %v", err)
 	}
@@ -109,13 +109,13 @@ func TestResolveVersionInfo_Integration_InvalidDigest(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	resolver := NewOrasResolver()
+	resolver := newOrasResolver()
 
 	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
 	// Valid format but non-existent digest
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
-	_, _, err := resolver.ResolveVersionInfo(ctx, image, invalidDigest)
+	_, _, err := resolver.resolveVersionInfo(ctx, image, invalidDigest)
 	if err == nil {
 		t.Error("Expected error for non-existent digest")
 	}
@@ -142,10 +142,10 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 	}
 
 	// Use the discoverer to find SBOM artifacts
-	resolver := NewOrasResolver()
+	resolver := newOrasResolver()
 	discoverer := &PackageDiscoverer{
-		Resolver:        resolver,
-		ChildDiscoverer: &OrasChildDiscoverer{resolver: resolver},
+		resolver:        resolver,
+		childDiscoverer: &orasChildDiscoverer{resolver: resolver},
 	}
 
 	// We need version info to discover - create a minimal version list
@@ -170,7 +170,7 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 	}
 
 	// Discover children of the main image
-	children, err := discoverer.ChildDiscoverer.DiscoverChildren(ctx, image, mainDigest, nil)
+	children, err := discoverer.childDiscoverer.discoverChildren(ctx, image, mainDigest, nil)
 	if err != nil {
 		t.Fatalf("Failed to discover children: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 	// Find an SBOM among the children
 	var sbomDigest string
 	for _, childDigest := range children {
-		types, _, err := resolver.ResolveVersionInfo(ctx, image, childDigest)
+		types, _, err := resolver.resolveVersionInfo(ctx, image, childDigest)
 		if err != nil {
 			continue
 		}

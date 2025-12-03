@@ -80,7 +80,7 @@ func TestLoggingRoundTripper(t *testing.T) {
 			io.Copy(io.Discard, resp.Body)
 
 			// Parse log output
-			var logEntry LogEntry
+			var logEntry logEntry
 			if err := json.Unmarshal(logBuf.Bytes(), &logEntry); err != nil {
 				t.Fatalf("Failed to parse log output: %v\nOutput: %s", err, logBuf.String())
 			}
@@ -125,7 +125,7 @@ func TestLoggingRoundTripperError(t *testing.T) {
 	}
 
 	// Parse log output
-	var logEntry LogEntry
+	var logEntry logEntry
 	if err := json.Unmarshal(logBuf.Bytes(), &logEntry); err != nil {
 		t.Fatalf("Failed to parse log output: %v", err)
 	}

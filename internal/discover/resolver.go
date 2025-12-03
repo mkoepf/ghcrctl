@@ -18,31 +18,24 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/logging"
 )
 
-// TypeResolver resolves OCI artifact types.
-type TypeResolver interface {
-	ResolveVersionType(ctx context.Context, image, digest string) ([]string, error)
-	ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error)
+// typeResolver resolves OCI artifact types.
+type typeResolver interface {
+	resolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error)
 }
 
-// OrasResolver implements TypeResolver using ORAS library.
-type OrasResolver struct {
+// orasResolver implements typeResolver using ORAS library.
+type orasResolver struct {
 	authClient *auth.Client
 	authOnce   sync.Once
 }
 
-// NewOrasResolver creates a new OrasResolver.
-func NewOrasResolver() *OrasResolver {
-	return &OrasResolver{}
+// newOrasResolver creates a new orasResolver.
+func newOrasResolver() *orasResolver {
+	return &orasResolver{}
 }
 
-// ResolveVersionType resolves the type(s) of an OCI artifact by digest.
-func (r *OrasResolver) ResolveVersionType(ctx context.Context, image, digest string) ([]string, error) {
-	types, _, err := r.ResolveVersionInfo(ctx, image, digest)
-	return types, err
-}
-
-// ResolveVersionInfo resolves the type(s) and size of an OCI artifact by digest.
-func (r *OrasResolver) ResolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
+// resolveVersionInfo resolves the type(s) and size of an OCI artifact by digest.
+func (r *orasResolver) resolveVersionInfo(ctx context.Context, image, digest string) ([]string, int64, error) {
 	if image == "" {
 		return nil, 0, fmt.Errorf("image cannot be empty")
 	}
@@ -123,7 +116,7 @@ func (r *OrasResolver) ResolveVersionInfo(ctx context.Context, image, digest str
 	return []string{platform}, size, nil
 }
 
-func (r *OrasResolver) configureAuth(ctx context.Context, repo *remote.Repository) {
+func (r *orasResolver) configureAuth(ctx context.Context, repo *remote.Repository) {
 	r.authOnce.Do(func() {
 		var httpClient *http.Client
 		if logging.IsLoggingEnabled(ctx) {

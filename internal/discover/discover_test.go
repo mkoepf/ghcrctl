@@ -10,17 +10,17 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
-// MockChildDiscoverer implements ChildDiscoverer for testing
-type MockChildDiscoverer struct {
+// mockChildDiscoverer implements childDiscoverer for testing
+type mockChildDiscoverer struct {
 	discoverFunc func(ctx context.Context, image, digest string, allTags []string) ([]string, error)
 }
 
-func (m *MockChildDiscoverer) DiscoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
+func (m *mockChildDiscoverer) discoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 	return m.discoverFunc(ctx, image, digest, allTags)
 }
 
 func TestDiscoverPackage_Basic(t *testing.T) {
-	mockResolver := &MockResolver{
+	mockResolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			switch digest {
 			case "sha256:index1":
@@ -33,7 +33,7 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 		},
 	}
 
-	mockDiscoverer := &MockChildDiscoverer{
+	mockDiscoverer := &mockChildDiscoverer{
 		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 			if digest == "sha256:index1" {
 				return []string{"sha256:platform1"}, nil
@@ -48,8 +48,8 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 	}
 
 	discoverer := &PackageDiscoverer{
-		Resolver:        mockResolver,
-		ChildDiscoverer: mockDiscoverer,
+		resolver:        mockResolver,
+		childDiscoverer: mockDiscoverer,
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
@@ -85,7 +85,7 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 	var maxConcurrent int32
 	var mu sync.Mutex
 
-	mockResolver := &MockResolver{
+	mockResolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			mu.Lock()
 			concurrentCalls++
@@ -104,7 +104,7 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 		},
 	}
 
-	mockDiscoverer := &MockChildDiscoverer{
+	mockDiscoverer := &mockChildDiscoverer{
 		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 			return nil, nil
 		},
@@ -121,8 +121,8 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 	}
 
 	discoverer := &PackageDiscoverer{
-		Resolver:        mockResolver,
-		ChildDiscoverer: mockDiscoverer,
+		resolver:        mockResolver,
+		childDiscoverer: mockDiscoverer,
 	}
 
 	_, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
@@ -140,13 +140,13 @@ func TestDiscoverPackage_ResolverFailure(t *testing.T) {
 	t.Parallel()
 
 	// When OCI registry is unreachable, version type should be marked as 'unknown'
-	mockResolver := &MockResolver{
+	mockResolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			return nil, fmt.Errorf("registry unreachable")
 		},
 	}
 
-	mockDiscoverer := &MockChildDiscoverer{
+	mockDiscoverer := &mockChildDiscoverer{
 		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 			return nil, nil
 		},
@@ -157,8 +157,8 @@ func TestDiscoverPackage_ResolverFailure(t *testing.T) {
 	}
 
 	discoverer := &PackageDiscoverer{
-		Resolver:        mockResolver,
-		ChildDiscoverer: mockDiscoverer,
+		resolver:        mockResolver,
+		childDiscoverer: mockDiscoverer,
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
@@ -177,7 +177,7 @@ func TestDiscoverPackage_ResolverFailure(t *testing.T) {
 }
 
 func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
-	mockResolver := &MockResolver{
+	mockResolver := &mockResolver{
 		resolveFunc: func(ctx context.Context, image, digest string) ([]string, error) {
 			switch digest {
 			case "sha256:index1":
@@ -190,7 +190,7 @@ func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 		},
 	}
 
-	mockDiscoverer := &MockChildDiscoverer{
+	mockDiscoverer := &mockChildDiscoverer{
 		discoverFunc: func(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 			if digest == "sha256:index1" {
 				return []string{"sha256:platform1"}, nil
@@ -205,8 +205,8 @@ func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 	}
 
 	discoverer := &PackageDiscoverer{
-		Resolver:        mockResolver,
-		ChildDiscoverer: mockDiscoverer,
+		resolver:        mockResolver,
+		childDiscoverer: mockDiscoverer,
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)

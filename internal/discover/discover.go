@@ -13,23 +13,23 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/gh"
 )
 
-// ChildDiscoverer discovers children of an OCI artifact.
-type ChildDiscoverer interface {
-	DiscoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error)
-}
-
 // PackageDiscoverer discovers all versions and their relationships.
 type PackageDiscoverer struct {
-	Resolver        TypeResolver
-	ChildDiscoverer ChildDiscoverer
+	resolver        typeResolver
+	childDiscoverer childDiscoverer
+}
+
+// childDiscoverer discovers children of an OCI artifact.
+type childDiscoverer interface {
+	discoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error)
 }
 
 // NewPackageDiscoverer creates a new PackageDiscoverer with default implementations.
 func NewPackageDiscoverer() *PackageDiscoverer {
-	resolver := NewOrasResolver()
+	resolver := newOrasResolver()
 	return &PackageDiscoverer{
-		Resolver:        resolver,
-		ChildDiscoverer: &OrasChildDiscoverer{resolver: resolver},
+		resolver:        resolver,
+		childDiscoverer: &orasChildDiscoverer{resolver: resolver},
 	}
 }
 
@@ -55,7 +55,7 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 		go func(digest string, info *VersionInfo) {
 			defer wg.Done()
 
-			types, size, err := d.Resolver.ResolveVersionInfo(ctx, image, digest)
+			types, size, err := d.resolver.resolveVersionInfo(ctx, image, digest)
 			if err != nil {
 				info.Types = []string{"unknown"}
 			} else {
@@ -63,7 +63,7 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 				info.Size = size
 			}
 
-			children, err := d.ChildDiscoverer.DiscoverChildren(ctx, image, digest, allTags)
+			children, err := d.childDiscoverer.discoverChildren(ctx, image, digest, allTags)
 			if err == nil {
 				info.OutgoingRefs = children
 			}
@@ -89,13 +89,13 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 	return result, nil
 }
 
-// OrasChildDiscoverer discovers children using ORAS.
-type OrasChildDiscoverer struct {
-	resolver *OrasResolver
+// orasChildDiscoverer discovers children using ORAS.
+type orasChildDiscoverer struct {
+	resolver *orasResolver
 }
 
-// DiscoverChildren discovers children of an OCI artifact.
-func (d *OrasChildDiscoverer) DiscoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
+// discoverChildren discovers children of an OCI artifact.
+func (d *orasChildDiscoverer) discoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
 	if !validateDigestFormat(digest) {
 		return nil, fmt.Errorf("invalid digest: %s", digest)
 	}
@@ -135,7 +135,7 @@ func (d *OrasChildDiscoverer) DiscoverChildren(ctx context.Context, image, diges
 	return children, nil
 }
 
-func (d *OrasChildDiscoverer) discoverFromIndex(ctx context.Context, repo *remote.Repository, desc ocispec.Descriptor) ([]string, error) {
+func (d *orasChildDiscoverer) discoverFromIndex(ctx context.Context, repo *remote.Repository, desc ocispec.Descriptor) ([]string, error) {
 	indexBytes, err := repo.Fetch(ctx, desc)
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (d *OrasChildDiscoverer) discoverFromIndex(ctx context.Context, repo *remot
 	return children, nil
 }
 
-func (d *OrasChildDiscoverer) discoverFromCosignTags(ctx context.Context, repo *remote.Repository, parentDigest string, allTags []string) []string {
+func (d *orasChildDiscoverer) discoverFromCosignTags(ctx context.Context, repo *remote.Repository, parentDigest string, allTags []string) []string {
 	prefix := strings.Replace(parentDigest, ":", "-", 1)
 	expectedSig := prefix + ".sig"
 	expectedAtt := prefix + ".att"

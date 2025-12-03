@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// LogEntry represents a single API call log entry
-type LogEntry struct {
+// logEntry represents a single API call log entry
+type logEntry struct {
 	Timestamp     time.Time `json:"timestamp"`
 	Category      string    `json:"category"`
 	Method        string    `json:"method"`
@@ -25,22 +25,22 @@ type LogEntry struct {
 	Error         string    `json:"error,omitempty"`
 }
 
-// LoggingRoundTripper is an http.RoundTripper that logs API calls
-type LoggingRoundTripper struct {
+// loggingRoundTripper is an http.RoundTripper that logs API calls
+type loggingRoundTripper struct {
 	transport http.RoundTripper
 	output    io.Writer
 }
 
 // NewLoggingRoundTripper creates a new logging transport
-func NewLoggingRoundTripper(transport http.RoundTripper, output io.Writer) *LoggingRoundTripper {
-	return &LoggingRoundTripper{
+func NewLoggingRoundTripper(transport http.RoundTripper, output io.Writer) *loggingRoundTripper {
+	return &loggingRoundTripper{
 		transport: transport,
 		output:    output,
 	}
 }
 
 // RoundTrip implements http.RoundTripper
-func (t *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
 
 	// Capture request size
@@ -61,7 +61,7 @@ func (t *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	category, path := categorizeAPICall(req.URL.String())
 
 	// Build log entry
-	entry := LogEntry{
+	entry := logEntry{
 		Timestamp:    start,
 		Category:     category,
 		Method:       req.Method,

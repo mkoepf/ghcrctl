@@ -1,8 +1,10 @@
 # Performance / usability 
 
-## README outdated
+## --digest / --version / --tag
 
-E.g., versions --verbose description
+These SHOULD be available for every command.
+
+Wherever there is --digest, there also MUST to be --version
 
 ## Is type resolution even necessary for anything but display
 

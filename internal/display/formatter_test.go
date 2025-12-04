@@ -2,8 +2,10 @@ package display
 
 import (
 	"bytes"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatTags(t *testing.T) {
@@ -37,9 +39,7 @@ func TestFormatTags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := FormatTags(tt.tags)
-			if result != tt.expected {
-				t.Errorf("FormatTags(%v) = %q, expected %q", tt.tags, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -75,9 +75,7 @@ func TestShortDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ShortDigest(tt.digest)
-			if result != tt.expected {
-				t.Errorf("ShortDigest(%q) = %q, expected %q", tt.digest, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -123,15 +121,13 @@ func TestOutputJSON(t *testing.T) {
 			var buf bytes.Buffer
 			err := OutputJSON(&buf, tt.data)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("OutputJSON() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
 
-			got := buf.String()
-			if got != tt.expected {
-				t.Errorf("OutputJSON() output = %q, expected %q", got, tt.expected)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, buf.String())
 		})
 	}
 }
@@ -140,10 +136,6 @@ func TestOutputJSONWithInvalidData(t *testing.T) {
 	var buf bytes.Buffer
 	// Functions cannot be marshaled to JSON
 	err := OutputJSON(&buf, func() {})
-	if err == nil {
-		t.Error("OutputJSON() should return error for unmarshalable data")
-	}
-	if !strings.Contains(err.Error(), "failed to marshal JSON") {
-		t.Errorf("OutputJSON() error should mention JSON marshaling, got: %v", err)
-	}
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "failed to marshal JSON")
 }

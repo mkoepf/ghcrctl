@@ -173,7 +173,7 @@ func TestParseImageReference(t *testing.T) {
 	}
 }
 
-func TestFetchArtifactContent(t *testing.T) {
+func TestGetArtifactContent(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -215,7 +215,7 @@ func TestFetchArtifactContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			content, err := FetchArtifactContent(ctx, tt.image, tt.digest)
+			content, err := GetArtifactContent(ctx, tt.image, tt.digest)
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -229,7 +229,7 @@ func TestFetchArtifactContent(t *testing.T) {
 	}
 }
 
-func TestFetchImageConfig(t *testing.T) {
+func TestGetImageConfig(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -271,7 +271,7 @@ func TestFetchImageConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			config, err := FetchImageConfig(ctx, tt.image, tt.digest)
+			config, err := GetImageConfig(ctx, tt.image, tt.digest)
 
 			if tt.wantError {
 				require.Error(t, err)

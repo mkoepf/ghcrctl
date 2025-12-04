@@ -127,10 +127,10 @@ func ValidateDigestFormat(digest string) bool {
 	return hexPattern.MatchString(hash)
 }
 
-// FetchArtifactContent fetches the full content of an artifact (SBOM, provenance, etc.) by digest
+// GetArtifactContent retrieves the full content of an artifact (SBOM, provenance, etc.) by digest
 // Returns the parsed content as a map which can be marshaled to JSON
 // The content includes all layers/blobs in the attestation manifest
-func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[string]interface{}, error) {
+func GetArtifactContent(ctx context.Context, image, digestStr string) ([]map[string]interface{}, error) {
 	// Validate inputs
 	if image == "" {
 		return nil, fmt.Errorf("image cannot be empty")
@@ -209,8 +209,8 @@ func FetchArtifactContent(ctx context.Context, image, digestStr string) ([]map[s
 	return attestations, nil
 }
 
-// FetchImageConfig fetches the image config blob which contains labels and other metadata
-func FetchImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Image, error) {
+// GetImageConfig retrieves the image config blob which contains labels and other metadata
+func GetImageConfig(ctx context.Context, image, digestStr string) (*ocispec.Image, error) {
 	// Validate inputs
 	if image == "" {
 		return nil, fmt.Errorf("image cannot be empty")

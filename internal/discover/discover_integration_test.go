@@ -96,10 +96,10 @@ func TestResolveVersionInfo_Integration_InvalidDigest(t *testing.T) {
 }
 
 // =============================================================================
-// FetchArtifactContent Integration Tests
+// GetArtifactContent Integration Tests
 // =============================================================================
 
-func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
+func TestGetArtifactContent_Integration_SBOM(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -168,14 +168,14 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 	}
 
 	// Now fetch the SBOM content
-	content, err := FetchArtifactContent(ctx, image, sbomDigest)
-	require.NoError(t, err, "FetchArtifactContent failed")
+	content, err := GetArtifactContent(ctx, image, sbomDigest)
+	require.NoError(t, err, "GetArtifactContent failed")
 	assert.NotNil(t, content, "Expected non-nil content")
 
 	t.Logf("Successfully fetched SBOM content from digest: %s", sbomDigest[:19])
 }
 
-func TestFetchArtifactContent_Integration_NonExistent(t *testing.T) {
+func TestGetArtifactContent_Integration_NonExistent(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -186,7 +186,7 @@ func TestFetchArtifactContent_Integration_NonExistent(t *testing.T) {
 	// Valid format but non-existent digest
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
-	_, err := FetchArtifactContent(ctx, image, invalidDigest)
+	_, err := GetArtifactContent(ctx, image, invalidDigest)
 	assert.Error(t, err, "Expected error for non-existent digest")
 }
 
@@ -227,10 +227,10 @@ func TestResolveTag_Integration_NonExistent(t *testing.T) {
 }
 
 // =============================================================================
-// FetchImageConfig Integration Tests
+// GetImageConfig Integration Tests
 // =============================================================================
 
-func TestFetchImageConfig_Integration_MultiArch(t *testing.T) {
+func TestGetImageConfig_Integration_MultiArch(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -244,8 +244,8 @@ func TestFetchImageConfig_Integration_MultiArch(t *testing.T) {
 	require.NoError(t, err, "Failed to resolve tag")
 
 	// Fetch the image config - this exercises the Image Index code path
-	config, err := FetchImageConfig(ctx, image, digest)
-	require.NoError(t, err, "FetchImageConfig failed")
+	config, err := GetImageConfig(ctx, image, digest)
+	require.NoError(t, err, "GetImageConfig failed")
 	require.NotNil(t, config, "Expected non-nil config")
 
 	// Verify config has expected fields
@@ -255,7 +255,7 @@ func TestFetchImageConfig_Integration_MultiArch(t *testing.T) {
 	t.Logf("Multi-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
 }
 
-func TestFetchImageConfig_Integration_SingleArch(t *testing.T) {
+func TestGetImageConfig_Integration_SingleArch(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -269,8 +269,8 @@ func TestFetchImageConfig_Integration_SingleArch(t *testing.T) {
 	require.NoError(t, err, "Failed to resolve tag")
 
 	// Fetch the image config - this exercises the simple manifest code path
-	config, err := FetchImageConfig(ctx, image, digest)
-	require.NoError(t, err, "FetchImageConfig failed")
+	config, err := GetImageConfig(ctx, image, digest)
+	require.NoError(t, err, "GetImageConfig failed")
 	require.NotNil(t, config, "Expected non-nil config")
 
 	// Verify config has expected fields
@@ -280,7 +280,7 @@ func TestFetchImageConfig_Integration_SingleArch(t *testing.T) {
 	t.Logf("Single-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
 }
 
-func TestFetchImageConfig_Integration_NonExistent(t *testing.T) {
+func TestGetImageConfig_Integration_NonExistent(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
@@ -291,7 +291,7 @@ func TestFetchImageConfig_Integration_NonExistent(t *testing.T) {
 	// Valid format but non-existent digest
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
-	_, err := FetchImageConfig(ctx, image, invalidDigest)
+	_, err := GetImageConfig(ctx, image, invalidDigest)
 	assert.Error(t, err, "Expected error for non-existent digest")
 	assert.ErrorContains(t, err, "failed to resolve digest")
 }

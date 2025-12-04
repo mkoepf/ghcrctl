@@ -504,7 +504,7 @@ func TestDisplayImageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			displayDeleteImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
+			outputDeleteImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
 			output := buf.String()
 
 			for _, want := range tt.wantContains {

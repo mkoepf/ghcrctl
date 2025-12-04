@@ -207,7 +207,7 @@ Examples:
 
 func getImageLabelsFromDigest(ctx context.Context, image, digest string) (map[string]string, error) {
 	// Fetch image config to get labels
-	config, err := discover.FetchImageConfig(ctx, image, digest)
+	config, err := discover.GetImageConfig(ctx, image, digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image config: %w", err)
 	}
@@ -255,7 +255,7 @@ func outputGetLabelsTable(w io.Writer, labels map[string]string, packageName, ta
 
 // newGetSBOMCmd creates the get sbom subcommand.
 func newGetSBOMCmd() *cobra.Command {
-	return newGetArtifactCmd(getArtifactConfig{
+	return newGetArtifactCmd(getArtifactParams{
 		Name:       "sbom",
 		Short:      "Get SBOM (Software Bill of Materials) attestation",
 		NoFoundMsg: "no SBOM found",
@@ -288,7 +288,7 @@ Examples:
 
 // newGetProvenanceCmd creates the get provenance subcommand.
 func newGetProvenanceCmd() *cobra.Command {
-	return newGetArtifactCmd(getArtifactConfig{
+	return newGetArtifactCmd(getArtifactParams{
 		Name:       "provenance",
 		Short:      "Get provenance attestation",
 		NoFoundMsg: "no provenance found",
@@ -319,8 +319,8 @@ Examples:
 	})
 }
 
-// getArtifactConfig defines the configuration for a specific artifact type command.
-type getArtifactConfig struct {
+// getArtifactParams defines the configuration for a specific artifact type command.
+type getArtifactParams struct {
 	Name       string // "sbom" or "provenance"
 	Short      string // Short description
 	Long       string // Long description with examples
@@ -329,7 +329,7 @@ type getArtifactConfig struct {
 }
 
 // newGetArtifactCmd creates a command for getting OCI artifacts of a specific type.
-func newGetArtifactCmd(cfg getArtifactConfig) *cobra.Command {
+func newGetArtifactCmd(cfg getArtifactParams) *cobra.Command {
 	var (
 		tag          string
 		digest       string

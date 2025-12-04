@@ -354,7 +354,7 @@ Examples:
 				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:     %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			displayDeleteImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
+			outputDeleteImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -818,8 +818,8 @@ func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 	return vf, nil
 }
 
-// displayDeleteImageVersions displays versions to delete and shared versions.
-func displayDeleteImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
+// outputDeleteImageVersions displays versions to delete and shared versions.
+func outputDeleteImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
 	// Build set of digests in this image for counting external refs
 	imageDigests := make(map[string]bool)
 	for _, v := range imageVersions {

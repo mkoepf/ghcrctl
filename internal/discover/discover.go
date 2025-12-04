@@ -100,11 +100,11 @@ type orasChildDiscoverer struct {
 
 // discoverChildren discovers children of an OCI artifact.
 func (d *orasChildDiscoverer) discoverChildren(ctx context.Context, image, digest string, allTags []string) ([]string, error) {
-	if !validateDigestFormat(digest) {
+	if !ValidateDigestFormat(digest) {
 		return nil, fmt.Errorf("invalid digest: %s", digest)
 	}
 
-	registry, path, err := parseImageReference(image)
+	registry, path, err := ParseImageReference(image)
 	if err != nil {
 		return nil, err
 	}

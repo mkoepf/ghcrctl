@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -42,11 +41,11 @@ func (r *orasResolver) resolveVersionInfo(ctx context.Context, image, digest str
 	if digest == "" {
 		return nil, 0, fmt.Errorf("digest cannot be empty")
 	}
-	if !validateDigestFormat(digest) {
+	if !ValidateDigestFormat(digest) {
 		return nil, 0, fmt.Errorf("invalid digest format: %s", digest)
 	}
 
-	registry, path, err := parseImageReference(image)
+	registry, path, err := ParseImageReference(image)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -215,32 +214,4 @@ func predicateToRole(predicateType string) string {
 		return "vex"
 	}
 	return "attestation"
-}
-
-func parseImageReference(image string) (string, string, error) {
-	if image == "" {
-		return "", "", fmt.Errorf("image cannot be empty")
-	}
-	parts := strings.SplitN(image, "/", 2)
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("invalid image format")
-	}
-	registry := parts[0]
-	path := parts[1]
-	if !strings.Contains(registry, ".") {
-		return "", "", fmt.Errorf("invalid registry format")
-	}
-	return registry, path, nil
-}
-
-func validateDigestFormat(digest string) bool {
-	if !strings.HasPrefix(digest, "sha256:") {
-		return false
-	}
-	hash := strings.TrimPrefix(digest, "sha256:")
-	if len(hash) != 64 {
-		return false
-	}
-	hexPattern := regexp.MustCompile("^[0-9a-f]{64}$")
-	return hexPattern.MatchString(hash)
 }

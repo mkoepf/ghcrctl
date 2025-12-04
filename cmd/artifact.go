@@ -14,7 +14,7 @@ import (
 // fetchAndDisplayArtifact fetches and displays a single artifact
 func fetchAndDisplayArtifact(w io.Writer, ctx context.Context, image, digest string, jsonOutput bool, artifactType string) error {
 	// Fetch the artifact content
-	content, err := discover.FetchArtifactContent(ctx, image, digest)
+	content, err := discover.GetArtifactContent(ctx, image, digest)
 	if err != nil {
 		return fmt.Errorf("failed to fetch %s: %w", artifactType, err)
 	}
@@ -31,7 +31,7 @@ func fetchAndDisplayAllArtifacts(w io.Writer, ctx context.Context, image string,
 	allContent := make([]interface{}, 0, len(artifacts))
 
 	for _, artifact := range artifacts {
-		content, err := discover.FetchArtifactContent(ctx, image, artifact.Digest)
+		content, err := discover.GetArtifactContent(ctx, image, artifact.Digest)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to fetch %s %s: %v\n", artifactType, artifact.Digest, err)
 			continue

@@ -1,3 +1,6 @@
+// Package prompts provides interactive user confirmation utilities for
+// destructive operations. It supports both simple yes/no prompts and
+// type-to-confirm prompts for high-risk operations like package deletion.
 package prompts
 
 import (

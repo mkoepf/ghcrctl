@@ -1,3 +1,6 @@
+// Package filter provides version filtering capabilities for GHCR package versions.
+// It supports filtering by tags (exact match and regex), date ranges, age,
+// version IDs, digests, and tagged/untagged status with graph-aware filtering.
 package filter
 
 import (

@@ -1,3 +1,6 @@
+// Package quiet provides context-based quiet mode for suppressing non-essential
+// output. When enabled via the --quiet flag, commands emit only machine-readable
+// output suitable for scripting and automation.
 package quiet
 
 import "context"

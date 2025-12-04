@@ -1,3 +1,7 @@
+// Package discover provides OCI artifact graph discovery and relationship mapping
+// for GitHub Container Registry (GHCR) packages. It resolves multi-platform images,
+// attestations (SBOM, provenance), signatures, and their parent-child relationships
+// by querying both the GitHub Packages API and OCI registry directly.
 package discover
 
 import (

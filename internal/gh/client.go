@@ -1,3 +1,6 @@
+// Package gh provides a GitHub API client for container package operations.
+// It wraps the go-github library to provide typed methods for listing packages,
+// managing versions, deleting artifacts, and determining owner types (user vs org).
 package gh
 
 import (

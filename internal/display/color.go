@@ -1,3 +1,6 @@
+// Package display provides terminal output formatting with consistent color styling
+// for CLI output. It handles colorization of version types, tags, digests, and
+// status messages with automatic detection of terminal capabilities.
 package display
 
 import (

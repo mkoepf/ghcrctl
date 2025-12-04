@@ -1,3 +1,6 @@
+// Package logging provides HTTP request/response logging for API debugging.
+// It uses context-based configuration to enable JSON logging of all HTTP calls
+// with timing data, useful for debugging and understanding API interactions.
 package logging
 
 import "context"

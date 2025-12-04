@@ -274,7 +274,7 @@ Examples:
 			}
 
 			// Table output (default)
-			return OutputVersionsTable(cmd.OutOrStdout(), filteredVersions, packageName, quiet.IsQuiet(cmd.Context()))
+			return outputVersionsTable(cmd.OutOrStdout(), filteredVersions, packageName, quiet.IsQuiet(cmd.Context()))
 		},
 	}
 
@@ -297,9 +297,9 @@ Examples:
 	return cmd
 }
 
-// OutputVersionsTable outputs a flat list of versions (exported for testing).
+// outputVersionsTable outputs a flat list of versions (exported for testing).
 // If quiet is true, informational headers and summaries are suppressed.
-func OutputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageName string, quiet bool) error {
+func outputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageName string, quiet bool) error {
 	if len(versions) == 0 {
 		if !quiet {
 			fmt.Fprintf(w, "No versions found for %s\n", packageName)

@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// PackageStats holds computed statistics for a package
-type PackageStats struct {
+// packageStats holds computed statistics for a package
+type packageStats struct {
 	PackageName      string `json:"package_name"`
 	TotalVersions    int    `json:"total_versions"`
 	TaggedVersions   int    `json:"tagged_versions"`
@@ -71,7 +71,7 @@ Examples:
 			}
 
 			// Calculate statistics
-			stats := CalculateStats(versions)
+			stats := calculateStats(versions)
 			stats.PackageName = packageName
 
 			// Output
@@ -79,7 +79,7 @@ Examples:
 				return display.OutputJSON(cmd.OutOrStdout(), stats)
 			}
 
-			return OutputStatsTable(cmd.OutOrStdout(), stats, quiet.IsQuiet(cmd.Context()))
+			return outputStatsTable(cmd.OutOrStdout(), stats, quiet.IsQuiet(cmd.Context()))
 		},
 	}
 
@@ -90,9 +90,9 @@ Examples:
 	return cmd
 }
 
-// CalculateStats computes statistics from a list of package versions
-func CalculateStats(versions []gh.PackageVersionInfo) PackageStats {
-	stats := PackageStats{
+// calculateStats computes statistics from a list of package versions
+func calculateStats(versions []gh.PackageVersionInfo) packageStats {
+	stats := packageStats{
 		TotalVersions: len(versions),
 	}
 
@@ -126,13 +126,13 @@ func CalculateStats(versions []gh.PackageVersionInfo) PackageStats {
 	return stats
 }
 
-// VersionLister is an interface for listing package versions
-type VersionLister interface {
+// versionLister is an interface for listing package versions
+type versionLister interface {
 	ListPackageVersions(ctx context.Context, owner, ownerType, packageName string) ([]gh.PackageVersionInfo, error)
 }
 
-// StatsParams contains parameters for stats execution
-type StatsParams struct {
+// statsParams contains parameters for stats execution
+type statsParams struct {
 	Owner       string
 	OwnerType   string
 	PackageName string
@@ -140,25 +140,25 @@ type StatsParams struct {
 	QuietMode   bool
 }
 
-// ExecuteStats executes the stats command logic with injected dependencies
-func ExecuteStats(ctx context.Context, lister VersionLister, params StatsParams, out io.Writer) error {
+// executeStats executes the stats command logic with injected dependencies
+func executeStats(ctx context.Context, lister versionLister, params statsParams, out io.Writer) error {
 	versions, err := lister.ListPackageVersions(ctx, params.Owner, params.OwnerType, params.PackageName)
 	if err != nil {
 		return fmt.Errorf("failed to list versions: %w", err)
 	}
 
-	stats := CalculateStats(versions)
+	stats := calculateStats(versions)
 	stats.PackageName = params.PackageName
 
 	if params.JSONOutput {
 		return display.OutputJSON(out, stats)
 	}
 
-	return OutputStatsTable(out, stats, params.QuietMode)
+	return outputStatsTable(out, stats, params.QuietMode)
 }
 
-// OutputStatsTable outputs package statistics in table format
-func OutputStatsTable(w io.Writer, stats PackageStats, quietMode bool) error {
+// outputStatsTable outputs package statistics in table format
+func outputStatsTable(w io.Writer, stats packageStats, quietMode bool) error {
 	if !quietMode {
 		fmt.Fprintf(w, "Statistics for %s:\n\n", stats.PackageName)
 	}

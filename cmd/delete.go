@@ -879,13 +879,13 @@ func formatTagsForDisplay(tags []string) string {
 // Exported types and functions for testing
 // =============================================================================
 
-// PackageDeleter interface for mocking in tests
-type PackageDeleter interface {
+// packageDeleter interface for mocking in tests
+type packageDeleter interface {
 	DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error
 }
 
-// DeleteVersionParams contains parameters for single version deletion
-type DeleteVersionParams struct {
+// deleteVersionParams contains parameters for single version deletion
+type deleteVersionParams struct {
 	Owner       string
 	OwnerType   string
 	PackageName string
@@ -896,8 +896,8 @@ type DeleteVersionParams struct {
 	DryRun      bool
 }
 
-// BulkDeleteParams contains parameters for bulk version deletion
-type BulkDeleteParams struct {
+// bulkDeleteParams contains parameters for bulk version deletion
+type bulkDeleteParams struct {
 	Owner       string
 	OwnerType   string
 	PackageName string
@@ -906,8 +906,8 @@ type BulkDeleteParams struct {
 	DryRun      bool
 }
 
-// DeleteGraphWithDeleter deletes versions using a deleter interface (for testing)
-func DeleteGraphWithDeleter(ctx context.Context, deleter PackageDeleter, owner, ownerType, packageName string, versionIDs []int64, w io.Writer) error {
+// deleteGraphWithDeleter deletes versions using a deleter interface (for testing)
+func deleteGraphWithDeleter(ctx context.Context, deleter packageDeleter, owner, ownerType, packageName string, versionIDs []int64, w io.Writer) error {
 	for i, versionID := range versionIDs {
 		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(versionIDs), versionID)
 		err := deleter.DeletePackageVersion(ctx, owner, ownerType, packageName, versionID)
@@ -918,8 +918,8 @@ func DeleteGraphWithDeleter(ctx context.Context, deleter PackageDeleter, owner, 
 	return nil
 }
 
-// ExecuteSingleDelete executes a single version deletion with confirmation (for testing)
-func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params DeleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
+// executeSingleDelete executes a single version deletion with confirmation (for testing)
+func executeSingleDelete(ctx context.Context, deleter packageDeleter, params deleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
 	// Show what will be deleted
 	fmt.Fprintf(w, "Preparing to delete package version:\n")
 	fmt.Fprintf(w, "  Package:    %s\n", params.PackageName)
@@ -969,8 +969,8 @@ func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params Del
 	return nil
 }
 
-// ExecuteBulkDelete executes bulk version deletion with confirmation (for testing)
-func ExecuteBulkDelete(ctx context.Context, deleter PackageDeleter, params BulkDeleteParams, w io.Writer, confirmFn func(count int) (bool, error)) error {
+// executeBulkDelete executes bulk version deletion with confirmation (for testing)
+func executeBulkDelete(ctx context.Context, deleter packageDeleter, params bulkDeleteParams, w io.Writer, confirmFn func(count int) (bool, error)) error {
 	// Display summary of what will be deleted
 	fmt.Fprintf(w, "Preparing to delete %s package version(s):\n",
 		display.ColorWarning(fmt.Sprintf("%d", len(params.Versions))))

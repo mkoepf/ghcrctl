@@ -149,14 +149,14 @@ Examples:
 	return cmd
 }
 
-// TagAdder is an interface for tag add operations
-type TagAdder interface {
+// tagAdder is an interface for tag add operations
+type tagAdder interface {
 	ResolveTag(ctx context.Context, fullImage, tag string) (string, error)
 	AddTagByDigest(ctx context.Context, fullImage, digest, newTag string) error
 }
 
-// TagAddParams contains parameters for tag add execution
-type TagAddParams struct {
+// tagAddParams contains parameters for tag add execution
+type tagAddParams struct {
 	Owner        string
 	PackageName  string
 	NewTag       string
@@ -164,8 +164,8 @@ type TagAddParams struct {
 	SourceDigest string
 }
 
-// ExecuteTagAdd executes the tag add logic with injected dependencies
-func ExecuteTagAdd(ctx context.Context, adder TagAdder, params TagAddParams, out io.Writer) error {
+// executeTagAdd executes the tag add logic with injected dependencies
+func executeTagAdd(ctx context.Context, adder tagAdder, params tagAddParams, out io.Writer) error {
 	fullImage := fmt.Sprintf("ghcr.io/%s/%s", params.Owner, params.PackageName)
 
 	// Resolve source to digest if tag was provided

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestDeletePackageVersion validates input parameters
@@ -73,13 +75,9 @@ func TestDeletePackageVersion(t *testing.T) {
 			err := client.DeletePackageVersion(ctx, tt.owner, tt.ownerType, tt.packageName, tt.versionID)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
-				}
-			} else {
-				if err != nil && err.Error() == "" {
-					t.Error("Error message should not be empty")
-				}
+				assert.Error(t, err)
+			} else if err != nil {
+				assert.NotEmpty(t, err.Error(), "Error message should not be empty")
 			}
 		})
 	}
@@ -129,9 +127,7 @@ func TestDeletePackage(t *testing.T) {
 			err := client.DeletePackage(ctx, tt.owner, tt.ownerType, tt.packageName)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
-				}
+				assert.Error(t, err)
 			}
 		})
 	}
@@ -171,9 +167,7 @@ func TestIsLastTaggedVersionError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := IsLastTaggedVersionError(tt.err)
-			if result != tt.expected {
-				t.Errorf("IsLastTaggedVersionError() = %v, want %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v58/github"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ===[ ListPackageVersions Tests ]===
@@ -22,9 +24,7 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	owner := "mkoepf"
@@ -32,9 +32,7 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 	packageName := "ghcrctl-test-with-sbom"
 
 	versions, err := client.ListPackageVersions(ctx, owner, ownerType, packageName)
-	if err != nil {
-		t.Fatalf("ListPackageVersions() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	// Should have multiple versions (root + platforms + attestations)
 	if len(versions) == 0 {
@@ -45,18 +43,10 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 
 	// Verify structure of returned versions
 	for i, ver := range versions {
-		if ver.ID == 0 {
-			t.Errorf("Version %d has zero ID", i)
-		}
-		if ver.Name == "" {
-			t.Errorf("Version %d has empty name (digest)", i)
-		}
-		if !strings.HasPrefix(ver.Name, "sha256:") {
-			t.Errorf("Version %d name should be a digest, got: %s", i, ver.Name)
-		}
-		if ver.CreatedAt == "" {
-			t.Errorf("Version %d has empty CreatedAt", i)
-		}
+		assert.NotZero(t, ver.ID, "Version %d has zero ID", i)
+		assert.NotEmpty(t, ver.Name, "Version %d has empty name (digest)", i)
+		assert.True(t, strings.HasPrefix(ver.Name, "sha256:"), "Version %d name should be a digest, got: %s", i, ver.Name)
+		assert.NotEmpty(t, ver.CreatedAt, "Version %d has empty CreatedAt", i)
 
 		// Log some details for debugging
 		if i < 5 {
@@ -73,9 +63,7 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 	}
 	t.Logf("Tagged versions: %d, Untagged: %d", taggedCount, len(versions)-taggedCount)
 
-	if taggedCount == 0 {
-		t.Error("Expected at least one tagged version")
-	}
+	assert.Greater(t, taggedCount, 0, "Expected at least one tagged version")
 }
 
 // TestListPackageVersionsMultipleImages tests listing versions for different test images
@@ -87,9 +75,7 @@ func TestListPackageVersionsMultipleImages(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	owner := "mkoepf"
@@ -109,15 +95,10 @@ func TestListPackageVersionsMultipleImages(t *testing.T) {
 	for _, img := range testImages {
 		t.Run(img.name, func(t *testing.T) {
 			versions, err := client.ListPackageVersions(ctx, owner, ownerType, img.name)
-			if err != nil {
-				t.Fatalf("ListPackageVersions() error = %v", err)
-			}
+			require.NoError(t, err)
 
 			t.Logf("%s (%s): %d versions", img.name, img.description, len(versions))
-
-			if len(versions) < img.expectMinVers {
-				t.Errorf("Expected at least %d versions, got %d", img.expectMinVers, len(versions))
-			}
+			assert.GreaterOrEqual(t, len(versions), img.expectMinVers)
 		})
 	}
 }
@@ -131,9 +112,7 @@ func TestListPackageVersionsInputValidation(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 
@@ -175,13 +154,10 @@ func TestListPackageVersionsInputValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := client.ListPackageVersions(ctx, tt.owner, tt.ownerType, tt.packageName)
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Expected error containing %q, got: %v", tt.errContains, err)
-				}
-			} else if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errContains)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -196,9 +172,7 @@ func TestListPackageVersionsNonexistentPackage(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	owner := "mkoepf"
@@ -206,9 +180,7 @@ func TestListPackageVersionsNonexistentPackage(t *testing.T) {
 	packageName := "this-package-definitely-does-not-exist-12345"
 
 	_, err = client.ListPackageVersions(ctx, owner, ownerType, packageName)
-	if err == nil {
-		t.Error("Expected error for non-existent package, got none")
-	}
+	assert.Error(t, err, "Expected error for non-existent package")
 
 	t.Logf("Got expected error for non-existent package: %v", err)
 }
@@ -224,19 +196,12 @@ func TestGetOwnerTypeUser(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	ownerType, err := client.GetOwnerType(ctx, "mkoepf")
-	if err != nil {
-		t.Fatalf("GetOwnerType() error = %v", err)
-	}
-
-	if ownerType != "user" {
-		t.Errorf("Expected 'user', got '%s'", ownerType)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "user", ownerType)
 }
 
 // TestGetOwnerTypeOrg tests that a known organization returns "org"
@@ -248,19 +213,12 @@ func TestGetOwnerTypeOrg(t *testing.T) {
 	}
 
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	ownerType, err := client.GetOwnerType(ctx, "golang")
-	if err != nil {
-		t.Fatalf("GetOwnerType() error = %v", err)
-	}
-
-	if ownerType != "org" {
-		t.Errorf("Expected 'org', got '%s'", ownerType)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "org", ownerType)
 }
 
 // ===[ Version ID Mapping Tests ]===
@@ -279,9 +237,7 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 
 	// Create client
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	owner := "mkoepf"
@@ -298,9 +254,7 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 	// This is a workaround - we'll need to use the go-github import
 	// Let me check what's already imported
 	versions, _, err := client.client.Users.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
-	if err != nil {
-		t.Fatalf("Failed to list package versions: %v", err)
-	}
+	require.NoError(t, err, "Failed to list package versions")
 
 	if len(versions) == 0 {
 		t.Skip("No package versions found - integration test images may not be created yet")
@@ -308,9 +262,8 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 
 	// Use the first version
 	firstVersion := versions[0]
-	if firstVersion.Name == nil || firstVersion.ID == nil {
-		t.Fatal("Version has nil name or ID")
-	}
+	require.NotNil(t, firstVersion.Name, "Version has nil name")
+	require.NotNil(t, firstVersion.ID, "Version has nil ID")
 
 	digest := *firstVersion.Name
 	expectedVersionID := *firstVersion.ID
@@ -325,14 +278,10 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 
 	// Now call our function to map it
 	actualVersionID, err := client.GetVersionIDByDigest(ctx, owner, ownerType, packageName, digest)
-	if err != nil {
-		t.Fatalf("Failed to map digest to version ID: %v", err)
-	}
+	require.NoError(t, err, "Failed to map digest to version ID")
 
 	// Verify the IDs match
-	if actualVersionID != expectedVersionID {
-		t.Errorf("Version ID mismatch: expected %d, got %d", expectedVersionID, actualVersionID)
-	}
+	assert.Equal(t, expectedVersionID, actualVersionID)
 
 	t.Logf("✓ Successfully verified digest->version ID mapping")
 }
@@ -347,9 +296,7 @@ func TestVersionIDNotFound(t *testing.T) {
 
 	// Create client
 	client, err := NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	ctx := context.Background()
 	owner := "mkoepf"
@@ -361,17 +308,9 @@ func TestVersionIDNotFound(t *testing.T) {
 
 	// This should return an error
 	versionID, err := client.GetVersionIDByDigest(ctx, owner, ownerType, packageName, fakeDigest)
-	if err == nil {
-		t.Error("Expected error for non-existent digest, but got none")
-	}
-
-	if versionID != 0 {
-		t.Errorf("Expected version ID 0 for error case, got %d", versionID)
-	}
-
-	if !strings.Contains(err.Error(), "no version found") {
-		t.Errorf("Expected error message to contain 'no version found', got: %v", err)
-	}
+	require.Error(t, err, "Expected error for non-existent digest")
+	assert.Equal(t, int64(0), versionID)
+	assert.ErrorContains(t, err, "no version found")
 
 	t.Logf("✓ Correctly handled non-existent digest")
 }

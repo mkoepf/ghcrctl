@@ -4,6 +4,9 @@ import (
 	"context"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetToken(t *testing.T) {
@@ -62,23 +65,14 @@ func TestGetToken(t *testing.T) {
 			// Call function
 			token, err := GetToken()
 
-			// Check error
+			// Check error and token
 			if tt.wantError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if err.Error() != tt.errorMsg {
-					t.Errorf("Expected error '%s', got '%s'", tt.errorMsg, err.Error())
-				}
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.errorMsg)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 			}
-
-			// Check token
-			if token != tt.wantToken {
-				t.Errorf("Expected token '%s', got '%s'", tt.wantToken, token)
-			}
+			assert.Equal(t, tt.wantToken, token)
 		})
 	}
 }
@@ -108,21 +102,12 @@ func TestNewClient(t *testing.T) {
 			client, err := NewClient(tt.token)
 
 			if tt.wantError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if err.Error() != tt.errorMsg {
-					t.Errorf("Expected error '%s', got '%s'", tt.errorMsg, err.Error())
-				}
-				if client != nil {
-					t.Errorf("Expected nil client on error, got non-nil")
-				}
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.errorMsg)
+				assert.Nil(t, client)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if client == nil {
-					t.Errorf("Expected non-nil client, got nil")
-				}
+				require.NoError(t, err)
+				assert.NotNil(t, client)
 			}
 		})
 	}
@@ -154,24 +139,16 @@ func TestListPackages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient("ghp_fake_token")
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
+			require.NoError(t, err)
 
 			ctx := context.Background()
 			packages, err := client.ListPackages(ctx, tt.owner, tt.ownerType)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if packages == nil {
-					t.Error("Expected non-nil packages slice")
-				}
+				require.NoError(t, err)
+				assert.NotNil(t, packages)
 			}
 		})
 	}
@@ -223,23 +200,15 @@ func TestGetVersionIDByDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient("ghp_fake_token")
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
+			require.NoError(t, err)
 
 			ctx := context.Background()
-			versionID, err := client.GetVersionIDByDigest(ctx, tt.owner, tt.ownerType, tt.pkg, tt.digest)
+			_, err = client.GetVersionIDByDigest(ctx, tt.owner, tt.ownerType, tt.pkg, tt.digest)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				// Can't verify actual version ID without real API call
-				_ = versionID
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -263,24 +232,16 @@ func TestGetOwnerType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient("ghp_fake_token")
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
+			require.NoError(t, err)
 
 			ctx := context.Background()
 			ownerType, err := client.GetOwnerType(ctx, tt.owner)
 
 			if tt.wantError {
-				if err == nil {
-					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if ownerType != "user" && ownerType != "org" {
-					t.Errorf("Expected 'user' or 'org', got '%s'", ownerType)
-				}
+				require.NoError(t, err)
+				assert.True(t, ownerType == "user" || ownerType == "org", "expected 'user' or 'org', got '%s'", ownerType)
 			}
 		})
 	}
@@ -326,22 +287,15 @@ func TestListPackageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient("ghp_fake_token")
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
+			require.NoError(t, err)
 
 			ctx := context.Background()
-			versions, err := client.ListPackageVersions(ctx, tt.owner, tt.ownerType, tt.pkg)
+			_, err = client.ListPackageVersions(ctx, tt.owner, tt.ownerType, tt.pkg)
 
 			if tt.wantError {
-				if err == nil {
-					t.Errorf("Expected error containing '%s', got nil", tt.errMsg)
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				_ = versions
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -393,23 +347,15 @@ func TestGetVersionTags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewClient("ghp_fake_token")
-			if err != nil {
-				t.Fatalf("Failed to create client: %v", err)
-			}
+			require.NoError(t, err)
 
 			ctx := context.Background()
-			tags, err := client.GetVersionTags(ctx, tt.owner, tt.ownerType, tt.pkg, tt.versionID)
+			_, err = client.GetVersionTags(ctx, tt.owner, tt.ownerType, tt.pkg, tt.versionID)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				// Can't verify actual tags without real API call
-				_ = tags
+				assert.NoError(t, err)
 			}
 		})
 	}

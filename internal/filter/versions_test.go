@@ -12,7 +12,7 @@ import (
 func createTestVersion(id int64, tags []string, createdAt string) gh.PackageVersionInfo {
 	return gh.PackageVersionInfo{
 		ID:        id,
-		Name:      "sha256:abc123",
+		Digest:    "sha256:abc123",
 		Tags:      tags,
 		CreatedAt: createdAt,
 		UpdatedAt: createdAt,
@@ -23,7 +23,7 @@ func createTestVersion(id int64, tags []string, createdAt string) gh.PackageVers
 func createTestVersionGitHubFormat(id int64, tags []string, createdAt string) gh.PackageVersionInfo {
 	return gh.PackageVersionInfo{
 		ID:        id,
-		Name:      "sha256:abc123",
+		Digest:    "sha256:abc123",
 		Tags:      tags,
 		CreatedAt: createdAt, // GitHub format: "2006-01-02 15:04:05"
 		UpdatedAt: createdAt,
@@ -380,9 +380,9 @@ func TestVersionFilter_Apply_VersionID_NotFound(t *testing.T) {
 
 func TestVersionFilter_Apply_Digest(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
-		{ID: 3, Name: "sha256:ghi789", Tags: []string{"latest"}, CreatedAt: "2025-01-03T00:00:00Z"},
+		{ID: 1, Digest: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Digest: "sha256:ghi789", Tags: []string{"latest"}, CreatedAt: "2025-01-03T00:00:00Z"},
 	}
 
 	filter := &VersionFilter{Digest: "sha256:def456"}
@@ -390,13 +390,13 @@ func TestVersionFilter_Apply_Digest(t *testing.T) {
 
 	assert.Equal(t, 1, len(result))
 	assert.Equal(t, int64(2), result[0].ID)
-	assert.Equal(t, "sha256:def456", result[0].Name)
+	assert.Equal(t, "sha256:def456", result[0].Digest)
 }
 
 func TestVersionFilter_Apply_Digest_NotFound(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 1, Digest: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:def456", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
 	}
 
 	filter := &VersionFilter{Digest: "sha256:notexist"}
@@ -407,8 +407,8 @@ func TestVersionFilter_Apply_Digest_NotFound(t *testing.T) {
 
 func TestVersionFilter_Apply_Digest_ShortForm(t *testing.T) {
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 1, Digest: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
 	}
 
 	// Short form should match the beginning of the digest
@@ -422,8 +422,8 @@ func TestVersionFilter_Apply_Digest_ShortForm(t *testing.T) {
 func TestVersionFilter_Apply_Digest_WithoutPrefix(t *testing.T) {
 	// This tests matching the format shown in the DIGEST column (no sha256: prefix)
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 1, Digest: "sha256:abc123def456789012345678901234567890123456789012345678901234", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:def456abc789012345678901234567890123456789012345678901234567", Tags: []string{"v2.0.0"}, CreatedAt: "2025-01-02T00:00:00Z"},
 	}
 
 	// User copies "abc123def456" from DIGEST column (first 12 chars without prefix)
@@ -441,11 +441,11 @@ func TestVersionFilter_Apply_OnlyUntagged_WithTaggedGraphMembers(t *testing.T) {
 	// - SBOM attestation (ID=4, untagged)
 	// Plus an orphan untagged version (ID=5)
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:amd64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 3, Name: "sha256:arm64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 4, Name: "sha256:sbom", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 5, Name: "sha256:orphan", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 1, Digest: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:amd64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 3, Digest: "sha256:arm64", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 4, Digest: "sha256:sbom", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 5, Digest: "sha256:orphan", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
 	}
 
 	// TaggedGraphMembers contains the tagged version and all its children
@@ -470,9 +470,9 @@ func TestVersionFilter_Apply_OnlyUntagged_WithTaggedGraphMembers(t *testing.T) {
 func TestVersionFilter_Apply_OnlyUntagged_WithEmptyTaggedGraphMembers(t *testing.T) {
 	// When TaggedGraphMembers is empty, all untagged versions should be returned
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
-		{ID: 3, Name: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
+		{ID: 1, Digest: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Digest: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
 	}
 
 	filter := &VersionFilter{
@@ -489,9 +489,9 @@ func TestVersionFilter_Apply_OnlyUntagged_WithEmptyTaggedGraphMembers(t *testing
 func TestVersionFilter_Apply_OnlyUntagged_WithNilTaggedGraphMembers(t *testing.T) {
 	// When TaggedGraphMembers is nil, behavior should be same as legacy (all untagged)
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
-		{ID: 3, Name: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
+		{ID: 1, Digest: "sha256:tagged", Tags: []string{"v1.0"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:untagged1", Tags: []string{}, CreatedAt: "2025-01-02T00:00:00Z"},
+		{ID: 3, Digest: "sha256:untagged2", Tags: []string{}, CreatedAt: "2025-01-03T00:00:00Z"},
 	}
 
 	filter := &VersionFilter{
@@ -712,9 +712,9 @@ func TestParseDateOrDuration(t *testing.T) {
 func TestVersionFilter_Apply_OnlyUntagged_AllInTaggedGraph(t *testing.T) {
 	// Edge case: All untagged versions are children of tagged versions
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 2, Name: "sha256:child1", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
-		{ID: 3, Name: "sha256:child2", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 1, Digest: "sha256:index", Tags: []string{"latest"}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 2, Digest: "sha256:child1", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
+		{ID: 3, Digest: "sha256:child2", Tags: []string{}, CreatedAt: "2025-01-01T00:00:00Z"},
 	}
 
 	taggedGraphMembers := map[int64]bool{

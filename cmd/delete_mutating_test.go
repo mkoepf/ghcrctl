@@ -96,7 +96,7 @@ func TestDeletePackageVersion_Mutating(t *testing.T) {
 	// Since both tags point to the same digest, we have only 1 version
 	// Attempting to delete it should fail with "last tagged version" error
 	versionToDelete := versions[0]
-	t.Logf("Attempting to delete version %d (digest: %s)", versionToDelete.ID, versionToDelete.Name[:20])
+	t.Logf("Attempting to delete version %d (digest: %s)", versionToDelete.ID, versionToDelete.Digest[:20])
 
 	err = client.DeletePackageVersion(ctx, testOwner, "user", ephemeralName, versionToDelete.ID)
 	if err == nil {

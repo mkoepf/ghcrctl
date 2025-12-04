@@ -44,13 +44,13 @@ func TestListPackageVersionsWithRealImage(t *testing.T) {
 	// Verify structure of returned versions
 	for i, ver := range versions {
 		assert.NotZero(t, ver.ID, "Version %d has zero ID", i)
-		assert.NotEmpty(t, ver.Name, "Version %d has empty name (digest)", i)
-		assert.True(t, strings.HasPrefix(ver.Name, "sha256:"), "Version %d name should be a digest, got: %s", i, ver.Name)
+		assert.NotEmpty(t, ver.Digest, "Version %d has empty digest", i)
+		assert.True(t, strings.HasPrefix(ver.Digest, "sha256:"), "Version %d digest should start with sha256:, got: %s", i, ver.Digest)
 		assert.NotEmpty(t, ver.CreatedAt, "Version %d has empty CreatedAt", i)
 
 		// Log some details for debugging
 		if i < 5 {
-			t.Logf("  Version %d: ID=%d, Tags=%v, Digest=%s...", i, ver.ID, ver.Tags, ver.Name[:20])
+			t.Logf("  Version %d: ID=%d, Tags=%v, Digest=%s...", i, ver.ID, ver.Tags, ver.Digest[:20])
 		}
 	}
 
@@ -251,8 +251,6 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 
-	// This is a workaround - we'll need to use the go-github import
-	// Let me check what's already imported
 	versions, _, err := client.client.Users.PackageGetAllVersions(ctx, owner, "container", packageName, opts)
 	require.NoError(t, err, "Failed to list package versions")
 

@@ -193,7 +193,7 @@ func TestListVersionsCommandNoTreeFlag(t *testing.T) {
 func TestOutputListVersionsTableQuietMode(t *testing.T) {
 	t.Parallel()
 	versions := []gh.PackageVersionInfo{
-		{ID: 123, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01"},
+		{ID: 123, Digest: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-01"},
 	}
 
 	// Normal mode should include header and summary

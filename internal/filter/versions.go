@@ -76,7 +76,7 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 
 	// Check digest filter (prefix matching for short digests)
 	// Supports both "sha256:abc123" and "abc123" (as shown in DIGEST column)
-	if f.Digest != "" && !matchesDigest(ver.Name, f.Digest) {
+	if f.Digest != "" && !matchesDigest(ver.Digest, f.Digest) {
 		return false
 	}
 

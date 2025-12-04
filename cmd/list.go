@@ -320,7 +320,7 @@ func outputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 		if idLen := len(fmt.Sprintf("%d", ver.ID)); idLen > maxIDLen {
 			maxIDLen = idLen
 		}
-		digestStr := display.ShortDigest(ver.Name)
+		digestStr := display.ShortDigest(ver.Digest)
 		if len(digestStr) > maxDigestLen {
 			maxDigestLen = len(digestStr)
 		}
@@ -344,7 +344,7 @@ func outputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 	// Print versions
 	for _, ver := range versions {
 		tagsStr := display.FormatTags(ver.Tags)
-		digestStr := display.ShortDigest(ver.Name)
+		digestStr := display.ShortDigest(ver.Digest)
 
 		fmt.Fprintf(w, "  %-*d  %s  %s%s  %s\n",
 			maxIDLen, ver.ID,

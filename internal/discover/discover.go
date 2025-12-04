@@ -45,11 +45,11 @@ func (d *PackageDiscoverer) DiscoverPackage(ctx context.Context, image string, v
 	for _, v := range versions {
 		info := &VersionInfo{
 			ID:        v.ID,
-			Digest:    v.Name,
+			Digest:    v.Digest,
 			Tags:      v.Tags,
 			CreatedAt: v.CreatedAt,
 		}
-		versionMap[v.Name] = info
+		versionMap[v.Digest] = info
 	}
 
 	// Resolve types, size, and discover children for each version in parallel

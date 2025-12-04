@@ -113,7 +113,7 @@ func TestVersionsCommandJSON(t *testing.T) {
 	// Verify structure of version objects
 	for _, ver := range versions {
 		assert.NotZero(t, ver.ID, "Expected non-zero version ID")
-		assert.NotEmpty(t, ver.Name, "Expected non-empty version name (digest)")
+		assert.NotEmpty(t, ver.Digest, "Expected non-empty digest")
 		assert.NotEmpty(t, ver.CreatedAt, "Expected non-empty CreatedAt timestamp")
 	}
 }
@@ -147,7 +147,3 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 	// Verify we get version output with headers
 	assert.Contains(t, output, "VERSION ID", "Expected output to contain 'VERSION ID' header")
 }
-
-// Note: Hierarchical tree view tests are now in images_integration_test.go
-// The versions command only shows flat table output.
-// Use 'ghcrctl images' for tree view with artifact relationships.

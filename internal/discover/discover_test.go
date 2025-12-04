@@ -45,8 +45,8 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 	}
 
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:index1", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
-		{ID: 2, Name: "sha256:platform1", Tags: nil, CreatedAt: "2025-01-15"},
+		{ID: 1, Digest: "sha256:index1", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
+		{ID: 2, Digest: "sha256:platform1", Tags: nil, CreatedAt: "2025-01-15"},
 	}
 
 	discoverer := &PackageDiscoverer{
@@ -107,7 +107,7 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		versions[i] = gh.PackageVersionInfo{
 			ID:        int64(i + 1),
-			Name:      fmt.Sprintf("sha256:digest%d", i),
+			Digest:    fmt.Sprintf("sha256:digest%d", i),
 			CreatedAt: "2025-01-15",
 		}
 	}
@@ -141,7 +141,7 @@ func TestDiscoverPackage_ResolverFailure(t *testing.T) {
 	}
 
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
+		{ID: 1, Digest: "sha256:abc123", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
 	}
 
 	discoverer := &PackageDiscoverer{
@@ -182,8 +182,8 @@ func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 	}
 
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:index1", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
-		{ID: 2, Name: "sha256:platform1", Tags: nil, CreatedAt: "2025-01-15"},
+		{ID: 1, Digest: "sha256:index1", Tags: []string{"v1.0.0"}, CreatedAt: "2025-01-15"},
+		{ID: 2, Digest: "sha256:platform1", Tags: nil, CreatedAt: "2025-01-15"},
 	}
 
 	discoverer := &PackageDiscoverer{

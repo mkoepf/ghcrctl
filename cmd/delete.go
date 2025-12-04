@@ -278,8 +278,8 @@ Examples:
 
 					var found bool
 					for _, ver := range allVersions {
-						if strings.HasPrefix(ver.Name, digestInput) {
-							rootDigest = ver.Name
+						if strings.HasPrefix(ver.Digest, digestInput) {
+							rootDigest = ver.Digest
 							found = true
 							break
 						}
@@ -303,7 +303,7 @@ Examples:
 				var found bool
 				for _, ver := range allVersions {
 					if ver.ID == versionID {
-						rootDigest = ver.Name
+						rootDigest = ver.Digest
 						found = true
 						break
 					}

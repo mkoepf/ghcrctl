@@ -52,10 +52,10 @@ func TestCalculateStats(t *testing.T) {
 	t.Parallel()
 
 	versions := []gh.PackageVersionInfo{
-		{ID: 1, Name: "sha256:aaa", Tags: []string{"v1.0.0", "latest"}, CreatedAt: "2025-01-15T10:00:00Z"},
-		{ID: 2, Name: "sha256:bbb", Tags: []string{"v0.9.0"}, CreatedAt: "2025-01-10T10:00:00Z"},
-		{ID: 3, Name: "sha256:ccc", Tags: []string{}, CreatedAt: "2025-01-05T10:00:00Z"},
-		{ID: 4, Name: "sha256:ddd", Tags: []string{}, CreatedAt: "2025-01-01T10:00:00Z"},
+		{ID: 1, Digest: "sha256:aaa", Tags: []string{"v1.0.0", "latest"}, CreatedAt: "2025-01-15T10:00:00Z"},
+		{ID: 2, Digest: "sha256:bbb", Tags: []string{"v0.9.0"}, CreatedAt: "2025-01-10T10:00:00Z"},
+		{ID: 3, Digest: "sha256:ccc", Tags: []string{}, CreatedAt: "2025-01-05T10:00:00Z"},
+		{ID: 4, Digest: "sha256:ddd", Tags: []string{}, CreatedAt: "2025-01-01T10:00:00Z"},
 	}
 
 	stats := CalculateStats(versions)

@@ -79,6 +79,3 @@ func TestGetProvenanceCommandHasFlags(t *testing.T) {
 		assert.NotNil(t, flag, "Expected flag '%s' to exist", flagName)
 	}
 }
-
-// Note: shortProvenanceDigest was removed - now using display.ShortDigest
-// The functionality is tested in internal/display/formatter_test.go

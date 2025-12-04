@@ -248,10 +248,11 @@ func (c *Client) GetVersionTags(ctx context.Context, owner, ownerType, packageNa
 	return []string{}, nil
 }
 
-// PackageVersionInfo contains information about a package version
+// PackageVersionInfo contains information about a package version.
+// For container packages, Digest contains the OCI digest (e.g., "sha256:abc123...").
 type PackageVersionInfo struct {
 	ID        int64
-	Name      string
+	Digest    string
 	Tags      []string
 	CreatedAt string
 	UpdatedAt string
@@ -297,8 +298,8 @@ func (c *Client) ListPackageVersions(ctx context.Context, owner, ownerType, pack
 		// Extract version info
 		for _, ver := range versions {
 			info := PackageVersionInfo{
-				ID:   *ver.ID,
-				Name: *ver.Name,
+				ID:     *ver.ID,
+				Digest: *ver.Name,
 			}
 
 			// Extract tags if available

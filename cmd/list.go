@@ -297,7 +297,7 @@ Examples:
 	return cmd
 }
 
-// outputVersionsTable outputs a flat list of versions (exported for testing).
+// outputVersionsTable outputs a flat list of versions
 // If quiet is true, informational headers and summaries are suppressed.
 func outputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageName string, quiet bool) error {
 	if len(versions) == 0 {

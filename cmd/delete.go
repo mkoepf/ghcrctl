@@ -875,11 +875,7 @@ func formatTagsForDisplay(tags []string) string {
 	return strings.Join(tags, ", ")
 }
 
-// =============================================================================
-// Exported types and functions for testing
-// =============================================================================
-
-// packageDeleter interface for mocking in tests
+// packageDeleter interface
 type packageDeleter interface {
 	DeletePackageVersion(ctx context.Context, owner, ownerType, packageName string, versionID int64) error
 }
@@ -906,7 +902,7 @@ type bulkDeleteParams struct {
 	DryRun      bool
 }
 
-// deleteGraphWithDeleter deletes versions using a deleter interface (for testing)
+// deleteGraphWithDeleter deletes versions using a deleter interface
 func deleteGraphWithDeleter(ctx context.Context, deleter packageDeleter, owner, ownerType, packageName string, versionIDs []int64, w io.Writer) error {
 	for i, versionID := range versionIDs {
 		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(versionIDs), versionID)
@@ -918,7 +914,7 @@ func deleteGraphWithDeleter(ctx context.Context, deleter packageDeleter, owner, 
 	return nil
 }
 
-// executeSingleDelete executes a single version deletion with confirmation (for testing)
+// executeSingleDelete executes a single version deletion with confirmation
 func executeSingleDelete(ctx context.Context, deleter packageDeleter, params deleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
 	// Show what will be deleted
 	fmt.Fprintf(w, "Preparing to delete package version:\n")
@@ -969,7 +965,7 @@ func executeSingleDelete(ctx context.Context, deleter packageDeleter, params del
 	return nil
 }
 
-// executeBulkDelete executes bulk version deletion with confirmation (for testing)
+// executeBulkDelete executes bulk version deletion with confirmation
 func executeBulkDelete(ctx context.Context, deleter packageDeleter, params bulkDeleteParams, w io.Writer, confirmFn func(count int) (bool, error)) error {
 	// Display summary of what will be deleted
 	fmt.Fprintf(w, "Preparing to delete %s package version(s):\n",

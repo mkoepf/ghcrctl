@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCapitalizeFirst(t *testing.T) {
@@ -41,9 +42,7 @@ func TestCapitalizeFirst(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := capitalizeFirst(tt.input)
-			if got != tt.want {
-				t.Errorf("capitalizeFirst(%q) = %q, want %q", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "capitalizeFirst(%q)", tt.input)
 		})
 	}
 }
@@ -56,21 +55,15 @@ func TestListArtifacts_ExampleShowsGetCommand(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := listArtifacts(&buf, artifacts, "myimage", "sbom", "tag", "latest")
-	if err != nil {
-		t.Fatalf("listArtifacts returned error: %v", err)
-	}
+	require.NoError(t, err, "listArtifacts returned error")
 
 	output := buf.String()
 
 	// The example should show "ghcrctl get sbom" not "ghcrctl sbom"
-	if !strings.Contains(output, "ghcrctl get sbom") {
-		t.Errorf("Expected example to show 'ghcrctl get sbom', got:\n%s", output)
-	}
+	assert.Contains(t, output, "ghcrctl get sbom", "Expected example to show 'ghcrctl get sbom'")
 
 	// Should not show the incorrect command without "get"
-	if strings.Contains(output, "Example: ghcrctl sbom") {
-		t.Errorf("Example should not show 'ghcrctl sbom' (missing 'get'), got:\n%s", output)
-	}
+	assert.NotContains(t, output, "Example: ghcrctl sbom", "Example should not show 'ghcrctl sbom' (missing 'get')")
 }
 
 func TestListArtifacts_ExampleShowsGetProvenance(t *testing.T) {
@@ -80,16 +73,12 @@ func TestListArtifacts_ExampleShowsGetProvenance(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := listArtifacts(&buf, artifacts, "myimage", "provenance", "tag", "latest")
-	if err != nil {
-		t.Fatalf("listArtifacts returned error: %v", err)
-	}
+	require.NoError(t, err, "listArtifacts returned error")
 
 	output := buf.String()
 
 	// The example should show "ghcrctl get provenance" not "ghcrctl provenance"
-	if !strings.Contains(output, "ghcrctl get provenance") {
-		t.Errorf("Expected example to show 'ghcrctl get provenance', got:\n%s", output)
-	}
+	assert.Contains(t, output, "ghcrctl get provenance", "Expected example to show 'ghcrctl get provenance'")
 }
 
 func TestListArtifacts_OutputFormat(t *testing.T) {
@@ -100,29 +89,19 @@ func TestListArtifacts_OutputFormat(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := listArtifacts(&buf, artifacts, "test-image", "sbom", "tag", "v1.0.0")
-	if err != nil {
-		t.Fatalf("listArtifacts returned error: %v", err)
-	}
+	require.NoError(t, err, "listArtifacts returned error")
 
 	output := buf.String()
 
 	// Should show header with image context
-	if !strings.Contains(output, "Multiple sbom documents found in image tagged 'v1.0.0'") {
-		t.Errorf("Expected header with tag context, got:\n%s", output)
-	}
+	assert.Contains(t, output, "Multiple sbom documents found in image tagged 'v1.0.0'", "Expected header with tag context")
 
 	// Should list both digests
-	if !strings.Contains(output, "sha256:abc123def456") {
-		t.Errorf("Expected first digest in output, got:\n%s", output)
-	}
-	if !strings.Contains(output, "sha256:def456abc789") {
-		t.Errorf("Expected second digest in output, got:\n%s", output)
-	}
+	assert.Contains(t, output, "sha256:abc123def456", "Expected first digest in output")
+	assert.Contains(t, output, "sha256:def456abc789", "Expected second digest in output")
 
 	// Should show usage hint
-	if !strings.Contains(output, "Select one by digest") {
-		t.Errorf("Expected usage hint, got:\n%s", output)
-	}
+	assert.Contains(t, output, "Select one by digest", "Expected usage hint")
 }
 
 func TestListArtifacts_DigestSelector(t *testing.T) {
@@ -132,16 +111,12 @@ func TestListArtifacts_DigestSelector(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := listArtifacts(&buf, artifacts, "test-image", "provenance", "digest", "abc123def456")
-	if err != nil {
-		t.Fatalf("listArtifacts returned error: %v", err)
-	}
+	require.NoError(t, err, "listArtifacts returned error")
 
 	output := buf.String()
 
 	// Should show header with digest context
-	if !strings.Contains(output, "image containing digest abc123def456") {
-		t.Errorf("Expected header with digest context, got:\n%s", output)
-	}
+	assert.Contains(t, output, "image containing digest abc123def456", "Expected header with digest context")
 }
 
 func TestListArtifacts_VersionSelector(t *testing.T) {
@@ -151,14 +126,10 @@ func TestListArtifacts_VersionSelector(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := listArtifacts(&buf, artifacts, "test-image", "sbom", "version", "12345678")
-	if err != nil {
-		t.Fatalf("listArtifacts returned error: %v", err)
-	}
+	require.NoError(t, err, "listArtifacts returned error")
 
 	output := buf.String()
 
 	// Should show header with version context
-	if !strings.Contains(output, "image containing version 12345678") {
-		t.Errorf("Expected header with version context, got:\n%s", output)
-	}
+	assert.Contains(t, output, "image containing version 12345678", "Expected header with version context")
 }

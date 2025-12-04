@@ -6,10 +6,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Integration tests for the versions command
@@ -19,9 +20,7 @@ import (
 func TestVersionsCommandFlat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance - flat table output is default
 	cmd := NewRootCmd()
@@ -35,45 +34,29 @@ func TestVersionsCommandFlat(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "versions command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Versions output:\n%s", output)
 
 	// Verify output contains expected sections
-	if !strings.Contains(output, "Versions for ghcrctl-test-with-sbom") {
-		t.Error("Expected output to contain 'Versions for ghcrctl-test-with-sbom'")
-	}
+	assert.Contains(t, output, "Versions for ghcrctl-test-with-sbom")
 
 	// Verify flat table format has headers
-	if !strings.Contains(output, "VERSION ID") {
-		t.Error("Expected output to contain 'VERSION ID' header")
-	}
-	if !strings.Contains(output, "DIGEST") {
-		t.Error("Expected output to contain 'DIGEST' header")
-	}
-	if !strings.Contains(output, "TAGS") {
-		t.Error("Expected output to contain 'TAGS' header")
-	}
-	if !strings.Contains(output, "CREATED") {
-		t.Error("Expected output to contain 'CREATED' header")
-	}
+	assert.Contains(t, output, "VERSION ID", "Expected output to contain 'VERSION ID' header")
+	assert.Contains(t, output, "DIGEST", "Expected output to contain 'DIGEST' header")
+	assert.Contains(t, output, "TAGS", "Expected output to contain 'TAGS' header")
+	assert.Contains(t, output, "CREATED", "Expected output to contain 'CREATED' header")
 
 	// Verify total count
-	if !strings.Contains(output, "Total:") {
-		t.Error("Expected 'Total:' in output")
-	}
+	assert.Contains(t, output, "Total:", "Expected 'Total:' in output")
 }
 
 // TestVersionsCommandWithTagFilter tests versions command with --tag filter
 func TestVersionsCommandWithTagFilter(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -87,26 +70,20 @@ func TestVersionsCommandWithTagFilter(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "versions command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Versions output with --tag:\n%s", output)
 
 	// Verify the tag "v1.0" is in the output
-	if !strings.Contains(output, "v1.0") {
-		t.Error("Expected filtered tag 'v1.0' in output")
-	}
+	assert.Contains(t, output, "v1.0", "Expected filtered tag 'v1.0' in output")
 }
 
 // TestVersionsCommandJSON tests JSON output format
 func TestVersionsCommandJSON(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -120,9 +97,7 @@ func TestVersionsCommandJSON(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "versions command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("JSON output:\n%s", output)
@@ -130,26 +105,16 @@ func TestVersionsCommandJSON(t *testing.T) {
 	// Verify it's valid JSON
 	var versions []gh.PackageVersionInfo
 	err = json.Unmarshal([]byte(output), &versions)
-	if err != nil {
-		t.Errorf("Failed to parse JSON output: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse JSON output")
 
 	// Verify we got multiple versions
-	if len(versions) < 2 {
-		t.Errorf("Expected at least 2 versions, got %d", len(versions))
-	}
+	assert.GreaterOrEqual(t, len(versions), 2, "Expected at least 2 versions")
 
 	// Verify structure of version objects
 	for _, ver := range versions {
-		if ver.ID == 0 {
-			t.Error("Expected non-zero version ID")
-		}
-		if ver.Name == "" {
-			t.Error("Expected non-empty version name (digest)")
-		}
-		if ver.CreatedAt == "" {
-			t.Error("Expected non-empty CreatedAt timestamp")
-		}
+		assert.NotZero(t, ver.ID, "Expected non-zero version ID")
+		assert.NotEmpty(t, ver.Name, "Expected non-empty version name (digest)")
+		assert.NotEmpty(t, ver.CreatedAt, "Expected non-empty CreatedAt timestamp")
 	}
 }
 
@@ -157,9 +122,7 @@ func TestVersionsCommandJSON(t *testing.T) {
 func TestVersionsCommandSinglePlatform(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -173,22 +136,16 @@ func TestVersionsCommandSinglePlatform(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("versions command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "versions command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Versions output (single platform):\n%s", output)
 
 	// Verify output
-	if !strings.Contains(output, "Versions for ghcrctl-test-no-sbom") {
-		t.Error("Expected output to contain 'Versions for ghcrctl-test-no-sbom'")
-	}
+	assert.Contains(t, output, "Versions for ghcrctl-test-no-sbom")
 
 	// Verify we get version output with headers
-	if !strings.Contains(output, "VERSION ID") {
-		t.Error("Expected output to contain 'VERSION ID' header")
-	}
+	assert.Contains(t, output, "VERSION ID", "Expected output to contain 'VERSION ID' header")
 }
 
 // Note: Hierarchical tree view tests are now in images_integration_test.go

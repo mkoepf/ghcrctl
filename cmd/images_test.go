@@ -3,6 +3,9 @@ package cmd
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestListImagesCmd_RequiresPackageName(t *testing.T) {
@@ -14,35 +17,25 @@ func TestListImagesCmd_RequiresPackageName(t *testing.T) {
 	rootCmd.SetArgs([]string{"list", "images"})
 
 	err := rootCmd.Execute()
-	if err == nil {
-		t.Error("expected error for missing package name")
-	}
+	assert.Error(t, err, "expected error for missing package name")
 }
 
 func TestListImagesCmd_HasFlags(t *testing.T) {
 	rootCmd := NewRootCmd()
 	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
-	if err != nil {
-		t.Fatalf("Failed to find list images command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find list images command")
 
 	// Check --json flag exists
 	jsonFlag := imagesCmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Error("expected --json flag")
-	}
+	assert.NotNil(t, jsonFlag, "expected --json flag")
 
 	// Check --flat flag exists (replaced --tree, default is now tree)
 	flatFlag := imagesCmd.Flags().Lookup("flat")
-	if flatFlag == nil {
-		t.Error("expected --flat flag")
-	}
+	assert.NotNil(t, flatFlag, "expected --flat flag")
 
 	// Check -o flag exists
 	outputFlag := imagesCmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Error("expected -o/--output flag")
-	}
+	assert.NotNil(t, outputFlag, "expected -o/--output flag")
 }
 
 func TestListImagesCmd_InvalidOutputFormat(t *testing.T) {
@@ -54,29 +47,21 @@ func TestListImagesCmd_InvalidOutputFormat(t *testing.T) {
 	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "-o", "invalid"})
 
 	err := rootCmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid output format")
-	}
+	assert.Error(t, err, "expected error for invalid output format")
 }
 
 func TestListImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
 	rootCmd := NewRootCmd()
 	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
-	if err != nil {
-		t.Fatalf("Failed to find list images command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find list images command")
 
 	// Check --version flag exists
 	versionFlag := imagesCmd.Flags().Lookup("version")
-	if versionFlag == nil {
-		t.Error("expected --version flag")
-	}
+	assert.NotNil(t, versionFlag, "expected --version flag")
 
 	// Check --digest flag exists
 	digestFlag := imagesCmd.Flags().Lookup("digest")
-	if digestFlag == nil {
-		t.Error("expected --digest flag")
-	}
+	assert.NotNil(t, digestFlag, "expected --digest flag")
 }
 
 func TestListImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
@@ -88,7 +73,5 @@ func TestListImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
 	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "--version", "123", "--digest", "sha256:abc"})
 
 	err := rootCmd.Execute()
-	if err == nil {
-		t.Error("expected error when both --version and --digest are specified")
-	}
+	assert.Error(t, err, "expected error when both --version and --digest are specified")
 }

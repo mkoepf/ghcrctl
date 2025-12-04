@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockVersionLister implements VersionLister for testing
@@ -28,13 +29,9 @@ func TestStatsCommandExists(t *testing.T) {
 	cmd := NewRootCmd()
 
 	statsCmd, _, err := cmd.Find([]string{"stats"})
-	if err != nil {
-		t.Fatalf("Failed to find stats command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find stats command")
 
-	if statsCmd.Use != "stats <owner/package>" {
-		t.Errorf("Expected Use to be 'stats <owner/package>', got %q", statsCmd.Use)
-	}
+	assert.Equal(t, "stats <owner/package>", statsCmd.Use)
 }
 
 func TestStatsCommandRequiresArg(t *testing.T) {
@@ -48,9 +45,7 @@ func TestStatsCommandRequiresArg(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error when no argument provided")
-	}
+	assert.Error(t, err, "Expected error when no argument provided")
 }
 
 func TestCalculateStats(t *testing.T) {
@@ -65,24 +60,12 @@ func TestCalculateStats(t *testing.T) {
 
 	stats := CalculateStats(versions)
 
-	if stats.TotalVersions != 4 {
-		t.Errorf("Expected TotalVersions=4, got %d", stats.TotalVersions)
-	}
-	if stats.TaggedVersions != 2 {
-		t.Errorf("Expected TaggedVersions=2, got %d", stats.TaggedVersions)
-	}
-	if stats.UntaggedVersions != 2 {
-		t.Errorf("Expected UntaggedVersions=2, got %d", stats.UntaggedVersions)
-	}
-	if stats.TotalTags != 3 {
-		t.Errorf("Expected TotalTags=3, got %d", stats.TotalTags)
-	}
-	if stats.OldestVersion != "2025-01-01T10:00:00Z" {
-		t.Errorf("Expected OldestVersion='2025-01-01T10:00:00Z', got %q", stats.OldestVersion)
-	}
-	if stats.NewestVersion != "2025-01-15T10:00:00Z" {
-		t.Errorf("Expected NewestVersion='2025-01-15T10:00:00Z', got %q", stats.NewestVersion)
-	}
+	assert.Equal(t, 4, stats.TotalVersions)
+	assert.Equal(t, 2, stats.TaggedVersions)
+	assert.Equal(t, 2, stats.UntaggedVersions)
+	assert.Equal(t, 3, stats.TotalTags)
+	assert.Equal(t, "2025-01-01T10:00:00Z", stats.OldestVersion)
+	assert.Equal(t, "2025-01-15T10:00:00Z", stats.NewestVersion)
 }
 
 func TestCalculateStatsEmpty(t *testing.T) {
@@ -90,9 +73,7 @@ func TestCalculateStatsEmpty(t *testing.T) {
 
 	stats := CalculateStats([]gh.PackageVersionInfo{})
 
-	if stats.TotalVersions != 0 {
-		t.Errorf("Expected TotalVersions=0, got %d", stats.TotalVersions)
-	}
+	assert.Equal(t, 0, stats.TotalVersions)
 }
 
 func TestOutputStatsTable(t *testing.T) {
@@ -110,25 +91,15 @@ func TestOutputStatsTable(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := OutputStatsTable(&buf, stats, false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	output := buf.String()
 
 	// Check key statistics are present
-	if !strings.Contains(output, "myimage") {
-		t.Error("output should contain package name")
-	}
-	if !strings.Contains(output, "10") {
-		t.Error("output should contain total versions count")
-	}
-	if !strings.Contains(output, "3") {
-		t.Error("output should contain tagged versions count")
-	}
-	if !strings.Contains(output, "7") {
-		t.Error("output should contain untagged versions count")
-	}
+	assert.Contains(t, output, "myimage", "output should contain package name")
+	assert.Contains(t, output, "10", "output should contain total versions count")
+	assert.Contains(t, output, "3", "output should contain tagged versions count")
+	assert.Contains(t, output, "7", "output should contain untagged versions count")
 }
 
 func TestOutputStatsTableQuiet(t *testing.T) {
@@ -143,16 +114,12 @@ func TestOutputStatsTableQuiet(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := OutputStatsTable(&buf, stats, true)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	output := buf.String()
 
 	// Quiet mode should not include decorative headers
-	if strings.Contains(output, "Statistics for") {
-		t.Error("quiet mode should not include 'Statistics for' header")
-	}
+	assert.NotContains(t, output, "Statistics for", "quiet mode should not include 'Statistics for' header")
 }
 
 // =============================================================================
@@ -269,16 +236,15 @@ func TestExecuteStats(t *testing.T) {
 
 			err := ExecuteStats(ctx, mock, tt.params, &buf)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExecuteStats() error = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
+			require.NoError(t, err)
 
 			output := buf.String()
 			for _, want := range tt.wantOutput {
-				if !strings.Contains(output, want) {
-					t.Errorf("output missing %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "output missing expected string")
 			}
 		})
 	}
@@ -303,12 +269,8 @@ func TestExecuteStats_QuietModeNoHeader(t *testing.T) {
 	}
 
 	err := ExecuteStats(context.Background(), mock, params, &buf)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	output := buf.String()
-	if strings.Contains(output, "Statistics for") {
-		t.Error("quiet mode should not include 'Statistics for' header")
-	}
+	assert.NotContains(t, output, "Statistics for", "quiet mode should not include 'Statistics for' header")
 }

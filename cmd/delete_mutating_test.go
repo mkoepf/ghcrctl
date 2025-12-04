@@ -13,15 +13,15 @@ import (
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"github.com/mkoepf/ghcrctl/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDeletePackage_Mutating(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -32,27 +32,19 @@ func TestDeletePackage_Mutating(t *testing.T) {
 	// Copy stable fixture to ephemeral package (no cleanup registered - we're testing delete)
 	t.Logf("Copying %s:%s to %s:latest", stableFixture, stableFixtureTag, ephemeralImage)
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	// Delete the entire package
 	t.Logf("Deleting package %s", ephemeralName)
 	err = testutil.DeletePackage(ctx, testOwner, ephemeralName)
-	if err != nil {
-		t.Fatalf("Failed to delete package: %v", err)
-	}
+	require.NoError(t, err, "Failed to delete package")
 
 	// Verify package no longer exists by trying to list versions
 	client, err := gh.NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	_, err = client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
-	if err == nil {
-		t.Error("Expected error when listing versions of deleted package, got none")
-	}
+	assert.Error(t, err, "Expected error when listing versions of deleted package, got none")
 
 	t.Logf("Successfully deleted package %s", ephemeralName)
 }
@@ -61,9 +53,7 @@ func TestDeletePackageVersion_Mutating(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -84,30 +74,20 @@ func TestDeletePackageVersion_Mutating(t *testing.T) {
 	// This creates two versions we can work with
 	t.Logf("Creating ephemeral package with multiple tags")
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "tag-v1")
-	if err != nil {
-		t.Fatalf("Failed to copy image with tag-v1: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image with tag-v1")
 
 	// Create a second tag pointing to the same digest
 	err = testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "tag-v2")
-	if err != nil {
-		t.Fatalf("Failed to copy image with tag-v2: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image with tag-v2")
 
 	// Get list of versions
 	client, err := gh.NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	versions, err := client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
-	if err != nil {
-		t.Fatalf("Failed to list versions: %v", err)
-	}
+	require.NoError(t, err, "Failed to list versions")
 
-	if len(versions) == 0 {
-		t.Fatal("Expected at least one version, got none")
-	}
+	require.NotEmpty(t, versions, "Expected at least one version, got none")
 
 	t.Logf("Found %d version(s)", len(versions))
 
@@ -124,7 +104,7 @@ func TestDeletePackageVersion_Mutating(t *testing.T) {
 	} else if gh.IsLastTaggedVersionError(err) {
 		t.Log("Got expected 'last tagged version' error - this confirms the delete API works")
 	} else {
-		t.Fatalf("Unexpected error deleting version: %v", err)
+		require.NoError(t, err, "Unexpected error deleting version")
 	}
 }
 
@@ -137,9 +117,7 @@ func TestDeleteVersionCmd_ByVersionID(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -156,30 +134,20 @@ func TestDeleteVersionCmd_ByVersionID(t *testing.T) {
 	// Create ephemeral package with multiple versions (so we can delete one)
 	t.Logf("Creating ephemeral package with multiple tags")
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "tag-v1")
-	if err != nil {
-		t.Fatalf("Failed to copy image with tag-v1: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image with tag-v1")
 
 	// Push a second distinct version
 	err = testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "tag-v2")
-	if err != nil {
-		t.Fatalf("Failed to copy image with tag-v2: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image with tag-v2")
 
 	// Get versions to find one to delete
 	client, err := gh.NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	versions, err := client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
-	if err != nil {
-		t.Fatalf("Failed to list versions: %v", err)
-	}
+	require.NoError(t, err, "Failed to list versions")
 
-	if len(versions) == 0 {
-		t.Fatal("Expected at least one version")
-	}
+	require.NotEmpty(t, versions, "Expected at least one version")
 
 	versionToDelete := versions[0]
 	t.Logf("Testing delete version command with --version %d", versionToDelete.ID)
@@ -198,20 +166,14 @@ func TestDeleteVersionCmd_ByVersionID(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete version --dry-run failed: %v", err)
-	}
+	require.NoError(t, err, "delete version --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
 
 	// Verify dry-run output
-	if !strings.Contains(output, "DRY RUN") {
-		t.Error("Expected 'DRY RUN' in output")
-	}
-	if !strings.Contains(output, fmt.Sprintf("%d", versionToDelete.ID)) {
-		t.Error("Expected version ID in output")
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected 'DRY RUN' in output")
+	assert.Contains(t, output, fmt.Sprintf("%d", versionToDelete.ID), "Expected version ID in output")
 }
 
 // TestDeleteVersionCmd_ByDigest tests delete version --digest <digest>
@@ -219,9 +181,7 @@ func TestDeleteVersionCmd_ByDigest(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -235,15 +195,11 @@ func TestDeleteVersionCmd_ByDigest(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	// Get the digest
 	digest, err := discover.ResolveTag(ctx, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	t.Logf("Testing delete version command with --digest %s", digest[:20])
 
@@ -261,16 +217,12 @@ func TestDeleteVersionCmd_ByDigest(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete version --digest --dry-run failed: %v", err)
-	}
+	require.NoError(t, err, "delete version --digest --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
 
-	if !strings.Contains(output, "DRY RUN") {
-		t.Error("Expected 'DRY RUN' in output")
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected 'DRY RUN' in output")
 }
 
 // TestDeleteVersionCmd_ByTag tests delete version --tag <tag>
@@ -278,9 +230,7 @@ func TestDeleteVersionCmd_ByTag(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -294,9 +244,7 @@ func TestDeleteVersionCmd_ByTag(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "test-tag")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	t.Logf("Testing delete version command with --tag test-tag")
 
@@ -314,19 +262,13 @@ func TestDeleteVersionCmd_ByTag(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete version --tag --dry-run failed: %v", err)
-	}
+	require.NoError(t, err, "delete version --tag --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
 
-	if !strings.Contains(output, "DRY RUN") {
-		t.Error("Expected 'DRY RUN' in output")
-	}
-	if !strings.Contains(output, "test-tag") {
-		t.Error("Expected tag name in output")
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected 'DRY RUN' in output")
+	assert.Contains(t, output, "test-tag", "Expected tag name in output")
 }
 
 // TestDeleteImageCmd_ByTag tests delete image --tag <tag>
@@ -334,9 +276,7 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -350,9 +290,7 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "delete-me")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	t.Logf("Testing delete image command with --tag delete-me")
 
@@ -370,20 +308,14 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete image --tag --dry-run failed: %v", err)
-	}
+	require.NoError(t, err, "delete image --tag --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
 
-	if !strings.Contains(output, "DRY RUN") {
-		t.Error("Expected 'DRY RUN' in output")
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected 'DRY RUN' in output")
 	// Should show what would be deleted
-	if !strings.Contains(output, "delete-me") {
-		t.Error("Expected tag in output")
-	}
+	assert.Contains(t, output, "delete-me", "Expected tag in output")
 }
 
 // TestDeleteImageCmd_ByDigest tests delete image --digest <digest>
@@ -391,9 +323,7 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -407,15 +337,11 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	// Get the digest
 	digest, err := discover.ResolveTag(ctx, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	t.Logf("Testing delete image command with --digest %s", digest[:20])
 
@@ -433,16 +359,12 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete image --digest --dry-run failed: %v", err)
-	}
+	require.NoError(t, err, "delete image --digest --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
 
-	if !strings.Contains(output, "DRY RUN") {
-		t.Error("Expected 'DRY RUN' in output")
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected 'DRY RUN' in output")
 }
 
 // TestDeletePackageCmd tests delete package command
@@ -450,9 +372,7 @@ func TestDeletePackageCmd(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -461,9 +381,7 @@ func TestDeletePackageCmd(t *testing.T) {
 
 	// Create ephemeral package (no cleanup - we're testing delete)
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	t.Logf("Testing delete package command for %s", ephemeralName)
 
@@ -480,28 +398,20 @@ func TestDeletePackageCmd(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Fatalf("delete package --force failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "delete package --force failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Output:\n%s", output)
 
 	// Verify success message
-	if !strings.Contains(output, "Successfully deleted") {
-		t.Error("Expected 'Successfully deleted' in output")
-	}
+	assert.Contains(t, output, "Successfully deleted", "Expected 'Successfully deleted' in output")
 
 	// Verify package no longer exists
 	client, err := gh.NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	_, err = client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
-	if err == nil {
-		t.Error("Expected error when listing deleted package")
-	}
+	assert.Error(t, err, "Expected error when listing deleted package")
 
 	t.Logf("Successfully verified package deletion via CLI")
 }
@@ -511,9 +421,7 @@ func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -527,9 +435,7 @@ func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "keep-me")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	t.Logf("Testing delete version command with --untagged --dry-run")
 
@@ -559,7 +465,7 @@ func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
 		if strings.Contains(err.Error(), "no versions match") {
 			t.Log("No untagged versions found - this is expected for our simple fixture")
 		} else {
-			t.Fatalf("Unexpected error: %v", err)
+			require.NoError(t, err, "Unexpected error")
 		}
 	} else {
 		// Command succeeded - check the output
@@ -580,9 +486,7 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -597,20 +501,14 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 
 	// Create ephemeral package
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "delete-this")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	// Get version count before delete
 	client, err := gh.NewClient(token)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create client")
 
 	versionsBefore, err := client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
-	if err != nil {
-		t.Fatalf("Failed to list versions before delete: %v", err)
-	}
+	require.NoError(t, err, "Failed to list versions before delete")
 	t.Logf("Versions before delete: %d", len(versionsBefore))
 
 	// Run delete image command with --force (actual delete)
@@ -633,16 +531,14 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 			t.Log("Got expected 'last tagged version' error - cannot delete when it's the only tagged version")
 			return
 		}
-		t.Fatalf("delete image --force failed: %v\nStderr: %s", err, stderr.String())
+		require.NoError(t, err, "delete image --force failed: %s", stderr.String())
 	}
 
 	output := stdout.String()
 	t.Logf("Output:\n%s", output)
 
 	// Verify success
-	if !strings.Contains(output, "Successfully deleted") {
-		t.Error("Expected 'Successfully deleted' in output")
-	}
+	assert.Contains(t, output, "Successfully deleted", "Expected 'Successfully deleted' in output")
 
 	// Verify versions were deleted
 	versionsAfter, err := client.ListPackageVersions(ctx, testOwner, "user", ephemeralName)
@@ -652,10 +548,8 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 		return
 	}
 
-	if len(versionsAfter) >= len(versionsBefore) {
-		t.Errorf("Expected fewer versions after delete: before=%d, after=%d",
-			len(versionsBefore), len(versionsAfter))
-	}
+	assert.Less(t, len(versionsAfter), len(versionsBefore),
+		"Expected fewer versions after delete: before=%d, after=%d", len(versionsBefore), len(versionsAfter))
 
 	t.Logf("Versions after delete: %d (was %d)", len(versionsAfter), len(versionsBefore))
 }

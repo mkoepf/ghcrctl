@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPackagesCommandWithRepoScopedToken tests that packages command works with valid token
@@ -16,9 +19,7 @@ import (
 func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -50,10 +51,7 @@ func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 		stdoutStr := stdout.String()
 
 		// Should show at least the test packages
-		if !strings.Contains(stdoutStr, "ghcrctl-test") {
-			t.Error("Expected to see test packages in output")
-			t.Logf("Stdout: %s", stdoutStr)
-		}
+		assert.Contains(t, stdoutStr, "ghcrctl-test", "Expected to see test packages in output")
 	} else {
 		// Case 2:
 		// In local development, a fine-grained personal access token or a
@@ -77,9 +75,7 @@ func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 			strings.Contains(strings.ToLower(errMsg), "token") ||
 			strings.Contains(strings.ToLower(errMsg), "permission")
 
-		if !hasHelpfulMessage {
-			t.Errorf("Error message should be helpful about token permissions, got: %v", err)
-		}
+		assert.True(t, hasHelpfulMessage, "Error message should be helpful about token permissions, got: %v", err)
 	}
 }
 
@@ -87,9 +83,7 @@ func TestPackagesCommandWithRepoScopedToken(t *testing.T) {
 func TestPackagesCommandErrorFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -110,9 +104,6 @@ func TestPackagesCommandErrorFormat(t *testing.T) {
 
 		// Should NOT show usage hint for operational errors
 		// (Usage hint would contain "Usage:" or "Flags:")
-		if strings.Contains(stderrOutput, "Usage:") {
-			t.Error("Operational error should not show usage hint")
-			t.Logf("Stderr output: %s", stderrOutput)
-		}
+		assert.NotContains(t, stderrOutput, "Usage:", "Operational error should not show usage hint")
 	}
 }

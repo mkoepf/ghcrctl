@@ -10,6 +10,8 @@ import (
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -22,9 +24,7 @@ func TestAddTag_Mutating(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	ctx := context.Background()
 
@@ -44,34 +44,24 @@ func TestAddTag_Mutating(t *testing.T) {
 	// Copy stable fixture to ephemeral package
 	t.Logf("Copying %s:%s to %s:latest", stableFixture, stableFixtureTag, ephemeralImage)
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to copy image: %v", err)
-	}
+	require.NoError(t, err, "Failed to copy image")
 
 	// Get the digest of the copied image
 	digest, err := discover.ResolveTag(ctx, ephemeralImage, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 	t.Logf("Ephemeral image digest: %s", digest)
 
 	// Add a new tag using AddTagByDigest
 	newTag := "test-tag-v1"
 	t.Logf("Adding tag %s to %s", newTag, ephemeralImage)
 	err = discover.AddTagByDigest(ctx, ephemeralImage, digest, newTag)
-	if err != nil {
-		t.Fatalf("Failed to add tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to add tag")
 
 	// Verify the new tag resolves to the same digest
 	resolvedDigest, err := discover.ResolveTag(ctx, ephemeralImage, newTag)
-	if err != nil {
-		t.Fatalf("Failed to resolve new tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve new tag")
 
-	if resolvedDigest != digest {
-		t.Errorf("New tag resolved to different digest: got %s, want %s", resolvedDigest, digest)
-	}
+	assert.Equal(t, digest, resolvedDigest, "New tag resolved to different digest")
 
 	t.Logf("Successfully added tag %s pointing to %s", newTag, digest[:20])
 }

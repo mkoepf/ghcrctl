@@ -3,10 +3,11 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/display"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestListPackagesCommandStructure(t *testing.T) {
@@ -14,20 +15,11 @@ func TestListPackagesCommandStructure(t *testing.T) {
 	// Verify list packages command exists and is properly structured
 	cmd := NewRootCmd()
 	packagesCmd, _, err := cmd.Find([]string{"list", "packages"})
-	if err != nil {
-		t.Fatalf("Failed to find list packages command: %v", err)
-	}
-	if packagesCmd == nil {
-		t.Fatal("packagesCmd should not be nil")
-	}
+	require.NoError(t, err, "Failed to find list packages command")
+	require.NotNil(t, packagesCmd, "packagesCmd should not be nil")
 
-	if packagesCmd.Use != "packages <owner>" {
-		t.Errorf("Expected Use to be 'packages <owner>', got '%s'", packagesCmd.Use)
-	}
-
-	if packagesCmd.RunE == nil {
-		t.Error("packagesCmd should have RunE function")
-	}
+	assert.Equal(t, "packages <owner>", packagesCmd.Use)
+	assert.NotNil(t, packagesCmd.RunE, "packagesCmd should have RunE function")
 }
 
 func TestListPackagesCommandArguments(t *testing.T) {
@@ -67,15 +59,14 @@ func TestListPackagesCommandArguments(t *testing.T) {
 			err := cmd.Execute()
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error")
-				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Expected error containing %q, got: %v", tt.errContains, err)
+				require.Error(t, err, "Expected error")
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 			} else {
 				// For valid args, it may still fail but not due to argument validation
-				if err != nil && strings.Contains(err.Error(), "accepts") {
-					t.Errorf("Should not fail on argument count: %v", err)
+				if err != nil {
+					assert.NotContains(t, err.Error(), "accepts", "Should not fail on argument count")
 				}
 			}
 		})
@@ -88,9 +79,7 @@ func TestListPackagesCommandHasJSONFlag(t *testing.T) {
 	cmd := NewRootCmd()
 	packagesCmd, _, _ := cmd.Find([]string{"list", "packages"})
 	jsonFlag := packagesCmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Error("list packages command should have --json flag")
-	}
+	assert.NotNil(t, jsonFlag, "list packages command should have --json flag")
 }
 
 func TestPackagesOutputJSON(t *testing.T) {
@@ -124,32 +113,23 @@ func TestPackagesOutputJSON(t *testing.T) {
 			err := display.OutputJSON(buf, tt.packages)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err, "Expected error but got none")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err, "Unexpected error")
 
 				// Verify JSON is valid
 				output := buf.String()
 				var parsed []string
-				if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-					t.Errorf("Output is not valid JSON: %v", err)
-				}
+				err := json.Unmarshal([]byte(output), &parsed)
+				require.NoError(t, err, "Output is not valid JSON")
 
 				// Verify contents match
-				if len(parsed) != len(tt.packages) {
-					t.Errorf("Expected %d packages, got %d", len(tt.packages), len(parsed))
-				}
+				assert.Len(t, parsed, len(tt.packages))
 				for i, pkg := range tt.packages {
 					if i >= len(parsed) {
 						break
 					}
-					if parsed[i] != pkg {
-						t.Errorf("Package %d: expected %s, got %s", i, pkg, parsed[i])
-					}
+					assert.Equal(t, pkg, parsed[i], "Package %d mismatch", i)
 				}
 			}
 		})
@@ -191,39 +171,27 @@ func TestPackagesOutputTable(t *testing.T) {
 			err := outputListPackagesTable(buf, tt.packages, tt.owner, false)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err, "Expected error but got none")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err, "Unexpected error")
 
 				// Verify output contains expected elements
 				output := buf.String()
 
 				// Should always mention the owner
-				if !strings.Contains(output, tt.owner) {
-					t.Errorf("Expected output to contain owner %s", tt.owner)
-				}
+				assert.Contains(t, output, tt.owner, "Expected output to contain owner")
 
 				// Verify each package appears in output
 				for _, pkg := range tt.packages {
-					if !strings.Contains(output, pkg) {
-						t.Errorf("Expected output to contain package %s", pkg)
-					}
+					assert.Contains(t, output, pkg, "Expected output to contain package")
 				}
 
 				// Verify correct message for empty list
 				if len(tt.packages) == 0 {
-					if !strings.Contains(output, "No packages found") {
-						t.Error("Expected 'No packages found' message for empty list")
-					}
+					assert.Contains(t, output, "No packages found", "Expected 'No packages found' message for empty list")
 				} else {
 					// Non-empty list should show count
-					if !strings.Contains(output, "Total:") {
-						t.Error("Expected 'Total:' in output for non-empty list")
-					}
+					assert.Contains(t, output, "Total:", "Expected 'Total:' in output for non-empty list")
 				}
 			}
 		})

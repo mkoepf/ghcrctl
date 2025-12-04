@@ -5,27 +5,19 @@ import (
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/display"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetSBOMCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	sbomCmd, _, err := cmd.Find([]string{"get", "sbom"})
-	if err != nil {
-		t.Fatalf("Failed to find get sbom command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find get sbom command")
 
-	if sbomCmd.Use != "sbom <owner/package>" {
-		t.Errorf("Expected Use 'sbom <owner/package>', got '%s'", sbomCmd.Use)
-	}
-
-	if sbomCmd.Short == "" {
-		t.Error("Expected non-empty Short description")
-	}
-
-	if sbomCmd.Long == "" {
-		t.Error("Expected non-empty Long description")
-	}
+	assert.Equal(t, "sbom <owner/package>", sbomCmd.Use)
+	assert.NotEmpty(t, sbomCmd.Short, "Expected non-empty Short description")
+	assert.NotEmpty(t, sbomCmd.Long, "Expected non-empty Long description")
 }
 
 func TestGetSBOMCommandArguments(t *testing.T) {
@@ -61,16 +53,15 @@ func TestGetSBOMCommandArguments(t *testing.T) {
 			cmd.SetErr(&errOut)
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
-			if tt.wantError && err == nil {
-				t.Error("Expected error but got none")
+			if tt.wantError {
+				assert.Error(t, err, "Expected error but got none")
 			}
 			// For valid args count, it may still fail but not due to arg count
 			if !tt.wantError && err != nil {
 				// Check if it's an args error
 				errStr := err.Error()
-				if errStr == "accepts 1 arg(s), received 0" || errStr == "accepts 1 arg(s), received 2" {
-					t.Errorf("Unexpected arg count error: %v", err)
-				}
+				assert.NotEqual(t, "accepts 1 arg(s), received 0", errStr, "Unexpected arg count error")
+				assert.NotEqual(t, "accepts 1 arg(s), received 2", errStr, "Unexpected arg count error")
 			}
 		})
 	}
@@ -86,9 +77,7 @@ func TestGetSBOMCommandHasFlags(t *testing.T) {
 
 	for _, flagName := range flags {
 		flag := sbomCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("Expected flag '%s' to exist", flagName)
-		}
+		assert.NotNil(t, flag, "Expected flag '%s' to exist", flagName)
 	}
 }
 
@@ -119,9 +108,7 @@ func TestShortDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := display.ShortDigest(tt.digest)
-			if result != tt.expected {
-				t.Errorf("display.ShortDigest(%s) = %s, want %s", tt.digest, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "display.ShortDigest(%s)", tt.digest)
 		})
 	}
 }

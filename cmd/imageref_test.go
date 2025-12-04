@@ -1,6 +1,11 @@
 package cmd
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestParsePackageRef(t *testing.T) {
 	t.Parallel()
@@ -76,27 +81,16 @@ func TestParsePackageRef(t *testing.T) {
 			owner, pkg, err := parsePackageRef(tt.input)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("parsePackageRef(%q) expected error containing %q, got none", tt.input, tt.errContains)
-					return
-				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
-					t.Errorf("parsePackageRef(%q) error = %q, want error containing %q", tt.input, err.Error(), tt.errContains)
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 				return
 			}
 
-			if err != nil {
-				t.Errorf("parsePackageRef(%q) unexpected error: %v", tt.input, err)
-				return
-			}
-
-			if owner != tt.wantOwner {
-				t.Errorf("parsePackageRef(%q) owner = %q, want %q", tt.input, owner, tt.wantOwner)
-			}
-			if pkg != tt.wantPackage {
-				t.Errorf("parsePackageRef(%q) package = %q, want %q", tt.input, pkg, tt.wantPackage)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantOwner, owner)
+			assert.Equal(t, tt.wantPackage, pkg)
 		})
 	}
 }

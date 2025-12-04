@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTagCommandStructure(t *testing.T) {
@@ -13,24 +15,12 @@ func TestTagCommandStructure(t *testing.T) {
 	// Verify tag command exists and is properly structured
 	cmd := NewRootCmd()
 	tagCmd, _, err := cmd.Find([]string{"tag"})
-	if err != nil {
-		t.Fatalf("Failed to find tag command: %v", err)
-	}
-	if tagCmd == nil {
-		t.Fatal("tagCmd should not be nil")
-	}
+	require.NoError(t, err, "Failed to find tag command")
+	require.NotNil(t, tagCmd, "tagCmd should not be nil")
 
-	if tagCmd.Use != "tag <owner/package> <new-tag>" {
-		t.Errorf("Expected Use to be 'tag <owner/package> <new-tag>', got '%s'", tagCmd.Use)
-	}
-
-	if tagCmd.RunE == nil {
-		t.Error("tagCmd should have RunE function")
-	}
-
-	if tagCmd.Short == "" {
-		t.Error("tagCmd should have a Short description")
-	}
+	assert.Equal(t, "tag <owner/package> <new-tag>", tagCmd.Use)
+	assert.NotNil(t, tagCmd.RunE, "tagCmd should have RunE function")
+	assert.NotEmpty(t, tagCmd.Short, "tagCmd should have a Short description")
 }
 
 func TestTagCommandArguments(t *testing.T) {
@@ -68,15 +58,12 @@ func TestTagCommandArguments(t *testing.T) {
 			err := cmd.Execute()
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				require.Error(t, err, "Expected error but got none")
+				if tt.errorMsg != "" {
+					assert.ErrorContains(t, err, tt.errorMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Unexpected error")
 			}
 		})
 	}
@@ -86,17 +73,13 @@ func TestTagCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	tagCmd, _, err := cmd.Find([]string{"tag"})
-	if err != nil {
-		t.Fatalf("Failed to find tag command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find tag command")
 
 	// Check for selector flags
 	flags := []string{"tag", "digest", "version"}
 	for _, flagName := range flags {
 		flag := tagCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("Expected --%s flag to exist", flagName)
-		}
+		assert.NotNil(t, flag, "Expected --%s flag to exist", flagName)
 	}
 }
 
@@ -201,23 +184,18 @@ func TestExecuteTagAdd(t *testing.T) {
 
 			err := ExecuteTagAdd(ctx, mock, tt.params, &buf)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExecuteTagAdd() error = %v, wantErr = %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && tt.wantErrMsg != "" {
-				if !strings.Contains(err.Error(), tt.wantErrMsg) {
-					t.Errorf("error message should contain %q, got %q", tt.wantErrMsg, err.Error())
+			if tt.wantErr {
+				require.Error(t, err, "Expected error but got none")
+				if tt.wantErrMsg != "" {
+					assert.ErrorContains(t, err, tt.wantErrMsg)
 				}
 				return
 			}
 
+			require.NoError(t, err, "Unexpected error")
 			output := buf.String()
 			for _, want := range tt.wantOutput {
-				if !strings.Contains(output, want) {
-					t.Errorf("output missing %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "output missing expected string")
 			}
 		})
 	}

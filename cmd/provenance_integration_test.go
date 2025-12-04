@@ -8,15 +8,16 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestProvenanceCommandWithImage tests provenance command against real image with provenance
 func TestProvenanceCommandWithImage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -30,17 +31,13 @@ func TestProvenanceCommandWithImage(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("provenance command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "provenance command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Provenance output length: %d bytes", len(output))
 
 	// Verify output contains provenance data
-	if len(output) == 0 {
-		t.Error("Expected provenance output, got empty string")
-	}
+	assert.NotEmpty(t, output, "Expected provenance output, got empty string")
 
 	// Should contain some indication of provenance format (SLSA, in-toto, or predicate)
 	hasFormat := strings.Contains(output, "SLSA") ||
@@ -49,18 +46,14 @@ func TestProvenanceCommandWithImage(t *testing.T) {
 		strings.Contains(output, "predicate") ||
 		strings.Contains(output, "provenance")
 
-	if !hasFormat {
-		t.Error("Expected provenance to contain format indicators (SLSA/in-toto/predicate)")
-	}
+	assert.True(t, hasFormat, "Expected provenance to contain format indicators (SLSA/in-toto/predicate)")
 }
 
 // TestProvenanceCommandJSONOutput tests provenance command with --json flag
 func TestProvenanceCommandJSONOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Create fresh command instance
 	cmd := NewRootCmd()
@@ -74,27 +67,22 @@ func TestProvenanceCommandJSONOutput(t *testing.T) {
 
 	// Execute command
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("provenance command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "provenance command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Provenance JSON output length: %d bytes", len(output))
 
 	// Verify output is valid JSON
 	var parsed interface{}
-	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-		t.Errorf("Output is not valid JSON: %v\nOutput: %s", err, output[:min(len(output), 200)])
-	}
+	err = json.Unmarshal([]byte(output), &parsed)
+	assert.NoError(t, err, "Output is not valid JSON: %s", output[:min(len(output), 200)])
 }
 
 // TestProvenanceCommandWithBothAttestations tests that test image has both SBOM and provenance
 func TestProvenanceCommandWithBothAttestations(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "Skipping integration test - GITHUB_TOKEN not set")
 
 	// Test that both sbom and provenance commands work on the same image
 	// This verifies that the image has both attestations
@@ -107,13 +95,8 @@ func TestProvenanceCommandWithBothAttestations(t *testing.T) {
 	sbomCmd.SetErr(new(bytes.Buffer))
 
 	err := sbomCmd.Execute()
-	if err != nil {
-		t.Errorf("SBOM command failed: %v", err)
-	}
-
-	if len(stdout.String()) == 0 {
-		t.Error("Expected SBOM output")
-	}
+	assert.NoError(t, err, "SBOM command failed")
+	assert.NotEmpty(t, stdout.String(), "Expected SBOM output")
 
 	// Test Provenance
 	provCmd := NewRootCmd()
@@ -123,11 +106,6 @@ func TestProvenanceCommandWithBothAttestations(t *testing.T) {
 	provCmd.SetErr(new(bytes.Buffer))
 
 	err = provCmd.Execute()
-	if err != nil {
-		t.Errorf("Provenance command failed: %v", err)
-	}
-
-	if len(stdout.String()) == 0 {
-		t.Error("Expected provenance output")
-	}
+	assert.NoError(t, err, "Provenance command failed")
+	assert.NotEmpty(t, stdout.String(), "Expected provenance output")
 }

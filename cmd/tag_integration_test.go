@@ -5,15 +5,15 @@ package cmd
 import (
 	"bytes"
 	"os"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTagCommandIntegration(t *testing.T) {
 	t.Parallel()
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, os.Getenv("GITHUB_TOKEN"), "GITHUB_TOKEN not set")
 
 	// Note: Actual tag creation tests are in tag_mutating_test.go (with //go:build mutating)
 
@@ -55,16 +55,12 @@ func TestTagCommandIntegration(t *testing.T) {
 			err := cmd.Execute()
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
-					t.Errorf("Expected error containing '%s', got '%s'", tt.errorContains, err.Error())
+				require.Error(t, err, "Expected error but got none")
+				if tt.errorContains != "" {
+					assert.ErrorContains(t, err, tt.errorContains)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-					t.Logf("Stderr: %s", errBuf.String())
-				}
+				assert.NoError(t, err, "Unexpected error: %s", errBuf.String())
 			}
 		})
 	}
@@ -73,9 +69,7 @@ func TestTagCommandIntegration(t *testing.T) {
 // TestTag_SourceTagNotFound tests error when source tag doesn't exist
 func TestTag_SourceTagNotFound(t *testing.T) {
 	t.Parallel()
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, os.Getenv("GITHUB_TOKEN"), "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"tag", "mkoepf/ghcrctl-test-no-sbom", "new-tag", "--tag", "nonexistent-tag-12345"})
@@ -86,27 +80,19 @@ func TestTag_SourceTagNotFound(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for nonexistent source tag, got none")
-	}
+	require.Error(t, err, "Expected error for nonexistent source tag, got none")
 
 	// Should mention tag resolution failure
-	if !strings.Contains(err.Error(), "failed to resolve source tag") {
-		t.Errorf("Expected error about tag resolution, got: %v", err)
-	}
+	assert.ErrorContains(t, err, "failed to resolve source tag")
 
 	// Should be operational error, not show usage
-	if strings.Contains(stderr.String(), "Usage:") {
-		t.Error("Operational error should not show usage hint")
-	}
+	assert.NotContains(t, stderr.String(), "Usage:", "Operational error should not show usage hint")
 }
 
 // TestTag_InvalidPackage tests error for nonexistent package
 func TestTag_InvalidPackage(t *testing.T) {
 	t.Parallel()
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, os.Getenv("GITHUB_TOKEN"), "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"tag", "mkoepf/nonexistent-package-12345", "new-tag", "--tag", "v1.0"})
@@ -117,14 +103,10 @@ func TestTag_InvalidPackage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for nonexistent package, got none")
-	}
+	require.Error(t, err, "Expected error for nonexistent package, got none")
 
 	// Should be operational error, not show usage
-	if strings.Contains(stderr.String(), "Usage:") {
-		t.Error("Operational error should not show usage hint")
-	}
+	assert.NotContains(t, stderr.String(), "Usage:", "Operational error should not show usage hint")
 }
 
 // TestTagCommand_Help tests that tag command shows help
@@ -140,19 +122,13 @@ func TestTagCommand_Help(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("tag --help failed: %v", err)
-	}
+	require.NoError(t, err, "tag --help failed")
 
 	output := stdout.String()
 
 	// Should show usage with arguments
-	if !strings.Contains(output, "<owner/package>") {
-		t.Error("Expected help to show <owner/package> argument")
-	}
+	assert.Contains(t, output, "<owner/package>", "Expected help to show <owner/package> argument")
 
 	// Should show flag descriptions
-	if !strings.Contains(output, "Source version by tag") {
-		t.Error("Expected help to contain 'Source version by tag'")
-	}
+	assert.Contains(t, output, "Source version by tag", "Expected help to contain 'Source version by tag'")
 }

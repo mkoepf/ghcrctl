@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootCommand(t *testing.T) {
@@ -11,17 +14,9 @@ func TestRootCommand(t *testing.T) {
 	// Test root command structure
 	cmd := NewRootCmd()
 
-	if cmd.Use != "ghcrctl" {
-		t.Errorf("Expected Use to be 'ghcrctl', got '%s'", cmd.Use)
-	}
-
-	if cmd.Short == "" {
-		t.Error("Expected Short description to be non-empty")
-	}
-
-	if cmd.Long == "" {
-		t.Error("Expected Long description to be non-empty")
-	}
+	assert.Equal(t, "ghcrctl", cmd.Use)
+	assert.NotEmpty(t, cmd.Short)
+	assert.NotEmpty(t, cmd.Long)
 
 	// Verify Long description contains expected functionality
 	expectedKeywords := []string{
@@ -32,9 +27,7 @@ func TestRootCommand(t *testing.T) {
 	}
 
 	for _, keyword := range expectedKeywords {
-		if !strings.Contains(cmd.Long, keyword) {
-			t.Errorf("Expected Long description to contain '%s'", keyword)
-		}
+		assert.Contains(t, cmd.Long, keyword)
 	}
 }
 
@@ -43,9 +36,7 @@ func TestRootCommandHasListSubcommand(t *testing.T) {
 	// Verify list subcommand is registered (contains packages, versions, images)
 	cmd := NewRootCmd()
 	listCmd, _, err := cmd.Find([]string{"list"})
-	if err != nil {
-		t.Fatalf("Failed to find list subcommand: %v", err)
-	}
+	require.NoError(t, err, "Failed to find list subcommand")
 
 	// Verify list has packages subcommand
 	packagesFound := false
@@ -56,9 +47,7 @@ func TestRootCommandHasListSubcommand(t *testing.T) {
 		}
 	}
 
-	if !packagesFound {
-		t.Error("Expected packages subcommand under list command")
-	}
+	assert.True(t, packagesFound, "Expected packages subcommand under list command")
 }
 
 func TestRootCommandHelp(t *testing.T) {
@@ -76,9 +65,7 @@ func TestRootCommandHelp(t *testing.T) {
 	err := cmd.Execute()
 
 	// Help returns nil error but sets flag
-	if err != nil {
-		t.Errorf("Expected --help to succeed, got error: %v", err)
-	}
+	assert.NoError(t, err, "Expected --help to succeed")
 }
 
 func TestRootCommandVersion(t *testing.T) {
@@ -86,14 +73,11 @@ func TestRootCommandVersion(t *testing.T) {
 	// Test that --version flag is available and returns version info
 	cmd := NewRootCmd()
 
-	if cmd.Version == "" {
-		t.Error("cmd.Version should not be empty")
-	}
+	assert.NotEmpty(t, cmd.Version, "cmd.Version should not be empty")
 
 	// Version should be set (either "dev" or injected at build time)
-	if cmd.Version != "dev" && !strings.HasPrefix(cmd.Version, "v") {
-		t.Errorf("Expected version to be 'dev' or start with 'v', got %q", cmd.Version)
-	}
+	validVersion := cmd.Version == "dev" || strings.HasPrefix(cmd.Version, "v")
+	assert.True(t, validVersion, "Expected version to be 'dev' or start with 'v', got %q", cmd.Version)
 }
 
 func TestRootCommandOutputIncludesVersion(t *testing.T) {
@@ -110,9 +94,7 @@ func TestRootCommandOutputIncludesVersion(t *testing.T) {
 	_ = cmd.Execute()
 
 	output := stdout.String()
-	if !strings.Contains(output, "ghcrctl version") {
-		t.Errorf("Expected root command output to contain version, got:\n%s", output)
-	}
+	assert.Contains(t, output, "ghcrctl version", "Expected root command output to contain version")
 }
 
 func TestRootCommandHasQuietFlag(t *testing.T) {
@@ -121,13 +103,9 @@ func TestRootCommandHasQuietFlag(t *testing.T) {
 
 	// Check that --quiet flag exists
 	quietFlag := cmd.PersistentFlags().Lookup("quiet")
-	if quietFlag == nil {
-		t.Error("Expected --quiet persistent flag to exist")
-	}
+	assert.NotNil(t, quietFlag, "Expected --quiet persistent flag to exist")
 
 	// Check shorthand
 	qFlag := cmd.PersistentFlags().ShorthandLookup("q")
-	if qFlag == nil {
-		t.Error("Expected -q shorthand for --quiet flag")
-	}
+	assert.NotNil(t, qFlag, "Expected -q shorthand for --quiet flag")
 }

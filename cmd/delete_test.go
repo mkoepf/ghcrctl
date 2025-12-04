@@ -8,6 +8,8 @@ import (
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestDeleteCommandStructure verifies the delete command is properly set up
@@ -15,19 +17,13 @@ func TestDeleteCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deleteCmd, _, err := cmd.Find([]string{"delete"})
-	if err != nil {
-		t.Fatalf("Failed to find delete command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete command")
 
-	if deleteCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.NotEmpty(t, deleteCmd.Short, "Short description should not be empty")
 
 	// Check for subcommands
 	subcommands := deleteCmd.Commands()
-	if len(subcommands) < 3 {
-		t.Errorf("Expected at least 3 subcommands (version, image, package), got %d", len(subcommands))
-	}
+	assert.GreaterOrEqual(t, len(subcommands), 3, "Expected at least 3 subcommands (version, image, package)")
 }
 
 // TestDeleteVersionCommandStructure verifies the delete version subcommand
@@ -35,17 +31,10 @@ func TestDeleteVersionCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deleteVersionCmd, _, err := cmd.Find([]string{"delete", "version"})
-	if err != nil {
-		t.Fatalf("Failed to find delete version command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete version command")
 
-	if deleteVersionCmd.Use != "version <owner/package>" {
-		t.Errorf("Expected Use 'version <owner/package>', got '%s'", deleteVersionCmd.Use)
-	}
-
-	if deleteVersionCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.Equal(t, "version <owner/package>", deleteVersionCmd.Use)
+	assert.NotEmpty(t, deleteVersionCmd.Short, "Short description should not be empty")
 }
 
 // TestDeleteVersionCommandArguments verifies argument validation
@@ -82,9 +71,7 @@ func TestDeleteVersionCommandArguments(t *testing.T) {
 			err := cmd.Execute()
 
 			// Should fail with usage error
-			if err == nil {
-				t.Error("Expected error but got none")
-			}
+			assert.Error(t, err, "Expected error but got none")
 		})
 	}
 }
@@ -94,9 +81,7 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deleteVersionCmd, _, err := cmd.Find([]string{"delete", "version"})
-	if err != nil {
-		t.Fatalf("Failed to find delete version command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete version command")
 
 	requiredFlags := []string{
 		"force",
@@ -114,9 +99,7 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 
 	for _, flagName := range requiredFlags {
 		flag := deleteVersionCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("delete version command should have --%s flag", flagName)
-		}
+		assert.NotNil(t, flag, "delete version command should have --%s flag", flagName)
 	}
 }
 
@@ -125,17 +108,10 @@ func TestDeletePackageCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deletePackageCmd, _, err := cmd.Find([]string{"delete", "package"})
-	if err != nil {
-		t.Fatalf("Failed to find delete package command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete package command")
 
-	if deletePackageCmd.Use != "package <owner/package>" {
-		t.Errorf("Expected Use 'package <owner/package>', got '%s'", deletePackageCmd.Use)
-	}
-
-	if deletePackageCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.Equal(t, "package <owner/package>", deletePackageCmd.Use)
+	assert.NotEmpty(t, deletePackageCmd.Short, "Short description should not be empty")
 }
 
 // TestDeletePackageCommandHasFlags verifies required flags exist
@@ -143,16 +119,12 @@ func TestDeletePackageCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deletePackageCmd, _, err := cmd.Find([]string{"delete", "package"})
-	if err != nil {
-		t.Fatalf("Failed to find delete package command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete package command")
 
 	requiredFlags := []string{"force", "yes"}
 	for _, flagName := range requiredFlags {
 		flag := deletePackageCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("delete package command should have --%s flag", flagName)
-		}
+		assert.NotNil(t, flag, "delete package command should have --%s flag", flagName)
 	}
 }
 
@@ -161,17 +133,10 @@ func TestDeleteImageCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
-	if err != nil {
-		t.Fatalf("Failed to find delete image command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete image command")
 
-	if deleteImageCmd.Use != "image <owner/package>" {
-		t.Errorf("Expected Use 'image <owner/package>', got '%s'", deleteImageCmd.Use)
-	}
-
-	if deleteImageCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.Equal(t, "image <owner/package>", deleteImageCmd.Use)
+	assert.NotEmpty(t, deleteImageCmd.Short, "Short description should not be empty")
 }
 
 // TestDeleteImageCommandArguments verifies argument validation
@@ -203,9 +168,7 @@ func TestDeleteImageCommandArguments(t *testing.T) {
 			err := cmd.Execute()
 
 			// Should fail with usage error
-			if err == nil {
-				t.Error("Expected error but got none")
-			}
+			assert.Error(t, err, "Expected error but got none")
 		})
 	}
 }
@@ -215,45 +178,31 @@ func TestDeleteImageCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
-	if err != nil {
-		t.Fatalf("Failed to find delete image command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find delete image command")
 
 	// Check for --force flag
 	forceFlag := deleteImageCmd.Flags().Lookup("force")
-	if forceFlag == nil {
-		t.Error("Expected --force flag to exist")
-	}
+	assert.NotNil(t, forceFlag, "Expected --force flag to exist")
 
 	// Check for --yes flag (alias for --force)
 	yesFlag := deleteImageCmd.Flags().Lookup("yes")
-	if yesFlag == nil {
-		t.Error("Expected --yes flag to exist")
-	}
+	assert.NotNil(t, yesFlag, "Expected --yes flag to exist")
 
 	// Check for -y shorthand
 	yShorthand := deleteImageCmd.Flags().ShorthandLookup("y")
-	if yShorthand == nil {
-		t.Error("Expected -y shorthand for --yes flag")
-	}
+	assert.NotNil(t, yShorthand, "Expected -y shorthand for --yes flag")
 
 	// Check for --dry-run flag
 	dryRunFlag := deleteImageCmd.Flags().Lookup("dry-run")
-	if dryRunFlag == nil {
-		t.Error("Expected --dry-run flag to exist")
-	}
+	assert.NotNil(t, dryRunFlag, "Expected --dry-run flag to exist")
 
 	// Check for --digest flag
 	digestFlag := deleteImageCmd.Flags().Lookup("digest")
-	if digestFlag == nil {
-		t.Error("Expected --digest flag to exist")
-	}
+	assert.NotNil(t, digestFlag, "Expected --digest flag to exist")
 
 	// Check for --version flag
 	versionFlag := deleteImageCmd.Flags().Lookup("version")
-	if versionFlag == nil {
-		t.Error("Expected --version flag to exist")
-	}
+	assert.NotNil(t, versionFlag, "Expected --version flag to exist")
 }
 
 // TestDeleteImageCommandFlagExclusivity verifies mutually exclusive flags
@@ -279,8 +228,8 @@ func TestDeleteImageCommandFlagExclusivity(t *testing.T) {
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
 
-			if tt.expectErr && err == nil {
-				t.Error("Expected error for mutually exclusive flags, got none")
+			if tt.expectErr {
+				assert.Error(t, err, "Expected error for mutually exclusive flags, got none")
 			}
 		})
 	}
@@ -341,35 +290,16 @@ func TestBuildDeleteFilter(t *testing.T) {
 				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if tt.errContains != "" && !containsStr(err.Error(), tt.errContains) {
-					t.Errorf("Expected error to contain %q, got %q", tt.errContains, err.Error())
+				require.Error(t, err, "Expected error but got none")
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if filter == nil {
-					t.Error("Expected non-nil filter")
-				}
+				require.NoError(t, err, "Unexpected error")
+				assert.NotNil(t, filter, "Expected non-nil filter")
 			}
 		})
 	}
-}
-
-func containsStr(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstr(s, substr)))
-}
-
-func findSubstr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // TestDeleteVersionBulkModeArgsValidation tests that bulk mode accepts only image name
@@ -409,9 +339,8 @@ func TestDeleteVersionBulkModeArgsValidation(t *testing.T) {
 			if !tt.expectErr && err != nil {
 				// Check if error is about args validation (not config/auth errors)
 				errStr := err.Error()
-				if containsStr(errStr, "accepts") || containsStr(errStr, "arg") {
-					t.Errorf("Unexpected args validation error: %v", err)
-				}
+				isArgsError := strings.Contains(errStr, "accepts") || strings.Contains(errStr, "arg")
+				assert.False(t, isArgsError, "Unexpected args validation error: %v", err)
 			}
 		})
 	}
@@ -450,9 +379,7 @@ func TestFormatTagsForDisplay(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatTagsForDisplay(tt.tags)
-			if got != tt.want {
-				t.Errorf("formatTagsForDisplay() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "formatTagsForDisplay()")
 		})
 	}
 }
@@ -563,15 +490,11 @@ func TestDisplayImageVersions(t *testing.T) {
 			output := buf.String()
 
 			for _, want := range tt.wantContains {
-				if !strings.Contains(output, want) {
-					t.Errorf("Expected output to contain %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "Expected output to contain %q", want)
 			}
 
 			for _, notWant := range tt.wantNotContain {
-				if strings.Contains(output, notWant) {
-					t.Errorf("Expected output NOT to contain %q\nGot:\n%s", notWant, output)
-				}
+				assert.NotContains(t, output, notWant, "Expected output NOT to contain %q", notWant)
 			}
 		})
 	}
@@ -673,31 +596,27 @@ func TestDeleteGraphWithDeleter(t *testing.T) {
 			err := DeleteGraphWithDeleter(ctx, mock, "owner", "user", "image", tt.versionIDs, &buf)
 
 			// Check error
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error = %v, wantErr = %v", err, tt.wantErr)
-			}
-			if tt.wantErrContain != "" && err != nil {
-				if !strings.Contains(err.Error(), tt.wantErrContain) {
-					t.Errorf("error = %q, want containing %q", err.Error(), tt.wantErrContain)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantErrContain != "" {
+					assert.ErrorContains(t, err, tt.wantErrContain)
 				}
+			} else {
+				require.NoError(t, err)
 			}
 
 			// Check deleted versions
-			if len(mock.deletedVersions) != len(tt.wantDeleted) {
-				t.Errorf("deleted %d versions, want %d", len(mock.deletedVersions), len(tt.wantDeleted))
-			}
+			assert.Len(t, mock.deletedVersions, len(tt.wantDeleted), "deleted versions count mismatch")
 			for i, id := range tt.wantDeleted {
-				if i < len(mock.deletedVersions) && mock.deletedVersions[i] != id {
-					t.Errorf("deletedVersions[%d] = %d, want %d", i, mock.deletedVersions[i], id)
+				if i < len(mock.deletedVersions) {
+					assert.Equal(t, id, mock.deletedVersions[i], "deletedVersions[%d] mismatch", i)
 				}
 			}
 
 			// Check output
 			output := buf.String()
 			for _, want := range tt.wantOutput {
-				if !strings.Contains(output, want) {
-					t.Errorf("output missing %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "output missing expected string")
 			}
 		})
 	}
@@ -894,27 +813,23 @@ func TestExecuteSingleDelete(t *testing.T) {
 			err := ExecuteSingleDelete(ctx, mock, tt.params, &buf, confirmFn)
 
 			// Check error
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			// Check deletion
 			deleted := len(mock.deletedVersions) > 0
-			if deleted != tt.wantDeleted {
-				t.Errorf("deleted = %v, want %v", deleted, tt.wantDeleted)
-			}
+			assert.Equal(t, tt.wantDeleted, deleted, "deletion state mismatch")
 
 			// Check output
 			output := buf.String()
 			for _, want := range tt.wantOutput {
-				if !strings.Contains(output, want) {
-					t.Errorf("output missing %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "output missing expected string")
 			}
 			for _, notWant := range tt.wantNotOutput {
-				if strings.Contains(output, notWant) {
-					t.Errorf("output should NOT contain %q\nGot:\n%s", notWant, output)
-				}
+				assert.NotContains(t, output, notWant, "output should NOT contain")
 			}
 		})
 	}
@@ -1133,26 +1048,22 @@ func TestExecuteBulkDelete(t *testing.T) {
 			err := ExecuteBulkDelete(ctx, mock, tt.params, &buf, confirmFn)
 
 			// Check error
-			if (err != nil) != tt.wantErr {
-				t.Errorf("error = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			// Check deleted versions
-			if len(mock.deletedVersions) != len(tt.wantDeleted) {
-				t.Errorf("deleted %d versions, want %d: got %v", len(mock.deletedVersions), len(tt.wantDeleted), mock.deletedVersions)
-			}
+			assert.Len(t, mock.deletedVersions, len(tt.wantDeleted), "deleted versions count mismatch")
 
 			// Check output
 			output := buf.String()
 			for _, want := range tt.wantOutput {
-				if !strings.Contains(output, want) {
-					t.Errorf("output missing %q\nGot:\n%s", want, output)
-				}
+				assert.Contains(t, output, want, "output missing expected string")
 			}
 			for _, notWant := range tt.wantNotOutput {
-				if strings.Contains(output, notWant) {
-					t.Errorf("output should NOT contain %q\nGot:\n%s", notWant, output)
-				}
+				assert.NotContains(t, output, notWant, "output should NOT contain")
 			}
 		})
 	}
@@ -1205,9 +1116,7 @@ func TestFormatVersionType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatVersionType(tt.types)
-			if got != tt.want {
-				t.Errorf("formatVersionType(%v) = %q, want %q", tt.types, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "formatVersionType(%v)", tt.types)
 		})
 	}
 }

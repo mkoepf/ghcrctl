@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/discover"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Integration tests for the list images command
@@ -18,9 +20,7 @@ import (
 func TestListImagesCommand_TreeOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom"})
@@ -31,38 +31,27 @@ func TestListImagesCommand_TreeOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Tree output:\n%s", output)
 
 	// Verify table headers
-	if !strings.Contains(output, "VERSION ID") {
-		t.Error("Expected output to contain 'VERSION ID' header")
-	}
-	if !strings.Contains(output, "DIGEST") {
-		t.Error("Expected output to contain 'DIGEST' header")
-	}
+	assert.Contains(t, output, "VERSION ID", "Expected output to contain 'VERSION ID' header")
+	assert.Contains(t, output, "DIGEST", "Expected output to contain 'DIGEST' header")
 
 	// Tree output should have tree indicators
-	if !strings.Contains(output, "├") && !strings.Contains(output, "└") {
-		t.Error("Expected tree output to contain tree indicators (├ or └)")
-	}
+	hasTreeIndicators := strings.Contains(output, "├") || strings.Contains(output, "└")
+	assert.True(t, hasTreeIndicators, "Expected tree output to contain tree indicators (├ or └)")
 
 	// Should contain tags
-	if !strings.Contains(output, "v1.0") {
-		t.Error("Expected output to contain tag 'v1.0'")
-	}
+	assert.Contains(t, output, "v1.0", "Expected output to contain tag 'v1.0'")
 }
 
 func TestListImagesCommand_FlatOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--flat"})
@@ -73,31 +62,21 @@ func TestListImagesCommand_FlatOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Flat output:\n%s", output)
 
 	// Flat output should have table headers
-	if !strings.Contains(output, "DIGEST") {
-		t.Error("Expected flat output to contain 'DIGEST' header")
-	}
-	if !strings.Contains(output, "TYPE") {
-		t.Error("Expected flat output to contain 'TYPE' header")
-	}
-	if !strings.Contains(output, "TAGS") {
-		t.Error("Expected flat output to contain 'TAGS' header")
-	}
+	assert.Contains(t, output, "DIGEST", "Expected flat output to contain 'DIGEST' header")
+	assert.Contains(t, output, "TYPE", "Expected flat output to contain 'TYPE' header")
+	assert.Contains(t, output, "TAGS", "Expected flat output to contain 'TAGS' header")
 }
 
 func TestListImagesCommand_JSONOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--json"})
@@ -108,9 +87,7 @@ func TestListImagesCommand_JSONOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("JSON output:\n%s", output[:min(500, len(output))])
@@ -118,32 +95,22 @@ func TestListImagesCommand_JSONOutput(t *testing.T) {
 	// Verify it's valid JSON array
 	var images []discover.VersionInfo
 	err = json.Unmarshal([]byte(output), &images)
-	if err != nil {
-		t.Fatalf("Failed to parse JSON output: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse JSON output")
 
 	// Verify we got images
-	if len(images) < 1 {
-		t.Errorf("Expected at least 1 image, got %d", len(images))
-	}
+	assert.GreaterOrEqual(t, len(images), 1, "Expected at least 1 image")
 
 	// Verify structure of image objects
 	for _, img := range images {
-		if img.Digest == "" {
-			t.Error("Expected non-empty digest")
-		}
-		if len(img.Types) == 0 {
-			t.Error("Expected non-empty types")
-		}
+		assert.NotEmpty(t, img.Digest, "Expected non-empty digest")
+		assert.NotEmpty(t, img.Types, "Expected non-empty types")
 	}
 }
 
 func TestListImagesCommand_FilterByTag(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
@@ -154,25 +121,19 @@ func TestListImagesCommand_FilterByTag(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Filtered output:\n%s", output)
 
 	// Should contain the tag we filtered for
-	if !strings.Contains(output, "v1.0") {
-		t.Error("Expected output to contain filtered tag 'v1.0'")
-	}
+	assert.Contains(t, output, "v1.0", "Expected output to contain filtered tag 'v1.0'")
 }
 
 func TestListImagesCommand_OutputFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	// Test -o json (alternative to --json)
 	cmd := NewRootCmd()
@@ -184,26 +145,20 @@ func TestListImagesCommand_OutputFormat(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 
 	// Should be valid JSON
 	var images []discover.VersionInfo
 	err = json.Unmarshal([]byte(output), &images)
-	if err != nil {
-		t.Fatalf("Failed to parse JSON output with -o flag: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse JSON output with -o flag")
 }
 
 func TestListImagesCommand_SinglePlatformImage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-no-sbom"})
@@ -214,28 +169,20 @@ func TestListImagesCommand_SinglePlatformImage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("list images command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "list images command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Single platform output:\n%s", output)
 
 	// Should still produce output with headers
-	if !strings.Contains(output, "VERSION ID") {
-		t.Error("Expected output to contain 'VERSION ID' header")
-	}
-	if !strings.Contains(output, "Total:") {
-		t.Error("Expected output to contain 'Total:' summary")
-	}
+	assert.Contains(t, output, "VERSION ID", "Expected output to contain 'VERSION ID' header")
+	assert.Contains(t, output, "Total:", "Expected output to contain 'Total:' summary")
 }
 
 func TestListImagesCommand_InvalidOutputFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-no-sbom", "-o", "invalid"})
@@ -246,21 +193,14 @@ func TestListImagesCommand_InvalidOutputFormat(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for invalid output format, got none")
-	}
-
-	if !strings.Contains(err.Error(), "invalid output format") {
-		t.Errorf("Expected error about invalid output format, got: %v", err)
-	}
+	require.Error(t, err, "Expected error for invalid output format, got none")
+	assert.ErrorContains(t, err, "invalid output format")
 }
 
 func TestListImagesCommand_InvalidPackage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"list", "images", "mkoepf/nonexistent-package-12345"})
@@ -271,12 +211,8 @@ func TestListImagesCommand_InvalidPackage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for nonexistent package, got none")
-	}
+	require.Error(t, err, "Expected error for nonexistent package, got none")
 
 	// Should be an operational error, not show usage
-	if strings.Contains(stderr.String(), "Usage:") {
-		t.Error("Operational error should not show usage hint")
-	}
+	assert.NotContains(t, stderr.String(), "Usage:", "Operational error should not show usage hint")
 }

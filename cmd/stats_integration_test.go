@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Integration tests for the stats command
@@ -16,9 +18,7 @@ import (
 func TestStatsCommand_TableOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"stats", "mkoepf/ghcrctl-test-with-sbom"})
@@ -29,17 +29,13 @@ func TestStatsCommand_TableOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("stats command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "stats command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Stats output:\n%s", output)
 
 	// Verify header
-	if !strings.Contains(output, "Statistics for ghcrctl-test-with-sbom") {
-		t.Error("Expected output to contain 'Statistics for ghcrctl-test-with-sbom'")
-	}
+	assert.Contains(t, output, "Statistics for ghcrctl-test-with-sbom")
 
 	// Verify key statistics are present
 	expectedFields := []string{
@@ -52,18 +48,14 @@ func TestStatsCommand_TableOutput(t *testing.T) {
 	}
 
 	for _, field := range expectedFields {
-		if !strings.Contains(output, field) {
-			t.Errorf("Expected output to contain '%s'", field)
-		}
+		assert.Contains(t, output, field, "Expected output to contain '%s'", field)
 	}
 }
 
 func TestStatsCommand_JSONOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"stats", "mkoepf/ghcrctl-test-with-sbom", "--json"})
@@ -74,9 +66,7 @@ func TestStatsCommand_JSONOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("stats command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "stats command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("JSON output:\n%s", output)
@@ -84,30 +74,18 @@ func TestStatsCommand_JSONOutput(t *testing.T) {
 	// Verify it's valid JSON
 	var stats PackageStats
 	err = json.Unmarshal([]byte(output), &stats)
-	if err != nil {
-		t.Fatalf("Failed to parse JSON output: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse JSON output")
 
 	// Verify structure
-	if stats.PackageName != "ghcrctl-test-with-sbom" {
-		t.Errorf("Expected package_name='ghcrctl-test-with-sbom', got %q", stats.PackageName)
-	}
-
-	if stats.TotalVersions < 1 {
-		t.Errorf("Expected at least 1 total version, got %d", stats.TotalVersions)
-	}
-
-	if stats.TaggedVersions < 1 {
-		t.Errorf("Expected at least 1 tagged version, got %d", stats.TaggedVersions)
-	}
+	assert.Equal(t, "ghcrctl-test-with-sbom", stats.PackageName)
+	assert.GreaterOrEqual(t, stats.TotalVersions, 1, "Expected at least 1 total version")
+	assert.GreaterOrEqual(t, stats.TaggedVersions, 1, "Expected at least 1 tagged version")
 }
 
 func TestStatsCommand_SinglePlatformImage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"stats", "mkoepf/ghcrctl-test-no-sbom"})
@@ -118,25 +96,19 @@ func TestStatsCommand_SinglePlatformImage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("stats command failed: %v\nStderr: %s", err, stderr.String())
-	}
+	require.NoError(t, err, "stats command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Stats output (single platform):\n%s", output)
 
 	// Verify statistics are present
-	if !strings.Contains(output, "Total versions:") {
-		t.Error("Expected output to contain 'Total versions:'")
-	}
+	assert.Contains(t, output, "Total versions:", "Expected output to contain 'Total versions:'")
 }
 
 func TestStatsCommand_InvalidPackage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Fatal("GITHUB_TOKEN not set")
-	}
+	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"stats", "mkoepf/nonexistent-package-12345"})
@@ -147,12 +119,8 @@ func TestStatsCommand_InvalidPackage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for nonexistent package, got none")
-	}
+	require.Error(t, err, "Expected error for nonexistent package, got none")
 
 	// Should be an operational error, not show usage
-	if strings.Contains(stderr.String(), "Usage:") {
-		t.Error("Operational error should not show usage hint")
-	}
+	assert.NotContains(t, stderr.String(), "Usage:", "Operational error should not show usage hint")
 }

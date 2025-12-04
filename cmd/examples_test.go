@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestCommandExamples ensures all commands have examples in their help text
@@ -29,13 +31,11 @@ func TestCommandExamples(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := findCommand(rootCmd, tt.commandName)
-			if cmd == nil {
-				t.Fatalf("command %q not found", tt.commandName)
-			}
+			require.NotNil(t, cmd, "command %q not found", tt.commandName)
 
 			hasExamples := strings.Contains(cmd.Long, "Examples:")
-			if tt.wantExample && !hasExamples {
-				t.Errorf("command %q is missing 'Examples:' section in Long description", tt.commandName)
+			if tt.wantExample {
+				assert.True(t, hasExamples, "command %q is missing 'Examples:' section in Long description", tt.commandName)
 			}
 		})
 	}
@@ -61,9 +61,7 @@ func TestExampleFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := findCommand(rootCmd, tt.commandName)
-			if cmd == nil {
-				t.Fatalf("command %q not found", tt.commandName)
-			}
+			require.NotNil(t, cmd, "command %q not found", tt.commandName)
 
 			// Check if Examples section exists
 			if !strings.Contains(cmd.Long, "Examples:") {
@@ -93,9 +91,7 @@ func TestExampleFormat(t *testing.T) {
 				}
 			}
 
-			if inExamples && !hasExampleComment {
-				t.Errorf("command %q has Examples section but no example comments starting with '# '", tt.commandName)
-			}
+			assert.True(t, !inExamples || hasExampleComment, "command %q has Examples section but no example comments starting with '# '", tt.commandName)
 		})
 	}
 }

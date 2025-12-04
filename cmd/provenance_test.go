@@ -3,27 +3,20 @@ package cmd
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetProvenanceCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	provenanceCmd, _, err := cmd.Find([]string{"get", "provenance"})
-	if err != nil {
-		t.Fatalf("Failed to find get provenance command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find get provenance command")
 
-	if provenanceCmd.Use != "provenance <owner/package>" {
-		t.Errorf("Expected Use 'provenance <owner/package>', got '%s'", provenanceCmd.Use)
-	}
-
-	if provenanceCmd.Short == "" {
-		t.Error("Expected non-empty Short description")
-	}
-
-	if provenanceCmd.Long == "" {
-		t.Error("Expected non-empty Long description")
-	}
+	assert.Equal(t, "provenance <owner/package>", provenanceCmd.Use)
+	assert.NotEmpty(t, provenanceCmd.Short, "Expected non-empty Short description")
+	assert.NotEmpty(t, provenanceCmd.Long, "Expected non-empty Long description")
 }
 
 func TestGetProvenanceCommandArguments(t *testing.T) {
@@ -59,16 +52,15 @@ func TestGetProvenanceCommandArguments(t *testing.T) {
 			cmd.SetErr(&errOut)
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
-			if tt.wantError && err == nil {
-				t.Error("Expected error but got none")
+			if tt.wantError {
+				assert.Error(t, err, "Expected error but got none")
 			}
 			// For valid args count, it may still fail but not due to arg count
 			if !tt.wantError && err != nil {
 				// Check if it's an args error
 				errStr := err.Error()
-				if errStr == "accepts 1 arg(s), received 0" || errStr == "accepts 1 arg(s), received 2" {
-					t.Errorf("Unexpected arg count error: %v", err)
-				}
+				assert.NotEqual(t, "accepts 1 arg(s), received 0", errStr, "Unexpected arg count error")
+				assert.NotEqual(t, "accepts 1 arg(s), received 2", errStr, "Unexpected arg count error")
 			}
 		})
 	}
@@ -84,9 +76,7 @@ func TestGetProvenanceCommandHasFlags(t *testing.T) {
 
 	for _, flagName := range flags {
 		flag := provenanceCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("Expected flag '%s' to exist", flagName)
-		}
+		assert.NotNil(t, flag, "Expected flag '%s' to exist", flagName)
 	}
 }
 

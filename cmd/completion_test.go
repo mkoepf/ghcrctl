@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompletionCommandExists(t *testing.T) {
@@ -12,17 +14,10 @@ func TestCompletionCommandExists(t *testing.T) {
 
 	// Find the completion command
 	completionCmd, _, err := cmd.Find([]string{"completion"})
-	if err != nil {
-		t.Fatalf("Failed to find completion command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find completion command")
 
-	if completionCmd.Use != "completion [bash|zsh|fish|powershell]" {
-		t.Errorf("Expected Use 'completion [bash|zsh|fish|powershell]', got '%s'", completionCmd.Use)
-	}
-
-	if completionCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.Equal(t, "completion [bash|zsh|fish|powershell]", completionCmd.Use)
+	assert.NotEmpty(t, completionCmd.Short, "Short description should not be empty")
 }
 
 func TestCompletionCommandGeneratesBash(t *testing.T) {
@@ -36,15 +31,12 @@ func TestCompletionCommandGeneratesBash(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("completion bash failed: %v", err)
-	}
+	require.NoError(t, err, "completion bash failed")
 
 	output := stdout.String()
 	// Bash completion scripts contain these markers
-	if !strings.Contains(output, "bash completion") || !strings.Contains(output, "__start_ghcrctl") {
-		t.Error("Expected bash completion script output")
-	}
+	assert.Contains(t, output, "bash completion", "Expected bash completion script output")
+	assert.Contains(t, output, "__start_ghcrctl", "Expected bash completion script output")
 }
 
 func TestCompletionCommandGeneratesZsh(t *testing.T) {
@@ -58,15 +50,12 @@ func TestCompletionCommandGeneratesZsh(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("completion zsh failed: %v", err)
-	}
+	require.NoError(t, err, "completion zsh failed")
 
 	output := stdout.String()
 	// Zsh completion scripts contain these markers
-	if !strings.Contains(output, "zsh completion") || !strings.Contains(output, "compdef") {
-		t.Error("Expected zsh completion script output")
-	}
+	assert.Contains(t, output, "zsh completion", "Expected zsh completion script output")
+	assert.Contains(t, output, "compdef", "Expected zsh completion script output")
 }
 
 func TestCompletionCommandGeneratesFish(t *testing.T) {
@@ -80,15 +69,12 @@ func TestCompletionCommandGeneratesFish(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("completion fish failed: %v", err)
-	}
+	require.NoError(t, err, "completion fish failed")
 
 	output := stdout.String()
 	// Fish completion scripts contain these markers
-	if !strings.Contains(output, "fish completion") || !strings.Contains(output, "complete -c ghcrctl") {
-		t.Error("Expected fish completion script output")
-	}
+	assert.Contains(t, output, "fish completion", "Expected fish completion script output")
+	assert.Contains(t, output, "complete -c ghcrctl", "Expected fish completion script output")
 }
 
 func TestCompletionCommandGeneratesPowershell(t *testing.T) {
@@ -102,15 +88,12 @@ func TestCompletionCommandGeneratesPowershell(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("completion powershell failed: %v", err)
-	}
+	require.NoError(t, err, "completion powershell failed")
 
 	output := stdout.String()
 	// PowerShell completion scripts contain these markers
-	if !strings.Contains(output, "powershell completion") || !strings.Contains(output, "Register-ArgumentCompleter") {
-		t.Error("Expected powershell completion script output")
-	}
+	assert.Contains(t, output, "powershell completion", "Expected powershell completion script output")
+	assert.Contains(t, output, "Register-ArgumentCompleter", "Expected powershell completion script output")
 }
 
 func TestCompletionCommandInvalidShell(t *testing.T) {
@@ -124,9 +107,7 @@ func TestCompletionCommandInvalidShell(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error for invalid shell")
-	}
+	assert.Error(t, err, "Expected error for invalid shell")
 }
 
 func TestCompletionCommandNoArgs(t *testing.T) {
@@ -140,9 +121,7 @@ func TestCompletionCommandNoArgs(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	if err == nil {
-		t.Error("Expected error when no shell specified")
-	}
+	assert.Error(t, err, "Expected error when no shell specified")
 }
 
 // TestCompleteImageRefStructure tests that image reference completion function exists
@@ -171,8 +150,8 @@ func TestCompleteImageRefStructure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Without a token, completion should return empty gracefully
 			completions := completeImageRef(nil, tt.toComplete)
-			if tt.expectEmpty && len(completions) != 0 {
-				t.Errorf("Expected empty completions for %q, got %d", tt.toComplete, len(completions))
+			if tt.expectEmpty {
+				assert.Empty(t, completions, "Expected empty completions for %q", tt.toComplete)
 			}
 		})
 	}
@@ -183,13 +162,9 @@ func TestVersionsCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	versionsCmd, _, err := cmd.Find([]string{"list", "versions"})
-	if err != nil {
-		t.Fatalf("Failed to find list versions command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find list versions command")
 
-	if versionsCmd.ValidArgsFunction == nil {
-		t.Error("Expected list versions command to have ValidArgsFunction for dynamic completion")
-	}
+	assert.NotNil(t, versionsCmd.ValidArgsFunction, "Expected list versions command to have ValidArgsFunction for dynamic completion")
 }
 
 // TestLabelsCommandHasValidArgsFunction tests that labels command has completion
@@ -197,13 +172,9 @@ func TestLabelsCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	labelsCmd, _, err := cmd.Find([]string{"get", "labels"})
-	if err != nil {
-		t.Fatalf("Failed to find get labels command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find get labels command")
 
-	if labelsCmd.ValidArgsFunction == nil {
-		t.Error("Expected get labels command to have ValidArgsFunction for dynamic completion")
-	}
+	assert.NotNil(t, labelsCmd.ValidArgsFunction, "Expected get labels command to have ValidArgsFunction for dynamic completion")
 }
 
 // TestSBOMCommandHasValidArgsFunction tests that sbom command has completion
@@ -211,13 +182,9 @@ func TestSBOMCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	sbomCmd, _, err := cmd.Find([]string{"get", "sbom"})
-	if err != nil {
-		t.Fatalf("Failed to find get sbom command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find get sbom command")
 
-	if sbomCmd.ValidArgsFunction == nil {
-		t.Error("Expected get sbom command to have ValidArgsFunction for dynamic completion")
-	}
+	assert.NotNil(t, sbomCmd.ValidArgsFunction, "Expected get sbom command to have ValidArgsFunction for dynamic completion")
 }
 
 // TestProvenanceCommandHasValidArgsFunction tests that provenance command has completion
@@ -225,11 +192,7 @@ func TestProvenanceCommandHasValidArgsFunction(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	provenanceCmd, _, err := cmd.Find([]string{"get", "provenance"})
-	if err != nil {
-		t.Fatalf("Failed to find get provenance command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find get provenance command")
 
-	if provenanceCmd.ValidArgsFunction == nil {
-		t.Error("Expected get provenance command to have ValidArgsFunction for dynamic completion")
-	}
+	assert.NotNil(t, provenanceCmd.ValidArgsFunction, "Expected get provenance command to have ValidArgsFunction for dynamic completion")
 }

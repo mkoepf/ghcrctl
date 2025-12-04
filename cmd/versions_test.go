@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildVersionFilter verifies that the filter is built correctly from flags
@@ -79,35 +80,16 @@ func TestBuildVersionFilter(t *testing.T) {
 			)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
-					t.Errorf("Expected error to contain %q, got %q", tt.errContains, err.Error())
+				require.Error(t, err, "Expected error but got none")
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if filter == nil {
-					t.Error("Expected non-nil filter")
-				}
+				require.NoError(t, err, "Unexpected error")
+				assert.NotNil(t, filter, "Expected non-nil filter")
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // TestListVersionsCommandStructure verifies the list versions command is properly set up
@@ -115,17 +97,10 @@ func TestListVersionsCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	versionsCmd, _, err := cmd.Find([]string{"list", "versions"})
-	if err != nil {
-		t.Fatalf("Failed to find list versions command: %v", err)
-	}
+	require.NoError(t, err, "Failed to find list versions command")
 
-	if versionsCmd.Use != "versions <owner/package>" {
-		t.Errorf("Expected Use 'versions <owner/package>', got '%s'", versionsCmd.Use)
-	}
-
-	if versionsCmd.Short == "" {
-		t.Error("Short description should not be empty")
-	}
+	assert.Equal(t, "versions <owner/package>", versionsCmd.Use)
+	assert.NotEmpty(t, versionsCmd.Short, "Short description should not be empty")
 }
 
 // TestListVersionsCommandArguments verifies argument validation
@@ -154,9 +129,7 @@ func TestListVersionsCommandArguments(t *testing.T) {
 			err := cmd.Execute()
 
 			// Should fail with usage error
-			if err == nil {
-				t.Error("Expected error but got none")
-			}
+			assert.Error(t, err, "Expected error but got none")
 		})
 	}
 }
@@ -183,9 +156,7 @@ func TestListVersionsCommandHasFlags(t *testing.T) {
 
 	for _, flagName := range requiredFlags {
 		flag := versionsCmd.Flags().Lookup(flagName)
-		if flag == nil {
-			t.Errorf("list versions command should have --%s flag", flagName)
-		}
+		assert.NotNil(t, flag, "list versions command should have --%s flag", flagName)
 	}
 }
 
@@ -197,9 +168,7 @@ func TestListVersionsCommandNoTreeFlag(t *testing.T) {
 	versionsCmd, _, _ := cmd.Find([]string{"list", "versions"})
 
 	flag := versionsCmd.Flags().Lookup("tree")
-	if flag != nil {
-		t.Error("list versions command should NOT have --tree flag (use 'ghcrctl list images' instead)")
-	}
+	assert.Nil(t, flag, "list versions command should NOT have --tree flag (use 'ghcrctl list images' instead)")
 }
 
 // TestOutputListVersionsTableQuietMode verifies quiet mode suppresses informational output
@@ -212,32 +181,18 @@ func TestOutputListVersionsTableQuietMode(t *testing.T) {
 	// Normal mode should include header and summary
 	var normalBuf bytes.Buffer
 	err := OutputVersionsTable(&normalBuf, versions, "testpkg", false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 	normalOutput := normalBuf.String()
-	if !strings.Contains(normalOutput, "Versions for testpkg") {
-		t.Error("normal mode should include 'Versions for' header")
-	}
-	if !strings.Contains(normalOutput, "Total:") {
-		t.Error("normal mode should include 'Total:' summary")
-	}
+	assert.Contains(t, normalOutput, "Versions for testpkg", "normal mode should include 'Versions for' header")
+	assert.Contains(t, normalOutput, "Total:", "normal mode should include 'Total:' summary")
 
 	// Quiet mode should NOT include header or summary
 	var quietBuf bytes.Buffer
 	err = OutputVersionsTable(&quietBuf, versions, "testpkg", true)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 	quietOutput := quietBuf.String()
-	if strings.Contains(quietOutput, "Versions for testpkg") {
-		t.Error("quiet mode should NOT include 'Versions for' header")
-	}
-	if strings.Contains(quietOutput, "Total:") {
-		t.Error("quiet mode should NOT include 'Total:' summary")
-	}
+	assert.NotContains(t, quietOutput, "Versions for testpkg", "quiet mode should NOT include 'Versions for' header")
+	assert.NotContains(t, quietOutput, "Total:", "quiet mode should NOT include 'Total:' summary")
 	// But should still have data
-	if !strings.Contains(quietOutput, "123") {
-		t.Error("quiet mode should still include version ID")
-	}
+	assert.Contains(t, quietOutput, "123", "quiet mode should still include version ID")
 }

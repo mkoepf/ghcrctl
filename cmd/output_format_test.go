@@ -1,8 +1,10 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestOutputFormatFlag ensures all commands that support --json also support -o json
@@ -20,26 +22,18 @@ func TestOutputFormatFlag(t *testing.T) {
 	for _, cmdName := range commandsWithJSON {
 		t.Run(cmdName+" supports -o flag", func(t *testing.T) {
 			cmd := findCommand(rootCmd, cmdName)
-			if cmd == nil {
-				t.Fatalf("command %q not found", cmdName)
-			}
+			require.NotNil(t, cmd, "command %q not found", cmdName)
 
 			// Check if -o flag exists
 			outputFlag := cmd.Flags().Lookup("output")
-			if outputFlag == nil {
-				t.Errorf("command %q does not have -o/--output flag", cmdName)
-			} else {
+			if assert.NotNil(t, outputFlag, "command %q does not have -o/--output flag", cmdName) {
 				// Check shorthand
-				if outputFlag.Shorthand != "o" {
-					t.Errorf("command %q --output flag does not have shorthand -o", cmdName)
-				}
+				assert.Equal(t, "o", outputFlag.Shorthand, "command %q --output flag does not have shorthand -o", cmdName)
 			}
 
 			// Ensure --json flag still exists for backward compatibility
 			jsonFlag := cmd.Flags().Lookup("json")
-			if jsonFlag == nil {
-				t.Errorf("command %q does not have --json flag (backward compatibility)", cmdName)
-			}
+			assert.NotNil(t, jsonFlag, "command %q does not have --json flag (backward compatibility)", cmdName)
 		})
 	}
 }
@@ -68,9 +62,7 @@ func TestOutputFormatValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.command+" -o "+tt.outputValue, func(t *testing.T) {
 			cmd := findCommand(rootCmd, tt.command)
-			if cmd == nil {
-				t.Fatalf("command %q not found", tt.command)
-			}
+			require.NotNil(t, cmd, "command %q not found", tt.command)
 
 			outputFlag := cmd.Flags().Lookup("output")
 			if outputFlag == nil {
@@ -96,15 +88,11 @@ func TestBackwardCompatibility(t *testing.T) {
 	for _, cmdName := range commandsWithJSON {
 		t.Run(cmdName+" --json still works", func(t *testing.T) {
 			cmd := findCommand(rootCmd, cmdName)
-			if cmd == nil {
-				t.Fatalf("command %q not found", cmdName)
-			}
+			require.NotNil(t, cmd, "command %q not found", cmdName)
 
 			// Ensure --json flag exists
 			jsonFlag := cmd.Flags().Lookup("json")
-			if jsonFlag == nil {
-				t.Errorf("command %q lost --json flag (backward compatibility broken)", cmdName)
-			}
+			assert.NotNil(t, jsonFlag, "command %q lost --json flag (backward compatibility broken)", cmdName)
 		})
 	}
 }
@@ -122,9 +110,7 @@ func TestOutputFlagDescription(t *testing.T) {
 	for _, cmdName := range commandsWithJSON {
 		t.Run(cmdName+" has clear -o description", func(t *testing.T) {
 			cmd := findCommand(rootCmd, cmdName)
-			if cmd == nil {
-				t.Fatalf("command %q not found", cmdName)
-			}
+			require.NotNil(t, cmd, "command %q not found", cmdName)
 
 			outputFlag := cmd.Flags().Lookup("output")
 			if outputFlag == nil {
@@ -133,9 +119,7 @@ func TestOutputFlagDescription(t *testing.T) {
 
 			// Check that description mentions valid formats
 			usage := outputFlag.Usage
-			if !strings.Contains(usage, "json") {
-				t.Errorf("command %q -o flag usage should mention 'json' format", cmdName)
-			}
+			assert.Contains(t, usage, "json", "command %q -o flag usage should mention 'json' format", cmdName)
 		})
 	}
 }

@@ -6,6 +6,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestModulePathConsistency verifies that all Go files use the correct module path.
@@ -16,20 +19,14 @@ func TestModulePathConsistency(t *testing.T) {
 
 	// Check go.mod
 	goModContent, err := os.ReadFile("go.mod")
-	if err != nil {
-		t.Fatalf("Failed to read go.mod: %v", err)
-	}
+	require.NoError(t, err, "Failed to read go.mod")
 
 	moduleRegex := regexp.MustCompile(`^module\s+(\S+)`)
 	matches := moduleRegex.FindSubmatch(goModContent)
-	if len(matches) < 2 {
-		t.Fatal("Could not find module declaration in go.mod")
-	}
+	require.GreaterOrEqual(t, len(matches), 2, "Could not find module declaration in go.mod")
 
 	actualModule := string(matches[1])
-	if actualModule != expectedModule {
-		t.Errorf("go.mod has wrong module path: got %q, want %q", actualModule, expectedModule)
-	}
+	assert.Equal(t, expectedModule, actualModule, "go.mod has wrong module path")
 
 	// Check all Go files for wrong import paths
 	var filesWithWrongImport []string
@@ -60,13 +57,10 @@ func TestModulePathConsistency(t *testing.T) {
 		return nil
 	})
 
-	if err != nil {
-		t.Fatalf("Failed to walk directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to walk directory")
 
-	if len(filesWithWrongImport) > 0 {
-		t.Errorf("Found %d files with wrong module path %q (should be %q):\n  %s",
-			len(filesWithWrongImport), wrongModule, expectedModule,
-			strings.Join(filesWithWrongImport, "\n  "))
-	}
+	assert.Empty(t, filesWithWrongImport,
+		"Found %d files with wrong module path %q (should be %q):\n  %s",
+		len(filesWithWrongImport), wrongModule, expectedModule,
+		strings.Join(filesWithWrongImport, "\n  "))
 }

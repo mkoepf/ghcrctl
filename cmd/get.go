@@ -457,21 +457,21 @@ func newGetArtifactCmd(cfg getArtifactParams) *cobra.Command {
 			}
 
 			// The selected version is not an artifact of this type
-			// Print informational message about searching in the containing image
+			// Print informational message about searching in the containing graph
 			if !quiet.IsQuiet(ctx) && !jsonOutput {
-				fmt.Fprintf(cmd.OutOrStdout(), "Version %s is not a %s. Searching in containing image...\n\n", selectorValue, cfg.Name)
+				fmt.Fprintf(cmd.OutOrStdout(), "Version %s is not a %s. Searching in containing graph...\n\n", selectorValue, cfg.Name)
 			}
 
-			// Find the image it belongs to and look for artifacts there
-			imageVersions := discover.FindImagesContainingVersion(versionMap, resolvedDigest)
-			if len(imageVersions) == 0 {
+			// Find the graph it belongs to and look for artifacts there
+			graphVersions := discover.FindGraphsContainingVersion(versionMap, resolvedDigest)
+			if len(graphVersions) == 0 {
 				// Fall back to treating it as a root and looking for children
-				imageVersions = discover.FindImageByDigest(versionMap, resolvedDigest)
+				graphVersions = discover.FindGraphByDigest(versionMap, resolvedDigest)
 			}
 
 			// Filter for artifacts of the specified role
 			var artifacts []discover.VersionInfo
-			for _, v := range imageVersions {
+			for _, v := range graphVersions {
 				// Skip the selected version itself
 				if v.Digest == resolvedDigest {
 					continue

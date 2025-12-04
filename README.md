@@ -41,14 +41,16 @@ ghcrctl provides functionality for:
 
 - **Exploring packages** and their versions (multi-arch platforms, SBOM, provenance, signatures)
 - **Package statistics** (version counts, date ranges)
-- **Viewing images** with their OCI artifact relationships (platforms, attestations)
+- **Viewing graphs** with their OCI artifact relationships (platforms, attestations)
 - **Viewing labels** (OCI annotations) embedded in container images
 - **Viewing and adding tags** (tag deletion is not supported by GHCR)
 - **Viewing SBOM** (Software Bill of Materials) attestations
 - **Viewing provenance** attestations (SLSA)
 - **Discovering signatures** and attestations from both Docker buildx and cosign
-- **Safe deletion** of package versions, images, and entire packages
+- **Safe deletion** of package versions, graphs, and entire packages
 - **Shell completion** with dynamic package name suggestions
+
+**Note on terminology:** Throughout this documentation, "graph" refers to a set of related OCI artifacts — an image index plus its platform manifests and associated attestations. This is distinct from a single "container image" which typically refers to just the runnable artifact.
 
 ## Terminology
 
@@ -58,9 +60,9 @@ versions and images:
 
 - **Package**: A container repository in GHCR (e.g., `mkoepf/myapp`). Comparable to a directory containing versions.
 - **Version**: A single package version identified by a numeric version ID. Each version corresponds to one OCI artifact (manifest or index) with a unique digest.
-- **Image**: A set of versions that belong together — typically an index plus its platform manifests and any associated attestations (SBOM, provenance) or signatures.
+- **Graph**: A set of versions that belong together — typically an index plus its platform manifests and any associated attestations (SBOM, provenance) or signatures. Also known as an "artifact graph" or "OCI graph".
 
-When you run `delete version`, you delete a single package version. When you run `delete image`, you delete an entire image graph (the index and all its referenced artifacts).
+When you run `delete version`, you delete a single package version. When you run `delete graph`, you delete an entire artifact graph (the index and all its referenced artifacts).
 
 ## Installation
 
@@ -107,7 +109,7 @@ ghcrctl list versions mkoepf/myimage --quiet
 ghcrctl list versions mkoepf/myimage -q
 
 # Log all API calls with timing (for debugging/performance analysis)
-ghcrctl list images mkoepf/myimage --log-api-calls
+ghcrctl list graphs mkoepf/myimage --log-api-calls
 ```
 
 ### List Packages
@@ -125,15 +127,15 @@ Get output in JSON format:
 ghcrctl list packages mkoepf --json
 ```
 
-### List Images
+### List Graphs
 
-Display all images in a package with their related artifacts (platforms, attestations, signatures):
+Display all graphs in a package with their related artifacts (platforms, attestations, signatures):
 
 ```bash
-ghcrctl list images mkoepf/myimage
+ghcrctl list graphs mkoepf/myimage
 ```
 
-This command shows images grouped by their OCI artifact relationships in a tree format:
+This command shows graphs grouped by their OCI artifact relationships in a tree format:
 
 ```
        VERSION ID       TYPE              DIGEST        SIZE    TAGS
@@ -156,35 +158,35 @@ The `(N*)` notation indicates versions shared across multiple graphs.
 **Options:**
 
 ```bash
-# Show images in flat table format
-ghcrctl list images mkoepf/myimage --flat
+# Show graphs in flat table format
+ghcrctl list graphs mkoepf/myimage --flat
 
 # Output in JSON format
-ghcrctl list images mkoepf/myimage --json
+ghcrctl list graphs mkoepf/myimage --json
 
-# Filter to images containing a specific version ID
-ghcrctl list images mkoepf/myimage --version 12345678
+# Filter to graphs containing a specific version ID
+ghcrctl list graphs mkoepf/myimage --version 12345678
 
-# Filter to images containing a specific tag
-ghcrctl list images mkoepf/myimage --tag v1.0.0
+# Filter to graphs containing a specific tag
+ghcrctl list graphs mkoepf/myimage --tag v1.0.0
 
-# Filter to images containing a specific digest
-ghcrctl list images mkoepf/myimage --digest sha256:abc123...
+# Filter to graphs containing a specific digest
+ghcrctl list graphs mkoepf/myimage --digest sha256:abc123...
 
-# Filter images with ANY version older than 30 days
-ghcrctl list images mkoepf/myimage --older-than 30d
+# Filter graphs with ANY version older than 30 days
+ghcrctl list graphs mkoepf/myimage --older-than 30d
 
-# Filter images with ANY version from the last hour
-ghcrctl list images mkoepf/myimage --newer-than 1h
+# Filter graphs with ANY version from the last hour
+ghcrctl list graphs mkoepf/myimage --newer-than 1h
 
-# Filter images with ANY version older than a specific date
-ghcrctl list images mkoepf/myimage --older-than 2025-01-01
+# Filter graphs with ANY version older than a specific date
+ghcrctl list graphs mkoepf/myimage --older-than 2025-01-01
 ```
 
 **Use cases:**
-- Quick overview of all images and their artifacts
-- Find images that contain a specific manifest
-- Identify shared platform manifests across images
+- Quick overview of all graphs and their artifacts
+- Find graphs that contain a specific manifest
+- Identify shared platform manifests across graphs
 
 ### List Package Versions
 
@@ -211,7 +213,7 @@ Versions for myimage:
 Total: 5 versions.
 ```
 
-To see artifact relationships (platform manifests, attestations), use `ghcrctl list images` instead.
+To see artifact relationships (platform manifests, attestations), use `ghcrctl list graphs` instead.
 
 **Filter options:**
 ```bash
@@ -328,7 +330,7 @@ ghcrctl get sbom mkoepf/myimage --digest abc123
 
 Requires a selector: `--tag`, `--digest`, or `--version`. The `--digest` flag supports short form.
 
-If the selected version is itself an SBOM, it is displayed directly. Otherwise, the command finds SBOMs in the image containing that version.
+If the selected version is itself an SBOM, it is displayed directly. Otherwise, the command finds SBOMs in the graph containing that version.
 
 The command automatically handles multiple SBOMs:
 - **One SBOM found**: Displays it automatically
@@ -338,7 +340,7 @@ The command automatically handles multiple SBOMs:
 **Options:**
 
 ```bash
-# Show all SBOMs for an image
+# Show all SBOMs for a graph
 ghcrctl get sbom mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
@@ -375,7 +377,7 @@ ghcrctl get provenance mkoepf/myimage --digest abc123
 
 Requires a selector: `--tag`, `--digest`, or `--version`. The `--digest` flag supports short form.
 
-If the selected version is itself a provenance attestation, it is displayed directly. Otherwise, the command finds provenance in the image containing that version.
+If the selected version is itself a provenance attestation, it is displayed directly. Otherwise, the command finds provenance in the graph containing that version.
 
 Provenance attestations contain build information including:
 - Builder details (GitHub Actions, GitLab CI, etc.)
@@ -386,7 +388,7 @@ Provenance attestations contain build information including:
 **Options:**
 
 ```bash
-# Show all provenance documents for an image
+# Show all provenance documents for a graph
 ghcrctl get provenance mkoepf/myimage --tag v1.0.0 --all
 
 # Output as raw JSON
@@ -531,26 +533,26 @@ Filters can be combined using AND logic (all must match).
 - GITHUB_TOKEN with `write:packages` and `delete:packages` scope
 - Must use Personal Access Token (not GitHub App installation token)
 
-#### Delete an Entire Image
+#### Delete an Entire Graph
 
-Delete a complete OCI image including the root index, all platform manifests, and attestations (SBOM, provenance):
+Delete a complete OCI artifact graph including the root index, all platform manifests, and attestations (SBOM, provenance):
 
 ```bash
 # Delete by tag (most common)
-ghcrctl delete image mkoepf/myimage --tag v1.0.0
+ghcrctl delete graph mkoepf/myimage --tag v1.0.0
 
 # Delete by digest
-ghcrctl delete image mkoepf/myimage --digest sha256:abc123...
+ghcrctl delete graph mkoepf/myimage --digest sha256:abc123...
 
-# Delete image containing a specific version
-ghcrctl delete image mkoepf/myimage --version 12345678
+# Delete graph containing a specific version
+ghcrctl delete graph mkoepf/myimage --version 12345678
 
 # Skip confirmation (--force or -y)
-ghcrctl delete image mkoepf/myimage --tag v1.0.0 --force
-ghcrctl delete image mkoepf/myimage --tag v1.0.0 -y
+ghcrctl delete graph mkoepf/myimage --tag v1.0.0 --force
+ghcrctl delete graph mkoepf/myimage --tag v1.0.0 -y
 
 # Preview what would be deleted
-ghcrctl delete image mkoepf/myimage --tag v1.0.0 --dry-run
+ghcrctl delete graph mkoepf/myimage --tag v1.0.0 --dry-run
 ```
 
 Requires a selector: `--tag`, `--digest`, or `--version`.
@@ -562,11 +564,11 @@ For a multi-arch image with attestations, this command discovers and deletes:
 2. All **exclusive** platform manifests (linux/amd64, linux/arm64, etc.)
 3. The root image index or manifest - deleted last
 
-**Shared manifests are preserved:** If a platform manifest or attestation is referenced by multiple images (e.g., two tags share the same builds), those shared artifacts are NOT deleted. They remain available for the other images that still reference them.
+**Shared manifests are preserved:** If a platform manifest or attestation is referenced by multiple graphs (e.g., two tags share the same builds), those shared artifacts are NOT deleted. They remain available for the other graphs that still reference them.
 
 **Use cases:**
 - Remove an entire release (tag)
-- Clean up complete multi-arch images with all artifacts
+- Clean up complete multi-arch artifact graphs with all artifacts
 - Delete all versions associated with a specific build
 
 **Safety features:**
@@ -613,7 +615,7 @@ This command deletes the package and ALL its versions permanently. Use this when
 
 ### Shell Completion
 
-ghcrctl supports shell completion with dynamic image name suggestions.
+ghcrctl supports shell completion with dynamic package name suggestions.
 
 **Setup:**
 
@@ -639,7 +641,7 @@ ghcrctl completion powershell > ghcrctl.ps1
 
 **Usage:**
 
-After setup, press TAB to complete commands and image names:
+After setup, press TAB to complete commands and package names:
 
 ```bash
 ghcrctl list ver<TAB>              # completes to: ghcrctl list versions
@@ -654,7 +656,7 @@ Dynamic package completion requires `GITHUB_TOKEN` to be exported in your shell.
 ghcrctl --help
 ghcrctl list --help
 ghcrctl list packages --help
-ghcrctl list images --help
+ghcrctl list graphs --help
 ghcrctl list versions --help
 ghcrctl stats --help
 ghcrctl get --help
@@ -664,7 +666,7 @@ ghcrctl get provenance --help
 ghcrctl tag --help
 ghcrctl delete --help
 ghcrctl delete version --help
-ghcrctl delete image --help
+ghcrctl delete graph --help
 ghcrctl delete package --help
 ghcrctl completion --help
 ```
@@ -695,9 +697,9 @@ This flag logs all HTTP requests to stderr as JSON, including:
 - Auditing: Track which operations make API calls
 - Optimization: Find opportunities to reduce API calls
 
-**Example: Analyzing list images command performance:**
+**Example: Analyzing list graphs command performance:**
 ```bash
-./ghcrctl list images mkoepf/myimage --log-api-calls 2>api-calls.log
+./ghcrctl list graphs mkoepf/myimage --log-api-calls 2>api-calls.log
 # Analyze the log to see which API calls take longest
 jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' api-calls.log
 ```
@@ -725,7 +727,7 @@ ghcrctl list versions myorg/myapp --untagged --json | jq 'length'
 **Verify a release has attestations:**
 ```bash
 # Check if the latest release has SBOM and provenance
-ghcrctl list images myorg/myapp --tag latest
+ghcrctl list graphs myorg/myapp --tag latest
 
 # Look for "sbom, provenance" in the TYPE column of children
 ```

@@ -14,16 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Integration tests for the list images command
+// Integration tests for the list graphs command
 // These tests require GITHUB_TOKEN and will skip if not set
 
-func TestListImagesCommand_TreeOutput(t *testing.T) {
+func TestListGraphsCommand_TreeOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-with-sbom"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -31,7 +31,7 @@ func TestListImagesCommand_TreeOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Tree output:\n%s", output)
@@ -48,13 +48,13 @@ func TestListImagesCommand_TreeOutput(t *testing.T) {
 	assert.Contains(t, output, "v1.0", "Expected output to contain tag 'v1.0'")
 }
 
-func TestListImagesCommand_FlatOutput(t *testing.T) {
+func TestListGraphsCommand_FlatOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--flat"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-with-sbom", "--flat"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -62,7 +62,7 @@ func TestListImagesCommand_FlatOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Flat output:\n%s", output)
@@ -73,13 +73,13 @@ func TestListImagesCommand_FlatOutput(t *testing.T) {
 	assert.Contains(t, output, "TAGS", "Expected flat output to contain 'TAGS' header")
 }
 
-func TestListImagesCommand_JSONOutput(t *testing.T) {
+func TestListGraphsCommand_JSONOutput(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--json"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-with-sbom", "--json"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -87,7 +87,7 @@ func TestListImagesCommand_JSONOutput(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("JSON output:\n%s", output[:min(500, len(output))])
@@ -107,13 +107,13 @@ func TestListImagesCommand_JSONOutput(t *testing.T) {
 	}
 }
 
-func TestListImagesCommand_FilterByTag(t *testing.T) {
+func TestListGraphsCommand_FilterByTag(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-with-sbom", "--tag", "v1.0"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -121,7 +121,7 @@ func TestListImagesCommand_FilterByTag(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Filtered output:\n%s", output)
@@ -130,14 +130,14 @@ func TestListImagesCommand_FilterByTag(t *testing.T) {
 	assert.Contains(t, output, "v1.0", "Expected output to contain filtered tag 'v1.0'")
 }
 
-func TestListImagesCommand_OutputFormat(t *testing.T) {
+func TestListGraphsCommand_OutputFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	// Test -o json (alternative to --json)
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-no-sbom", "-o", "json"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-no-sbom", "-o", "json"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -145,7 +145,7 @@ func TestListImagesCommand_OutputFormat(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 
@@ -155,13 +155,13 @@ func TestListImagesCommand_OutputFormat(t *testing.T) {
 	require.NoError(t, err, "Failed to parse JSON output with -o flag")
 }
 
-func TestListImagesCommand_SinglePlatformImage(t *testing.T) {
+func TestListGraphsCommand_SinglePlatformImage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-no-sbom"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-no-sbom"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -169,7 +169,7 @@ func TestListImagesCommand_SinglePlatformImage(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err := cmd.Execute()
-	require.NoError(t, err, "list images command failed: %s", stderr.String())
+	require.NoError(t, err, "list graphs command failed: %s", stderr.String())
 
 	output := stdout.String()
 	t.Logf("Single platform output:\n%s", output)
@@ -179,13 +179,13 @@ func TestListImagesCommand_SinglePlatformImage(t *testing.T) {
 	assert.Contains(t, output, "Total:", "Expected output to contain 'Total:' summary")
 }
 
-func TestListImagesCommand_InvalidOutputFormat(t *testing.T) {
+func TestListGraphsCommand_InvalidOutputFormat(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/ghcrctl-test-no-sbom", "-o", "invalid"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/ghcrctl-test-no-sbom", "-o", "invalid"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
@@ -197,13 +197,13 @@ func TestListImagesCommand_InvalidOutputFormat(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid output format")
 }
 
-func TestListImagesCommand_InvalidPackage(t *testing.T) {
+func TestListGraphsCommand_InvalidPackage(t *testing.T) {
 	t.Parallel()
 	token := os.Getenv("GITHUB_TOKEN")
 	require.NotEmpty(t, token, "GITHUB_TOKEN not set")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"list", "images", "mkoepf/nonexistent-package-12345"})
+	cmd.SetArgs([]string{"list", "graphs", "mkoepf/nonexistent-package-12345"})
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)

@@ -19,20 +19,20 @@ import (
 func newDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete resources (versions, images, packages)",
+		Short: "Delete resources (versions, graphs, packages)",
 		Long: `Delete resources from GitHub Container Registry.
 
-Use subcommands to delete individual versions, complete OCI images, or entire packages.
+Use subcommands to delete individual versions, complete OCI graphs, or entire packages.
 
 Available Commands:
   version     Delete a single package version or bulk delete with filters
-  image       Delete an entire OCI image (index + platforms + attestations)
+  graph       Delete an entire OCI graph (index + platforms + attestations)
   package     Delete an entire package (all versions)`,
 	}
 
 	// Add subcommands via their factories
 	cmd.AddCommand(newDeleteVersionCmd())
-	cmd.AddCommand(newDeleteImageCmd())
+	cmd.AddCommand(newDeleteGraphCmd())
 	cmd.AddCommand(newDeletePackageCmd())
 
 	return cmd
@@ -172,8 +172,8 @@ Examples:
 	return cmd
 }
 
-// newDeleteImageCmd creates the delete image subcommand with isolated flag state.
-func newDeleteImageCmd() *cobra.Command {
+// newDeleteGraphCmd creates the delete graph subcommand with isolated flag state.
+func newDeleteGraphCmd() *cobra.Command {
 	var (
 		force     bool
 		yes       bool
@@ -184,11 +184,11 @@ func newDeleteImageCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "image <owner/package>",
-		Short: "Delete an entire OCI image",
-		Long: `Delete an entire OCI image from GitHub Container Registry.
+		Use:   "graph <owner/package>",
+		Short: "Delete an entire OCI graph",
+		Long: `Delete an entire OCI graph from GitHub Container Registry.
 
-This command discovers and deletes all versions that make up an OCI image,
+This command discovers and deletes all versions that make up an OCI graph,
 including the root index, platform manifests, and attestations (SBOM, provenance).
 
 Requires a selector: --tag, --digest, or --version.
@@ -197,20 +197,20 @@ IMPORTANT: Deletion is permanent and cannot be undone (except within 30 days
 via the GitHub web UI if the package namespace is available).
 
 Examples:
-  # Delete image by tag (most common)
-  ghcrctl delete image mkoepf/myimage --tag v1.0.0
+  # Delete graph by tag (most common)
+  ghcrctl delete graph mkoepf/myimage --tag v1.0.0
 
-  # Delete image by digest
-  ghcrctl delete image mkoepf/myimage --digest sha256:abc123...
+  # Delete graph by digest
+  ghcrctl delete graph mkoepf/myimage --digest sha256:abc123...
 
-  # Delete image containing a specific version
-  ghcrctl delete image mkoepf/myimage --version 12345678
+  # Delete graph containing a specific version
+  ghcrctl delete graph mkoepf/myimage --version 12345678
 
   # Skip confirmation
-  ghcrctl delete image mkoepf/myimage --tag v1.0.0 --force
+  ghcrctl delete graph mkoepf/myimage --tag v1.0.0 --force
 
   # Preview what would be deleted
-  ghcrctl delete image mkoepf/myimage --tag v1.0.0 --dry-run`,
+  ghcrctl delete graph mkoepf/myimage --tag v1.0.0 --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/package reference (reject inline tags)
@@ -249,14 +249,14 @@ Examples:
 				return fmt.Errorf("failed to determine owner type: %w", err)
 			}
 
-			fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+			ociRef := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 
 			// Determine the root digest based on which selector was used
 			var rootDigest string
 
 			if tag != "" {
 				// Resolve tag to digest
-				rootDigest, err = discover.ResolveTag(ctx, fullImage, tag)
+				rootDigest, err = discover.ResolveTag(ctx, ociRef, tag)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
@@ -323,7 +323,7 @@ Examples:
 			}
 
 			discoverer := discover.NewPackageDiscoverer()
-			versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+			versions, err := discoverer.DiscoverPackage(ctx, ociRef, allVersions, nil)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to discover package: %w", err)
@@ -331,15 +331,15 @@ Examples:
 
 			versionMap := discover.ToMap(versions)
 
-			// Find image by root digest
-			imageVersions := discover.FindImageByDigest(versionMap, rootDigest)
-			if len(imageVersions) == 0 {
+			// Find graph by root digest
+			graphVersions := discover.FindGraphByDigest(versionMap, rootDigest)
+			if len(graphVersions) == 0 {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("no image found for digest %s", rootDigest)
+				return fmt.Errorf("no graph found for digest %s", rootDigest)
 			}
 
 			// Classify versions into exclusive (to delete) and shared (to preserve)
-			toDelete, shared := discover.ClassifyImageVersions(imageVersions)
+			toDelete, shared := discover.ClassifyGraphVersions(graphVersions)
 
 			// Extract version IDs from toDelete list
 			versionIDs := make([]int64, len(toDelete))
@@ -348,13 +348,13 @@ Examples:
 			}
 
 			// Display what will be deleted
-			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI image:\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete complete OCI graph:\n")
 			fmt.Fprintf(cmd.OutOrStdout(), "  Package: %s\n", packageName)
 			if tag != "" {
 				fmt.Fprintf(cmd.OutOrStdout(), "  Tag:     %s\n", tag)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "\n")
-			outputDeleteImageVersions(cmd.OutOrStdout(), toDelete, shared, imageVersions)
+			outputDeleteGraphVersions(cmd.OutOrStdout(), toDelete, shared, graphVersions)
 			fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %s version(s) will be deleted\n\n",
 				display.ColorWarning(fmt.Sprintf("%d", len(versionIDs))))
 
@@ -367,7 +367,7 @@ Examples:
 			// Confirm deletion unless --force or --yes is used
 			skipConfirm := force || yes
 			if !skipConfirm {
-				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this image?"))
+				confirmed, err := prompts.Confirm(os.Stdin, cmd.OutOrStdout(), display.ColorWarning("Are you sure you want to delete this graph?"))
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
@@ -392,9 +392,9 @@ Examples:
 	}
 
 	// Selector flags
-	cmd.Flags().StringVar(&tag, "tag", "", "Delete image by tag")
-	cmd.Flags().StringVar(&digest, "digest", "", "Delete image by digest")
-	cmd.Flags().Int64Var(&versionID, "version", 0, "Delete image containing this version ID")
+	cmd.Flags().StringVar(&tag, "tag", "", "Delete graph by tag")
+	cmd.Flags().StringVar(&digest, "digest", "", "Delete graph by digest")
+	cmd.Flags().Int64Var(&versionID, "version", 0, "Delete graph containing this version ID")
 
 	// Common flags
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
@@ -542,8 +542,8 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 		}
 	} else if tag != "" {
 		// Resolve tag to digest first, then get version ID
-		fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
-		resolvedDigest, err := discover.ResolveTag(ctx, fullImage, tag)
+		ociRef := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+		resolvedDigest, err := discover.ResolveTag(ctx, ociRef, tag)
 		if err != nil {
 			cmd.SilenceUsage = true
 			return fmt.Errorf("failed to resolve tag '%s': %w", tag, err)
@@ -563,7 +563,7 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 	}
 
 	// Count how many other versions reference this one
-	imageCount := countIncomingRefs(ctx, client, owner, ownerType, packageName, targetVersionID)
+	refCount := countIncomingRefs(ctx, client, owner, ownerType, packageName, targetVersionID)
 
 	// Show what will be deleted
 	fmt.Fprintf(cmd.OutOrStdout(), "Preparing to delete package version:\n")
@@ -571,12 +571,12 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 	fmt.Fprintf(cmd.OutOrStdout(), "  Owner:      %s (%s)\n", owner, ownerType)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Version ID: %d\n", targetVersionID)
 	fmt.Fprintf(cmd.OutOrStdout(), "  Tags:       %s\n", formatTagsForDisplay(tags))
-	if imageCount > 0 {
+	if refCount > 0 {
 		versionWord := "version"
-		if imageCount > 1 {
+		if refCount > 1 {
 			versionWord = "versions"
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", imageCount, versionWord)))
+		fmt.Fprintf(cmd.OutOrStdout(), "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", refCount, versionWord)))
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 
@@ -644,10 +644,10 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 		return nil
 	}
 
-	// Build all images to identify shared children that should be protected
-	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+	// Build all graphs to identify shared children that should be protected
+	ociRef := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 	discoverer := discover.NewPackageDiscoverer()
-	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+	versions, err := discoverer.DiscoverPackage(ctx, ociRef, allVersions, nil)
 
 	// Track which version IDs are shared (have incoming refs from outside deletion set)
 	sharedChildren := make(map[int64]bool)
@@ -691,7 +691,7 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 
 	// Update matching versions to only include safe ones
 	if len(protectedVersions) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s %d version(s) are shared by multiple images and will be preserved.\n\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "%s %d version(s) are shared by multiple graphs and will be preserved.\n\n",
 			display.ColorWarning("Note:"), len(protectedVersions))
 	}
 
@@ -699,7 +699,7 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 
 	// Re-check if any versions remain after filtering
 	if len(matchingVersions) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No versions to delete (all matching versions are shared with other images)")
+		fmt.Fprintln(cmd.OutOrStdout(), "No versions to delete (all matching versions are shared with other graphs)")
 		return nil
 	}
 
@@ -818,12 +818,12 @@ func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
 	return vf, nil
 }
 
-// outputDeleteImageVersions displays versions to delete and shared versions.
-func outputDeleteImageVersions(w io.Writer, toDelete, shared, imageVersions []discover.VersionInfo) {
-	// Build set of digests in this image for counting external refs
-	imageDigests := make(map[string]bool)
-	for _, v := range imageVersions {
-		imageDigests[v.Digest] = true
+// outputDeleteGraphVersions displays versions to delete and shared versions.
+func outputDeleteGraphVersions(w io.Writer, toDelete, shared, graphVersions []discover.VersionInfo) {
+	// Build set of digests in this graph for counting external refs
+	graphDigests := make(map[string]bool)
+	for _, v := range graphVersions {
+		graphDigests[v.Digest] = true
 	}
 
 	// Show what will be deleted
@@ -834,14 +834,14 @@ func outputDeleteImageVersions(w io.Writer, toDelete, shared, imageVersions []di
 		}
 	}
 
-	// Show what will be preserved (shared with other images)
+	// Show what will be preserved (shared with other graphs)
 	if len(shared) > 0 {
 		fmt.Fprintf(w, "\n%s\n", display.ColorWarning("Shared versions (preserved):"))
 		for _, v := range shared {
 			// Count external references
 			externalRefs := 0
 			for _, inRef := range v.IncomingRefs {
-				if !imageDigests[inRef] {
+				if !graphDigests[inRef] {
 					externalRefs++
 				}
 			}
@@ -887,7 +887,7 @@ type deleteVersionParams struct {
 	PackageName string
 	VersionID   int64
 	Tags        []string
-	ImageCount  int
+	RefCount    int
 	Force       bool
 	DryRun      bool
 }
@@ -922,12 +922,12 @@ func executeSingleDelete(ctx context.Context, deleter packageDeleter, params del
 	fmt.Fprintf(w, "  Owner:      %s (%s)\n", params.Owner, params.OwnerType)
 	fmt.Fprintf(w, "  Version ID: %d\n", params.VersionID)
 	fmt.Fprintf(w, "  Tags:       %s\n", formatTagsForDisplay(params.Tags))
-	if params.ImageCount > 0 {
+	if params.RefCount > 0 {
 		versionWord := "version"
-		if params.ImageCount > 1 {
+		if params.RefCount > 1 {
 			versionWord = "versions"
 		}
-		fmt.Fprintf(w, "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", params.ImageCount, versionWord)))
+		fmt.Fprintf(w, "  Referenced: %s\n", display.ColorShared(fmt.Sprintf("by %d other %s", params.RefCount, versionWord)))
 	}
 	fmt.Fprintln(w)
 
@@ -1055,11 +1055,11 @@ func countIncomingRefs(ctx context.Context, client *gh.Client, owner, ownerType,
 		return 0
 	}
 
-	fullImage := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+	ociRef := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 
 	// Use discover package to get version relationships
 	discoverer := discover.NewPackageDiscoverer()
-	versions, err := discoverer.DiscoverPackage(ctx, fullImage, allVersions, nil)
+	versions, err := discoverer.DiscoverPackage(ctx, ociRef, allVersions, nil)
 	if err != nil {
 		return 0
 	}

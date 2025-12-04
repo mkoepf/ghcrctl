@@ -271,8 +271,8 @@ func TestDeleteVersionCmd_ByTag(t *testing.T) {
 	assert.Contains(t, output, "test-tag", "Expected tag name in output")
 }
 
-// TestDeleteImageCmd_ByTag tests delete image --tag <tag>
-func TestDeleteImageCmd_ByTag(t *testing.T) {
+// TestDeleteGraphCmd_ByTag tests delete graph --tag <tag>
+func TestDeleteGraphCmd_ByTag(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
@@ -292,12 +292,12 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 	err := testutil.CopyImage(ctx, stableFixture, stableFixtureTag, ephemeralImage, "delete-me")
 	require.NoError(t, err, "Failed to copy image")
 
-	t.Logf("Testing delete image command with --tag delete-me")
+	t.Logf("Testing delete graph command with --tag delete-me")
 
-	// Run delete image command with --dry-run
+	// Run delete graph command with --dry-run
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{
-		"delete", "image", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
+		"delete", "graph", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
 		"--tag", "delete-me",
 		"--dry-run",
 	})
@@ -308,7 +308,7 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	require.NoError(t, err, "delete image --tag --dry-run failed")
+	require.NoError(t, err, "delete graph --tag --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
@@ -318,8 +318,8 @@ func TestDeleteImageCmd_ByTag(t *testing.T) {
 	assert.Contains(t, output, "delete-me", "Expected tag in output")
 }
 
-// TestDeleteImageCmd_ByDigest tests delete image --digest <digest>
-func TestDeleteImageCmd_ByDigest(t *testing.T) {
+// TestDeleteGraphCmd_ByDigest tests delete graph --digest <digest>
+func TestDeleteGraphCmd_ByDigest(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
@@ -343,12 +343,12 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 	digest, err := discover.ResolveTag(ctx, ephemeralImage, "latest")
 	require.NoError(t, err, "Failed to resolve tag")
 
-	t.Logf("Testing delete image command with --digest %s", digest[:20])
+	t.Logf("Testing delete graph command with --digest %s", digest[:20])
 
-	// Run delete image command with --dry-run
+	// Run delete graph command with --dry-run
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{
-		"delete", "image", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
+		"delete", "graph", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
 		"--digest", digest,
 		"--dry-run",
 	})
@@ -359,7 +359,7 @@ func TestDeleteImageCmd_ByDigest(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	err = cmd.Execute()
-	require.NoError(t, err, "delete image --digest --dry-run failed")
+	require.NoError(t, err, "delete graph --digest --dry-run failed")
 
 	output := stdout.String()
 	t.Logf("Dry-run output:\n%s", output)
@@ -481,8 +481,8 @@ func TestDeleteVersionCmd_BulkUntagged(t *testing.T) {
 	}
 }
 
-// TestDeleteImageCmd_ActualDelete tests actual deletion (not just dry-run)
-func TestDeleteImageCmd_ActualDelete(t *testing.T) {
+// TestDeleteGraphCmd_ActualDelete tests actual deletion (not just dry-run)
+func TestDeleteGraphCmd_ActualDelete(t *testing.T) {
 	t.Parallel()
 
 	token := os.Getenv("GITHUB_TOKEN")
@@ -511,10 +511,10 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 	require.NoError(t, err, "Failed to list versions before delete")
 	t.Logf("Versions before delete: %d", len(versionsBefore))
 
-	// Run delete image command with --force (actual delete)
+	// Run delete graph command with --force (actual delete)
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{
-		"delete", "image", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
+		"delete", "graph", fmt.Sprintf("%s/%s", testOwner, ephemeralName),
 		"--tag", "delete-this",
 		"--force",
 	})
@@ -531,7 +531,7 @@ func TestDeleteImageCmd_ActualDelete(t *testing.T) {
 			t.Log("Got expected 'last tagged version' error - cannot delete when it's the only tagged version")
 			return
 		}
-		require.NoError(t, err, "delete image --force failed: %s", stderr.String())
+		require.NoError(t, err, "delete graph --force failed: %s", stderr.String())
 	}
 
 	output := stdout.String()

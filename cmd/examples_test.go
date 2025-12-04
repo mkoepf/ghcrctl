@@ -19,13 +19,13 @@ func TestCommandExamples(t *testing.T) {
 		// Commands that should have examples (updated for new structure)
 		{"list packages command", "list packages", true},
 		{"list versions command", "list versions", true},
-		{"list images command", "list images", true},
+		{"list graphs command", "list graphs", true},
 		{"get labels command", "get labels", true},
 		{"get sbom command", "get sbom", true},
 		{"get provenance command", "get provenance", true},
 		{"tag command", "tag", true},
 		{"delete version command", "delete version", true},
-		{"delete image command", "delete image", true},
+		{"delete graph command", "delete graph", true},
 	}
 
 	for _, tt := range tests {
@@ -49,13 +49,13 @@ func TestExampleFormat(t *testing.T) {
 	}{
 		{"list packages command", "list packages"},
 		{"list versions command", "list versions"},
-		{"list images command", "list images"},
+		{"list graphs command", "list graphs"},
 		{"get labels command", "get labels"},
 		{"get sbom command", "get sbom"},
 		{"get provenance command", "get provenance"},
 		{"tag command", "tag"},
 		{"delete version command", "delete version"},
-		{"delete image command", "delete image"},
+		{"delete graph command", "delete graph"},
 	}
 
 	for _, tt := range tests {

@@ -148,7 +148,7 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 		PackageName: imageName,
 		VersionID:   versionID,
 		Tags:        tags,
-		ImageCount:  1, // It's a root, so count is 1
+		RefCount:    1, // It's a root, so count is 1
 		Force:       true,
 		DryRun:      true, // DRY RUN
 	}

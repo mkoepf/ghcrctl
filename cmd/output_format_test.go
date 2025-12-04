@@ -13,7 +13,7 @@ func TestOutputFormatFlag(t *testing.T) {
 	commandsWithJSON := []string{
 		"list packages",
 		"list versions",
-		"list images",
+		"list graphs",
 		"get labels",
 		"get sbom",
 		"get provenance",

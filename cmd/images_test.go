@@ -10,22 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestListImagesCmd_RequiresPackageName(t *testing.T) {
+func TestListGraphsCmd_RequiresPackageName(t *testing.T) {
 	rootCmd := NewRootCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetErr(&errOut)
-	rootCmd.SetArgs([]string{"list", "images"})
+	rootCmd.SetArgs([]string{"list", "graphs"})
 
 	err := rootCmd.Execute()
 	assert.Error(t, err, "expected error for missing package name")
 }
 
-func TestListImagesCmd_HasFlags(t *testing.T) {
+func TestListGraphsCmd_HasFlags(t *testing.T) {
 	rootCmd := NewRootCmd()
-	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
-	require.NoError(t, err, "Failed to find list images command")
+	imagesCmd, _, err := rootCmd.Find([]string{"list", "graphs"})
+	require.NoError(t, err, "Failed to find list graphs command")
 
 	// Check --json flag exists
 	jsonFlag := imagesCmd.Flags().Lookup("json")
@@ -40,22 +40,22 @@ func TestListImagesCmd_HasFlags(t *testing.T) {
 	assert.NotNil(t, outputFlag, "expected -o/--output flag")
 }
 
-func TestListImagesCmd_InvalidOutputFormat(t *testing.T) {
+func TestListGraphsCmd_InvalidOutputFormat(t *testing.T) {
 	rootCmd := NewRootCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetErr(&errOut)
-	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "-o", "invalid"})
+	rootCmd.SetArgs([]string{"list", "graphs", "owner/test-package", "-o", "invalid"})
 
 	err := rootCmd.Execute()
 	assert.Error(t, err, "expected error for invalid output format")
 }
 
-func TestListImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
+func TestListGraphsCmd_HasVersionAndDigestFlags(t *testing.T) {
 	rootCmd := NewRootCmd()
-	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
-	require.NoError(t, err, "Failed to find list images command")
+	imagesCmd, _, err := rootCmd.Find([]string{"list", "graphs"})
+	require.NoError(t, err, "Failed to find list graphs command")
 
 	// Check --version flag exists
 	versionFlag := imagesCmd.Flags().Lookup("version")
@@ -66,23 +66,23 @@ func TestListImagesCmd_HasVersionAndDigestFlags(t *testing.T) {
 	assert.NotNil(t, digestFlag, "expected --digest flag")
 }
 
-func TestListImagesCmd_MutuallyExclusiveFlags(t *testing.T) {
+func TestListGraphsCmd_MutuallyExclusiveFlags(t *testing.T) {
 	rootCmd := NewRootCmd()
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetErr(&errOut)
-	rootCmd.SetArgs([]string{"list", "images", "owner/test-package", "--version", "123", "--digest", "sha256:abc"})
+	rootCmd.SetArgs([]string{"list", "graphs", "owner/test-package", "--version", "123", "--digest", "sha256:abc"})
 
 	err := rootCmd.Execute()
 	assert.Error(t, err, "expected error when both --version and --digest are specified")
 }
 
-func TestListImagesCmd_HasTimeFlags(t *testing.T) {
+func TestListGraphsCmd_HasTimeFlags(t *testing.T) {
 	t.Parallel()
 	rootCmd := NewRootCmd()
-	imagesCmd, _, err := rootCmd.Find([]string{"list", "images"})
-	require.NoError(t, err, "Failed to find list images command")
+	imagesCmd, _, err := rootCmd.Find([]string{"list", "graphs"})
+	require.NoError(t, err, "Failed to find list graphs command")
 
 	// Check --older-than flag exists
 	olderThanFlag := imagesCmd.Flags().Lookup("older-than")
@@ -184,34 +184,34 @@ func TestFilterImagesByTime(t *testing.T) {
 		},
 	}
 
-	images := []discover.VersionInfo{
+	graphs := []discover.VersionInfo{
 		allVersions["sha256:parent1"],
 		allVersions["sha256:parent2"],
 	}
 
-	t.Run("filter older-than includes old image", func(t *testing.T) {
+	t.Run("filter older-than includes old graph", func(t *testing.T) {
 		olderThan, err := filter.ParseDate("2025-06-01")
 		require.NoError(t, err)
 		tf := &filter.VersionFilter{OlderThan: olderThan}
 
-		result := filterImagesByTime(images, allVersions, tf)
+		result := filterGraphsByTime(graphs, allVersions, tf)
 		assert.Len(t, result, 1)
 		assert.Equal(t, "sha256:parent1", result[0].Digest)
 	})
 
-	t.Run("filter newer-than includes new image", func(t *testing.T) {
+	t.Run("filter newer-than includes new graph", func(t *testing.T) {
 		newerThan, err := filter.ParseDate("2025-06-01")
 		require.NoError(t, err)
 		tf := &filter.VersionFilter{NewerThan: newerThan}
 
-		result := filterImagesByTime(images, allVersions, tf)
+		result := filterGraphsByTime(graphs, allVersions, tf)
 		assert.Len(t, result, 1)
 		assert.Equal(t, "sha256:parent2", result[0].Digest)
 	})
 
-	t.Run("no filter returns all images", func(t *testing.T) {
+	t.Run("no filter returns all graphs", func(t *testing.T) {
 		tf := &filter.VersionFilter{}
-		result := filterImagesByTime(images, allVersions, tf)
+		result := filterGraphsByTime(graphs, allVersions, tf)
 		assert.Len(t, result, 2)
 	})
 }

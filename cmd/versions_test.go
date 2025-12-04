@@ -124,13 +124,13 @@ func TestListVersionsCommandArguments(t *testing.T) {
 		expectUsage bool
 	}{
 		{
-			name:        "missing image argument",
+			name:        "missing package argument",
 			args:        []string{"list", "versions"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"list", "versions", "myimage", "extra"},
+			args:        []string{"list", "versions", "mypackage", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -179,14 +179,14 @@ func TestListVersionsCommandHasFlags(t *testing.T) {
 }
 
 // TestListVersionsCommandNoTreeFlag verifies --tree flag was removed
-// (use 'ghcrctl list images' for tree view instead)
+// (use 'ghcrctl list graphs' for tree view instead)
 func TestListVersionsCommandNoTreeFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
 	versionsCmd, _, _ := cmd.Find([]string{"list", "versions"})
 
 	flag := versionsCmd.Flags().Lookup("tree")
-	assert.Nil(t, flag, "list versions command should NOT have --tree flag (use 'ghcrctl list images' instead)")
+	assert.Nil(t, flag, "list versions command should NOT have --tree flag (use 'ghcrctl list graphs' instead)")
 }
 
 // TestOutputListVersionsTableQuietMode verifies quiet mode suppresses informational output

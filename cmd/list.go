@@ -17,18 +17,18 @@ import (
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List resources (packages, versions, images)",
+		Short: "List resources (packages, versions, graphs)",
 		Long: `List resources from GitHub Container Registry.
 
 Available subcommands:
   packages    List all container packages for an owner
   versions    List all versions of a package
-  images      List images with their artifact relationships`,
+  graphs      List artifact graphs with their relationships`,
 	}
 
 	cmd.AddCommand(newListPackagesCmd())
 	cmd.AddCommand(newListVersionsCmd())
-	cmd.AddCommand(newListImagesCmd())
+	cmd.AddCommand(newListGraphsCmd())
 
 	return cmd
 }
@@ -160,7 +160,7 @@ This command displays all versions of a package with their version ID, digest,
 tags, and creation date. The version ID can be used with the delete command.
 
 To see artifact relationships (platform manifests, attestations, signatures),
-use 'ghcrctl list images' instead.
+use 'ghcrctl list graphs' instead.
 
 Examples:
   # List all versions
@@ -366,30 +366,30 @@ func outputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 	return nil
 }
 
-// filterImagesByTime filters images to those where ANY version matches the time criteria.
-// An image is included if any of its versions (including children in OutgoingRefs)
+// filterGraphsByTime filters graphs to those where ANY version matches the time criteria.
+// A graph is included if any of its versions (including children in OutgoingRefs)
 // match the time filter.
-func filterImagesByTime(images []discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) []discover.VersionInfo {
+func filterGraphsByTime(graphs []discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) []discover.VersionInfo {
 	var result []discover.VersionInfo
 
-	for _, img := range images {
-		if imageMatchesTimeFilter(img, allVersions, timeFilter) {
-			result = append(result, img)
+	for _, g := range graphs {
+		if graphMatchesTimeFilter(g, allVersions, timeFilter) {
+			result = append(result, g)
 		}
 	}
 
 	return result
 }
 
-// imageMatchesTimeFilter checks if an image or any of its children match the time filter.
-func imageMatchesTimeFilter(img discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) bool {
-	// Check if the image itself matches
-	if versionMatchesTime(img.CreatedAt, timeFilter) {
+// graphMatchesTimeFilter checks if a graph root or any of its children match the time filter.
+func graphMatchesTimeFilter(g discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) bool {
+	// Check if the graph root itself matches
+	if versionMatchesTime(g.CreatedAt, timeFilter) {
 		return true
 	}
 
 	// Check if any child (OutgoingRefs) matches
-	for _, childDigest := range img.OutgoingRefs {
+	for _, childDigest := range g.OutgoingRefs {
 		if child, ok := allVersions[childDigest]; ok {
 			if versionMatchesTime(child.CreatedAt, timeFilter) {
 				return true
@@ -459,8 +459,8 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 	return vf, nil
 }
 
-// newListImagesCmd creates the list images subcommand.
-func newListImagesCmd() *cobra.Command {
+// newListGraphsCmd creates the list graphs subcommand.
+func newListGraphsCmd() *cobra.Command {
 	var (
 		jsonOutput    bool
 		flatOutput    bool
@@ -473,45 +473,45 @@ func newListImagesCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "images <owner/package>",
-		Short: "List images with their artifact relationships",
-		Long: `List all images (OCI artifacts) in a package, grouped by their relationships.
+		Use:   "graphs <owner/package>",
+		Short: "List artifact graphs with their relationships",
+		Long: `List all artifact graphs in a package, grouped by their relationships.
 
-Each image includes its platform manifests, attestations (SBOM, provenance, etc.),
-and signatures. By default, images are displayed in a tree format showing these
+Each graph includes its platform manifests, attestations (SBOM, provenance, etc.),
+and signatures. By default, graphs are displayed in a tree format showing these
 relationships. Use --flat for a simple table view.
 
-Use --version, --digest, or --tag to filter output to only images containing
-a specific version. Use --older-than or --newer-than to filter by time (an image
+Use --version, --digest, or --tag to filter output to only graphs containing
+a specific version. Use --older-than or --newer-than to filter by time (a graph
 is included if ANY of its versions match the time criteria).
 
 Examples:
-  # List images with relationships (tree view, default)
-  ghcrctl list images mkoepf/my-package
+  # List graphs with relationships (tree view, default)
+  ghcrctl list graphs mkoepf/my-package
 
-  # List images in flat table format
-  ghcrctl list images mkoepf/my-package --flat
+  # List graphs in flat table format
+  ghcrctl list graphs mkoepf/my-package --flat
 
   # Output in JSON format
-  ghcrctl list images mkoepf/my-package --json
+  ghcrctl list graphs mkoepf/my-package --json
 
-  # Filter to images containing a specific tag
-  ghcrctl list images mkoepf/my-package --tag v1.0.0
+  # Filter to graphs containing a specific tag
+  ghcrctl list graphs mkoepf/my-package --tag v1.0.0
 
-  # Filter to images containing a specific version ID
-  ghcrctl list images mkoepf/my-package --version 12345678
+  # Filter to graphs containing a specific version ID
+  ghcrctl list graphs mkoepf/my-package --version 12345678
 
-  # Filter to images containing a specific digest
-  ghcrctl list images mkoepf/my-package --digest sha256:abc123...
+  # Filter to graphs containing a specific digest
+  ghcrctl list graphs mkoepf/my-package --digest sha256:abc123...
 
-  # List images with ANY version older than 30 days
-  ghcrctl list images mkoepf/my-package --older-than 30d
+  # List graphs with ANY version older than 30 days
+  ghcrctl list graphs mkoepf/my-package --older-than 30d
 
-  # List images with ANY version from the last hour
-  ghcrctl list images mkoepf/my-package --newer-than 1h
+  # List graphs with ANY version from the last hour
+  ghcrctl list graphs mkoepf/my-package --newer-than 1h
 
-  # List images with ANY version older than a specific date
-  ghcrctl list images mkoepf/my-package --older-than 2025-01-01`,
+  # List graphs with ANY version older than a specific date
+  ghcrctl list graphs mkoepf/my-package --older-than 2025-01-01`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/package reference (reject inline tags)
@@ -567,7 +567,7 @@ Examples:
 			}
 
 			if len(versions) == 0 {
-				fmt.Fprintf(cmd.OutOrStdout(), "No images found for %s\n", packageName)
+				fmt.Fprintf(cmd.OutOrStdout(), "No graphs found for %s\n", packageName)
 				return nil
 			}
 
@@ -577,15 +577,15 @@ Examples:
 				allTags = append(allTags, v.Tags...)
 			}
 
-			// Build image reference
-			image := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
+			// Build OCI reference
+			ociRef := fmt.Sprintf("ghcr.io/%s/%s", owner, packageName)
 
 			// Discover versions and relationships
 			discoverer := discover.NewPackageDiscoverer()
-			results, err := discoverer.DiscoverPackage(ctx, image, versions, allTags)
+			results, err := discoverer.DiscoverPackage(ctx, ociRef, versions, allTags)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to discover images: %w", err)
+				return fmt.Errorf("failed to discover graphs: %w", err)
 			}
 
 			// Build version map for output
@@ -596,7 +596,7 @@ Examples:
 
 			// Apply tag filter if specified (resolve tag to digest first)
 			if filterTag != "" {
-				resolvedDigest, err := discover.ResolveTag(ctx, image, filterTag)
+				resolvedDigest, err := discover.ResolveTag(ctx, ociRef, filterTag)
 				if err != nil {
 					cmd.SilenceUsage = true
 					return fmt.Errorf("failed to resolve tag '%s': %w", filterTag, err)
@@ -632,10 +632,10 @@ Examples:
 					}
 				}
 
-				// Filter to images containing this version
-				results = discover.FindImagesContainingVersion(allVersions, targetDigest)
+				// Filter to graphs containing this version
+				results = discover.FindGraphsContainingVersion(allVersions, targetDigest)
 				if len(results) == 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "No images found containing the specified version\n")
+					fmt.Fprintf(cmd.OutOrStdout(), "No graphs found containing the specified version\n")
 					return nil
 				}
 
@@ -646,7 +646,7 @@ Examples:
 				}
 			}
 
-			// Apply time-based filtering (include image if ANY version matches)
+			// Apply time-based filtering (include graph if ANY version matches)
 			if olderThan != "" || newerThan != "" {
 				timeFilter := &filter.VersionFilter{}
 
@@ -668,10 +668,10 @@ Examples:
 					timeFilter.NewerThan = t
 				}
 
-				// Filter results to images where ANY version matches the time criteria
-				results = filterImagesByTime(results, allVersions, timeFilter)
+				// Filter results to graphs where ANY version matches the time criteria
+				results = filterGraphsByTime(results, allVersions, timeFilter)
 				if len(results) == 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "No images found matching time criteria\n")
+					fmt.Fprintf(cmd.OutOrStdout(), "No graphs found matching time criteria\n")
 					return nil
 				}
 
@@ -701,11 +701,11 @@ Examples:
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	cmd.Flags().BoolVar(&flatOutput, "flat", false, "Output in flat table format (default is tree)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table, tree)")
-	cmd.Flags().Int64Var(&filterVersion, "version", 0, "Filter to images containing this version ID")
-	cmd.Flags().StringVar(&filterDigest, "digest", "", "Filter to images containing this digest")
-	cmd.Flags().StringVar(&filterTag, "tag", "", "Filter to images containing this tag")
-	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show images with ANY version older than date or duration (e.g., 2025-01-01, 7d, 24h)")
-	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show images with ANY version newer than date or duration (e.g., 2025-01-01, 7d, 24h)")
+	cmd.Flags().Int64Var(&filterVersion, "version", 0, "Filter to graphs containing this version ID")
+	cmd.Flags().StringVar(&filterDigest, "digest", "", "Filter to graphs containing this digest")
+	cmd.Flags().StringVar(&filterTag, "tag", "", "Filter to graphs containing this tag")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show graphs with ANY version older than date or duration (e.g., 2025-01-01, 7d, 24h)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show graphs with ANY version newer than date or duration (e.g., 2025-01-01, 7d, 24h)")
 	cmd.MarkFlagsMutuallyExclusive("version", "digest", "tag")
 
 	return cmd

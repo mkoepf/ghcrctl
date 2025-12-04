@@ -23,7 +23,7 @@ func TestToMap(t *testing.T) {
 	assert.Equal(t, int64(2), m["sha256:def"].ID)
 }
 
-func TestFindImageByDigest(t *testing.T) {
+func TestFindGraphByDigest(t *testing.T) {
 	t.Parallel()
 
 	versions := map[string]VersionInfo{
@@ -52,13 +52,13 @@ func TestFindImageByDigest(t *testing.T) {
 		},
 	}
 
-	// Find image by root digest
-	image := FindImageByDigest(versions, "sha256:index1")
-	assert.Len(t, image, 3)
+	// Find graph by root digest
+	graph := FindGraphByDigest(versions, "sha256:index1")
+	assert.Len(t, graph, 3)
 
 	// Verify all expected digests are present
 	digestSet := make(map[string]bool)
-	for _, v := range image {
+	for _, v := range graph {
 		digestSet[v.Digest] = true
 	}
 	assert.True(t, digestSet["sha256:index1"], "missing sha256:index1")
@@ -66,19 +66,19 @@ func TestFindImageByDigest(t *testing.T) {
 	assert.True(t, digestSet["sha256:sbom1"], "missing sha256:sbom1")
 
 	// Find standalone version
-	image = FindImageByDigest(versions, "sha256:standalone")
-	assert.Len(t, image, 1)
+	graph = FindGraphByDigest(versions, "sha256:standalone")
+	assert.Len(t, graph, 1)
 
 	// Find nonexistent digest returns empty
-	image = FindImageByDigest(versions, "sha256:nonexistent")
-	assert.Empty(t, image)
+	graph = FindGraphByDigest(versions, "sha256:nonexistent")
+	assert.Empty(t, graph)
 }
 
-func TestClassifyImageVersions(t *testing.T) {
+func TestClassifyGraphVersions(t *testing.T) {
 	t.Parallel()
 
-	// All versions in one image, no external refs
-	imageVersions := []VersionInfo{
+	// All versions in one graph, no external refs
+	graphVersions := []VersionInfo{
 		{
 			ID:           100,
 			Digest:       "sha256:index1",
@@ -100,18 +100,18 @@ func TestClassifyImageVersions(t *testing.T) {
 		},
 	}
 
-	toDelete, shared := ClassifyImageVersions(imageVersions)
+	toDelete, shared := ClassifyGraphVersions(graphVersions)
 
 	// All versions should be exclusive (no sharing)
 	assert.Len(t, toDelete, 3)
 	assert.Empty(t, shared)
 }
 
-func TestClassifyImageVersions_WithShared(t *testing.T) {
+func TestClassifyGraphVersions_WithShared(t *testing.T) {
 	t.Parallel()
 
-	// Versions for index1's image, but shared-platform has external ref to index2
-	imageVersions := []VersionInfo{
+	// Versions for index1's graph, but shared-platform has external ref to index2
+	graphVersions := []VersionInfo{
 		{
 			ID:           1,
 			Digest:       "sha256:index1",
@@ -133,7 +133,7 @@ func TestClassifyImageVersions_WithShared(t *testing.T) {
 		},
 	}
 
-	toDelete, shared := ClassifyImageVersions(imageVersions)
+	toDelete, shared := ClassifyGraphVersions(graphVersions)
 
 	// 2 exclusive (index1 + exclusive-sbom), 1 shared (shared-platform)
 	assert.Len(t, toDelete, 2)
@@ -144,11 +144,11 @@ func TestClassifyImageVersions_WithShared(t *testing.T) {
 	assert.Equal(t, int64(3), shared[0].ID)
 }
 
-func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
+func TestClassifyGraphVersions_ExternalRefCount(t *testing.T) {
 	t.Parallel()
 
 	// Version with multiple external refs
-	imageVersions := []VersionInfo{
+	graphVersions := []VersionInfo{
 		{
 			ID:           1,
 			Digest:       "sha256:index1",
@@ -163,7 +163,7 @@ func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
 		},
 	}
 
-	toDelete, shared := ClassifyImageVersions(imageVersions)
+	toDelete, shared := ClassifyGraphVersions(graphVersions)
 
 	assert.Len(t, toDelete, 1)
 	assert.Len(t, shared, 1)
@@ -171,19 +171,19 @@ func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
 	// Verify we can count external refs from the shared version
 	require.NotEmpty(t, shared)
 	externalCount := 0
-	imageDigests := map[string]bool{"sha256:index1": true, "sha256:shared": true}
+	graphDigests := map[string]bool{"sha256:index1": true, "sha256:shared": true}
 	for _, inRef := range shared[0].IncomingRefs {
-		if !imageDigests[inRef] {
+		if !graphDigests[inRef] {
 			externalCount++
 		}
 	}
 	assert.Equal(t, 3, externalCount)
 }
 
-func TestFindImagesContainingVersion(t *testing.T) {
+func TestFindGraphsContainingVersion(t *testing.T) {
 	t.Parallel()
 
-	// Two images sharing a platform
+	// Two graphs sharing a platform
 	versions := map[string]VersionInfo{
 		"sha256:index1": {
 			ID:           1,
@@ -211,15 +211,15 @@ func TestFindImagesContainingVersion(t *testing.T) {
 		},
 	}
 
-	// Find images containing shared platform - should return both images
-	result := FindImagesContainingVersion(versions, "sha256:shared-platform")
+	// Find graphs containing shared platform - should return both graphs
+	result := FindGraphsContainingVersion(versions, "sha256:shared-platform")
 	assert.Len(t, result, 4)
 
-	// Find images containing exclusive platform - should return only index2's image
-	result = FindImagesContainingVersion(versions, "sha256:exclusive")
+	// Find graphs containing exclusive platform - should return only index2's graph
+	result = FindGraphsContainingVersion(versions, "sha256:exclusive")
 	assert.Len(t, result, 3)
 
-	// Verify index2's image contains the right versions
+	// Verify index2's graph contains the right versions
 	digestSet := make(map[string]bool)
 	for _, v := range result {
 		digestSet[v.Digest] = true
@@ -229,12 +229,12 @@ func TestFindImagesContainingVersion(t *testing.T) {
 	assert.True(t, digestSet["sha256:exclusive"], "missing sha256:exclusive")
 	assert.False(t, digestSet["sha256:index1"], "should not contain index1")
 
-	// Find images containing a root - should return just that image
-	result = FindImagesContainingVersion(versions, "sha256:index1")
+	// Find graphs containing a root - should return just that graph
+	result = FindGraphsContainingVersion(versions, "sha256:index1")
 	assert.Len(t, result, 2)
 
 	// Find nonexistent digest returns nil
-	result = FindImagesContainingVersion(versions, "sha256:nonexistent")
+	result = FindGraphsContainingVersion(versions, "sha256:nonexistent")
 	assert.Empty(t, result)
 }
 

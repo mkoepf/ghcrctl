@@ -133,19 +133,19 @@ func TestDeletePackageCommandHasFlags(t *testing.T) {
 	}
 }
 
-// TestDeleteImageCommandStructure verifies the delete image subcommand
-func TestDeleteImageCommandStructure(t *testing.T) {
+// TestDeleteGraphCommandStructure verifies the delete graph subcommand
+func TestDeleteGraphCommandStructure(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
-	require.NoError(t, err, "Failed to find delete image command")
+	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
+	require.NoError(t, err, "Failed to find delete graph command")
 
-	assert.Equal(t, "image <owner/package>", deleteImageCmd.Use)
-	assert.NotEmpty(t, deleteImageCmd.Short, "Short description should not be empty")
+	assert.Equal(t, "graph <owner/package>", deleteGraphCmd.Use)
+	assert.NotEmpty(t, deleteGraphCmd.Short, "Short description should not be empty")
 }
 
-// TestDeleteImageCommandArguments verifies argument validation
-func TestDeleteImageCommandArguments(t *testing.T) {
+// TestDeleteGraphCommandArguments verifies argument validation
+func TestDeleteGraphCommandArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -154,12 +154,12 @@ func TestDeleteImageCommandArguments(t *testing.T) {
 	}{
 		{
 			name:        "missing all arguments",
-			args:        []string{"delete", "image"},
+			args:        []string{"delete", "graph"},
 			expectUsage: true,
 		},
 		{
 			name:        "too many arguments",
-			args:        []string{"delete", "image", "mkoepf/myimage:v1.0.0", "extra"},
+			args:        []string{"delete", "graph", "mkoepf/myimage:v1.0.0", "extra"},
 			expectUsage: true,
 		},
 	}
@@ -178,40 +178,40 @@ func TestDeleteImageCommandArguments(t *testing.T) {
 	}
 }
 
-// TestDeleteImageCommandHasFlags verifies required flags exist
-func TestDeleteImageCommandHasFlags(t *testing.T) {
+// TestDeleteGraphCommandHasFlags verifies required flags exist
+func TestDeleteGraphCommandHasFlags(t *testing.T) {
 	t.Parallel()
 	cmd := NewRootCmd()
-	deleteImageCmd, _, err := cmd.Find([]string{"delete", "image"})
-	require.NoError(t, err, "Failed to find delete image command")
+	deleteGraphCmd, _, err := cmd.Find([]string{"delete", "graph"})
+	require.NoError(t, err, "Failed to find delete graph command")
 
 	// Check for --force flag
-	forceFlag := deleteImageCmd.Flags().Lookup("force")
+	forceFlag := deleteGraphCmd.Flags().Lookup("force")
 	assert.NotNil(t, forceFlag, "Expected --force flag to exist")
 
 	// Check for --yes flag (alias for --force)
-	yesFlag := deleteImageCmd.Flags().Lookup("yes")
+	yesFlag := deleteGraphCmd.Flags().Lookup("yes")
 	assert.NotNil(t, yesFlag, "Expected --yes flag to exist")
 
 	// Check for -y shorthand
-	yShorthand := deleteImageCmd.Flags().ShorthandLookup("y")
+	yShorthand := deleteGraphCmd.Flags().ShorthandLookup("y")
 	assert.NotNil(t, yShorthand, "Expected -y shorthand for --yes flag")
 
 	// Check for --dry-run flag
-	dryRunFlag := deleteImageCmd.Flags().Lookup("dry-run")
+	dryRunFlag := deleteGraphCmd.Flags().Lookup("dry-run")
 	assert.NotNil(t, dryRunFlag, "Expected --dry-run flag to exist")
 
 	// Check for --digest flag
-	digestFlag := deleteImageCmd.Flags().Lookup("digest")
+	digestFlag := deleteGraphCmd.Flags().Lookup("digest")
 	assert.NotNil(t, digestFlag, "Expected --digest flag to exist")
 
 	// Check for --version flag
-	versionFlag := deleteImageCmd.Flags().Lookup("version")
+	versionFlag := deleteGraphCmd.Flags().Lookup("version")
 	assert.NotNil(t, versionFlag, "Expected --version flag to exist")
 }
 
-// TestDeleteImageCommandFlagExclusivity verifies mutually exclusive flags
-func TestDeleteImageCommandFlagExclusivity(t *testing.T) {
+// TestDeleteGraphCommandFlagExclusivity verifies mutually exclusive flags
+func TestDeleteGraphCommandFlagExclusivity(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -220,7 +220,7 @@ func TestDeleteImageCommandFlagExclusivity(t *testing.T) {
 	}{
 		{
 			name:      "digest and version flags both set",
-			args:      []string{"delete", "image", "mkoepf/myimage", "--digest", "sha256:abc", "--version", "12345"},
+			args:      []string{"delete", "graph", "mkoepf/myimage", "--digest", "sha256:abc", "--version", "12345"},
 			expectErr: true,
 		},
 	}
@@ -403,16 +403,16 @@ func TestFormatTagsForDisplay(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for displayImageSummary using discover.VersionInfo
+// Tests for displayGraphSummary using discover.VersionInfo
 // =============================================================================
 
-func TestDisplayImageVersions(t *testing.T) {
+func TestDisplayGraphVersions(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
 		toDelete       []discover.VersionInfo
 		shared         []discover.VersionInfo
-		imageVersions  []discover.VersionInfo
+		graphVersions  []discover.VersionInfo
 		wantContains   []string
 		wantNotContain []string
 	}{
@@ -420,7 +420,7 @@ func TestDisplayImageVersions(t *testing.T) {
 			name:     "single version to delete",
 			toDelete: []discover.VersionInfo{{ID: 100, Digest: "sha256:rootdigest123", Tags: []string{"v1.0.0"}, Types: []string{"index"}}},
 			shared:   nil,
-			imageVersions: []discover.VersionInfo{
+			graphVersions: []discover.VersionInfo{
 				{ID: 100, Digest: "sha256:rootdigest123", Tags: []string{"v1.0.0"}, Types: []string{"index"}},
 			},
 			wantContains: []string{
@@ -439,7 +439,7 @@ func TestDisplayImageVersions(t *testing.T) {
 				{ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}},
 			},
 			shared: nil,
-			imageVersions: []discover.VersionInfo{
+			graphVersions: []discover.VersionInfo{
 				{ID: 100, Digest: "sha256:indexdigest", Tags: []string{"latest"}, Types: []string{"index"}},
 				{ID: 101, Digest: "sha256:amd64", Types: []string{"linux/amd64"}},
 				{ID: 102, Digest: "sha256:arm64", Types: []string{"linux/arm64"}},
@@ -462,7 +462,7 @@ func TestDisplayImageVersions(t *testing.T) {
 				{ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}},
 			},
 			shared: nil,
-			imageVersions: []discover.VersionInfo{
+			graphVersions: []discover.VersionInfo{
 				{ID: 200, Digest: "sha256:manifestdigest", Types: []string{"manifest"}},
 				{ID: 201, Digest: "sha256:sbomdigest", Types: []string{"sbom"}},
 				{ID: 202, Digest: "sha256:provdigest", Types: []string{"provenance"}},
@@ -478,7 +478,7 @@ func TestDisplayImageVersions(t *testing.T) {
 			},
 		},
 		{
-			name: "image with shared platforms (preserved)",
+			name: "graph with shared platforms (preserved)",
 			toDelete: []discover.VersionInfo{
 				{ID: 300, Digest: "sha256:rootwithshared", Tags: []string{"v2.0"}, Types: []string{"index"}},
 				{ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}},
@@ -486,7 +486,7 @@ func TestDisplayImageVersions(t *testing.T) {
 			shared: []discover.VersionInfo{
 				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
 			},
-			imageVersions: []discover.VersionInfo{
+			graphVersions: []discover.VersionInfo{
 				{ID: 300, Digest: "sha256:rootwithshared", Tags: []string{"v2.0"}, Types: []string{"index"}, OutgoingRefs: []string{"sha256:exclusive", "sha256:shared"}},
 				{ID: 301, Digest: "sha256:exclusive", Types: []string{"linux/amd64"}, IncomingRefs: []string{"sha256:rootwithshared"}},
 				{ID: 302, Digest: "sha256:shared", Types: []string{"linux/arm64"}, IncomingRefs: []string{"sha256:rootwithshared", "sha256:otherroot1", "sha256:otherroot2"}},
@@ -504,7 +504,7 @@ func TestDisplayImageVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf strings.Builder
-			outputDeleteImageVersions(&buf, tt.toDelete, tt.shared, tt.imageVersions)
+			outputDeleteGraphVersions(&buf, tt.toDelete, tt.shared, tt.graphVersions)
 			output := buf.String()
 
 			for _, want := range tt.wantContains {
@@ -665,7 +665,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 				PackageName: "testimage",
 				VersionID:   12345,
 				Tags:        []string{"v1.0", "latest"},
-				ImageCount:  0,
+				RefCount:    0,
 				Force:       true,
 				DryRun:      false,
 			},
@@ -772,7 +772,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 				PackageName: "testimage",
 				VersionID:   55555,
 				Tags:        []string{},
-				ImageCount:  2,
+				RefCount:    2,
 				Force:       true,
 				DryRun:      false,
 			},
@@ -788,7 +788,7 @@ func TestExecuteSingleDelete(t *testing.T) {
 				PackageName: "testimage",
 				VersionID:   66666,
 				Tags:        []string{},
-				ImageCount:  1,
+				RefCount:    1,
 				Force:       true,
 				DryRun:      false,
 			},

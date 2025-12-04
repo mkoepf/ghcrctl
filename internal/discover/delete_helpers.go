@@ -2,20 +2,20 @@ package discover
 
 import "fmt"
 
-// ClassifyImageVersions separates image versions into exclusive (to delete) and shared (to preserve).
-// A version is shared if it has incoming refs from outside the image being deleted.
-func ClassifyImageVersions(imageVersions []VersionInfo) (toDelete, shared []VersionInfo) {
-	// Build set of digests in this image
-	imageDigests := make(map[string]bool)
-	for _, v := range imageVersions {
-		imageDigests[v.Digest] = true
+// ClassifyGraphVersions separates graph versions into exclusive (to delete) and shared (to preserve).
+// A version is shared if it has incoming refs from outside the graph being deleted.
+func ClassifyGraphVersions(graphVersions []VersionInfo) (toDelete, shared []VersionInfo) {
+	// Build set of digests in this graph
+	graphDigests := make(map[string]bool)
+	for _, v := range graphVersions {
+		graphDigests[v.Digest] = true
 	}
 
-	for _, v := range imageVersions {
-		// Check if any incoming ref is from outside this image
+	for _, v := range graphVersions {
+		// Check if any incoming ref is from outside this graph
 		isShared := false
 		for _, inRef := range v.IncomingRefs {
-			if !imageDigests[inRef] {
+			if !graphDigests[inRef] {
 				isShared = true
 				break
 			}
@@ -29,8 +29,8 @@ func ClassifyImageVersions(imageVersions []VersionInfo) (toDelete, shared []Vers
 	return
 }
 
-// FindImageByDigest returns all versions reachable from a root digest via OutgoingRefs.
-func FindImageByDigest(versions map[string]VersionInfo, rootDigest string) []VersionInfo {
+// FindGraphByDigest returns all versions reachable from a root digest via OutgoingRefs.
+func FindGraphByDigest(versions map[string]VersionInfo, rootDigest string) []VersionInfo {
 	visited := make(map[string]bool)
 	var result []VersionInfo
 
@@ -61,20 +61,20 @@ func ToMap(versions []VersionInfo) map[string]VersionInfo {
 	return m
 }
 
-// FindImagesContainingVersion returns all versions that belong to images containing the target digest.
-// It finds the root(s) that can reach the target and returns all versions in those images.
-func FindImagesContainingVersion(versions map[string]VersionInfo, targetDigest string) []VersionInfo {
+// FindGraphsContainingVersion returns all versions that belong to graphs containing the target digest.
+// It finds the root(s) that can reach the target and returns all versions in those graphs.
+func FindGraphsContainingVersion(versions map[string]VersionInfo, targetDigest string) []VersionInfo {
 	// Find all roots that can reach the target
 	roots := findRootsContaining(versions, targetDigest)
 	if len(roots) == 0 {
 		return nil
 	}
 
-	// Collect all versions from all images containing the target
+	// Collect all versions from all graphs containing the target
 	seen := make(map[string]bool)
 	var result []VersionInfo
 	for _, rootDigest := range roots {
-		for _, v := range FindImageByDigest(versions, rootDigest) {
+		for _, v := range FindGraphByDigest(versions, rootDigest) {
 			if !seen[v.Digest] {
 				seen[v.Digest] = true
 				result = append(result, v)
@@ -84,7 +84,7 @@ func FindImagesContainingVersion(versions map[string]VersionInfo, targetDigest s
 	return result
 }
 
-// findRootsContaining finds all root digests whose image trees contain the target digest.
+// findRootsContaining finds all root digests whose graphs contain the target digest.
 func findRootsContaining(versions map[string]VersionInfo, targetDigest string) []string {
 	// If target doesn't exist, return empty
 	if _, exists := versions[targetDigest]; !exists {

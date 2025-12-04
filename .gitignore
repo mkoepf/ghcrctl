@@ -34,4 +34,4 @@ go.work.sum
 
 # Claude
 .claude/
-CLAUDE.md
+CLAUDE*.md

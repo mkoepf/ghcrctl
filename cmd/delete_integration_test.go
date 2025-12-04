@@ -143,14 +143,14 @@ func TestExecuteSingleDeleteDryRunIntegration(t *testing.T) {
 
 	// Build params for dry-run
 	params := DeleteVersionParams{
-		Owner:      owner,
-		OwnerType:  ownerType,
-		ImageName:  imageName,
-		VersionID:  versionID,
-		Tags:       tags,
-		ImageCount: 1, // It's a root, so count is 1
-		Force:      true,
-		DryRun:     true, // DRY RUN
+		Owner:       owner,
+		OwnerType:   ownerType,
+		PackageName: imageName,
+		VersionID:   versionID,
+		Tags:        tags,
+		ImageCount:  1, // It's a root, so count is 1
+		Force:       true,
+		DryRun:      true, // DRY RUN
 	}
 
 	var buf strings.Builder
@@ -238,12 +238,12 @@ func TestExecuteBulkDeleteDryRunIntegration(t *testing.T) {
 
 	// Build params for dry-run
 	params := BulkDeleteParams{
-		Owner:     owner,
-		OwnerType: ownerType,
-		ImageName: imageName,
-		Versions:  testVersions,
-		Force:     true,
-		DryRun:    true, // DRY RUN
+		Owner:       owner,
+		OwnerType:   ownerType,
+		PackageName: imageName,
+		Versions:    testVersions,
+		Force:       true,
+		DryRun:      true, // DRY RUN
 	}
 
 	var buf strings.Builder

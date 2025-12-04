@@ -50,6 +50,18 @@ ghcrctl provides functionality for:
 - **Safe deletion** of package versions, images, and entire packages
 - **Shell completion** with dynamic package name suggestions
 
+## Terminology
+
+Since GHCR combines a container registry with GitHub Packages, the terminology
+can be confusing. Here's how ghcrctl distinguishes between packages, package
+versions and images:
+
+- **Package**: A container repository in GHCR (e.g., `mkoepf/myapp`). Comparable to a directory containing versions.
+- **Version**: A single package version identified by a numeric version ID. Each version corresponds to one OCI artifact (manifest or index) with a unique digest.
+- **Image**: A set of versions that belong together — typically an index plus its platform manifests and any associated attestations (SBOM, provenance) or signatures.
+
+When you run `delete version`, you delete a single package version. When you run `delete image`, you delete an entire image graph (the index and all its referenced artifacts).
+
 ## Installation
 
 ### Using Go Install

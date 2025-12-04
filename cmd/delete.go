@@ -894,24 +894,24 @@ type PackageDeleter interface {
 
 // DeleteVersionParams contains parameters for single version deletion
 type DeleteVersionParams struct {
-	Owner      string
-	OwnerType  string
-	ImageName  string
-	VersionID  int64
-	Tags       []string
-	ImageCount int
-	Force      bool
-	DryRun     bool
+	Owner       string
+	OwnerType   string
+	PackageName string
+	VersionID   int64
+	Tags        []string
+	ImageCount  int
+	Force       bool
+	DryRun      bool
 }
 
 // BulkDeleteParams contains parameters for bulk version deletion
 type BulkDeleteParams struct {
-	Owner     string
-	OwnerType string
-	ImageName string
-	Versions  []gh.PackageVersionInfo
-	Force     bool
-	DryRun    bool
+	Owner       string
+	OwnerType   string
+	PackageName string
+	Versions    []gh.PackageVersionInfo
+	Force       bool
+	DryRun      bool
 }
 
 // DeleteGraphWithDeleter deletes versions using a deleter interface (for testing)
@@ -930,7 +930,7 @@ func DeleteGraphWithDeleter(ctx context.Context, deleter PackageDeleter, owner, 
 func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params DeleteVersionParams, w io.Writer, confirmFn func() (bool, error)) error {
 	// Show what will be deleted
 	fmt.Fprintf(w, "Preparing to delete package version:\n")
-	fmt.Fprintf(w, "  Image:      %s\n", params.ImageName)
+	fmt.Fprintf(w, "  Package:    %s\n", params.PackageName)
 	fmt.Fprintf(w, "  Owner:      %s (%s)\n", params.Owner, params.OwnerType)
 	fmt.Fprintf(w, "  Version ID: %d\n", params.VersionID)
 	fmt.Fprintf(w, "  Tags:       %s\n", formatTagsForDisplay(params.Tags))
@@ -962,18 +962,18 @@ func ExecuteSingleDelete(ctx context.Context, deleter PackageDeleter, params Del
 	}
 
 	// Perform deletion
-	err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.ImageName, params.VersionID)
+	err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.PackageName, params.VersionID)
 	if err != nil {
 		if gh.IsLastTaggedVersionError(err) {
 			fmt.Fprintf(w, "\n%s\n", display.ColorWarning("GHCR does not allow to delete the last tagged version of a package."))
 			fmt.Fprintf(w, "You can delete the package instead:\n")
-			fmt.Fprintf(w, "  ghcrctl delete package %s/%s\n", params.Owner, params.ImageName)
+			fmt.Fprintf(w, "  ghcrctl delete package %s/%s\n", params.Owner, params.PackageName)
 			return fmt.Errorf("GHCR does not allow to delete the last tagged version of a package. You can delete the package instead.")
 		}
 		return fmt.Errorf("failed to delete package version: %w", err)
 	}
 
-	fmt.Fprintln(w, display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", params.VersionID, params.ImageName)))
+	fmt.Fprintln(w, display.ColorSuccess(fmt.Sprintf("Successfully deleted version %d of %s", params.VersionID, params.PackageName)))
 	return nil
 }
 
@@ -982,8 +982,8 @@ func ExecuteBulkDelete(ctx context.Context, deleter PackageDeleter, params BulkD
 	// Display summary of what will be deleted
 	fmt.Fprintf(w, "Preparing to delete %s package version(s):\n",
 		display.ColorWarning(fmt.Sprintf("%d", len(params.Versions))))
-	fmt.Fprintf(w, "  Image: %s\n", params.ImageName)
-	fmt.Fprintf(w, "  Owner: %s (%s)\n\n", params.Owner, params.OwnerType)
+	fmt.Fprintf(w, "  Package: %s\n", params.PackageName)
+	fmt.Fprintf(w, "  Owner:   %s (%s)\n\n", params.Owner, params.OwnerType)
 
 	// Show details of matching versions (limit to first 10 for readability)
 	displayLimit := 10
@@ -1020,7 +1020,7 @@ func ExecuteBulkDelete(ctx context.Context, deleter PackageDeleter, params BulkD
 	failCount := 0
 	for i, ver := range params.Versions {
 		fmt.Fprintf(w, "Deleting version %d/%d (ID: %d)...\n", i+1, len(params.Versions), ver.ID)
-		err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.ImageName, ver.ID)
+		err := deleter.DeletePackageVersion(ctx, params.Owner, params.OwnerType, params.PackageName, ver.ID)
 		if err != nil {
 			fmt.Fprintf(w, "  %s\n", display.ColorError(fmt.Sprintf("Failed: %v", err)))
 			failCount++

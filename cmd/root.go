@@ -15,9 +15,9 @@ var (
 	Version = "dev"
 )
 
-// NewRootCmd creates a new root command with isolated flag state.
+// newRootCmd creates a new root command with isolated flag state.
 // This enables parallel test execution by avoiding shared global state.
-func NewRootCmd() *cobra.Command {
+func newRootCmd() *cobra.Command {
 	var logAPICalls bool
 	var quietMode bool
 
@@ -66,7 +66,7 @@ It provides functionality for:
 }
 
 // rootCmd is the global command instance used by main.go
-var rootCmd = NewRootCmd()
+var rootCmd = newRootCmd()
 
 // Execute runs the root command
 func Execute() {

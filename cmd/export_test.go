@@ -5,6 +5,7 @@ package cmd
 
 // Function exports
 var (
+	NewRootCmd             = newRootCmd
 	DeleteGraphWithDeleter = deleteGraphWithDeleter
 	ExecuteBulkDelete      = executeBulkDelete
 	ExecuteSingleDelete    = executeSingleDelete

@@ -41,19 +41,17 @@ Available Commands:
 // newDeleteVersionCmd creates the delete version subcommand with isolated flag state.
 func newDeleteVersionCmd() *cobra.Command {
 	var (
-		force         bool
-		yes           bool
-		dryRun        bool
-		versionID     int64
-		digest        string
-		tag           string
-		tagPattern    string
-		onlyTagged    bool
-		onlyUntagged  bool
-		olderThan     string
-		newerThan     string
-		olderThanDays int
-		newerThanDays int
+		force        bool
+		yes          bool
+		dryRun       bool
+		versionID    int64
+		digest       string
+		tag          string
+		tagPattern   string
+		onlyTagged   bool
+		onlyUntagged bool
+		olderThan    string
+		newerThan    string
 	)
 
 	cmd := &cobra.Command{
@@ -105,12 +103,11 @@ Examples:
 			// Check if any selector is provided
 			hasSingleSelector := versionID != 0 || digest != "" || tag != ""
 			hasFilterSelector := onlyTagged || onlyUntagged || tagPattern != "" ||
-				olderThan != "" || newerThan != "" ||
-				olderThanDays > 0 || newerThanDays > 0
+				olderThan != "" || newerThan != ""
 
 			if !hasSingleSelector && !hasFilterSelector {
 				cmd.SilenceUsage = true
-				return fmt.Errorf("selector required: use --version, --digest, --tag, or filter flags (--untagged, --older-than-days, etc.)")
+				return fmt.Errorf("selector required: use --version, --digest, --tag, or filter flags (--untagged, --older-than, etc.)")
 			}
 
 			// Get GitHub token
@@ -142,7 +139,7 @@ Examples:
 				// Bulk deletion mode
 				return runBulkDeleteVersion(ctx, cmd, client, owner, ownerType, packageName,
 					tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan,
-					olderThanDays, newerThanDays, skipConfirm, dryRun)
+					skipConfirm, dryRun)
 			}
 
 			// Single deletion mode
@@ -160,10 +157,8 @@ Examples:
 	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "Delete versions matching regex pattern")
 	cmd.Flags().BoolVar(&onlyTagged, "tagged", false, "Delete only tagged versions")
 	cmd.Flags().BoolVar(&onlyUntagged, "untagged", false, "Delete only untagged versions")
-	cmd.Flags().StringVar(&olderThan, "older-than", "", "Delete versions older than date (YYYY-MM-DD or RFC3339)")
-	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Delete versions newer than date (YYYY-MM-DD or RFC3339)")
-	cmd.Flags().IntVar(&olderThanDays, "older-than-days", 0, "Delete versions older than N days")
-	cmd.Flags().IntVar(&newerThanDays, "newer-than-days", 0, "Delete versions newer than N days")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Delete versions older than date or duration (e.g., 2025-01-01, 7d, 24h)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Delete versions newer than date or duration (e.g., 2025-01-01, 7d, 24h)")
 
 	// Common flags
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
@@ -624,10 +619,10 @@ func runSingleDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.
 // runBulkDeleteVersion handles deletion of multiple versions using filters
 func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Client, owner, ownerType, packageName string,
 	tagPattern string, onlyTagged, onlyUntagged bool, olderThan, newerThan string,
-	olderThanDays, newerThanDays int, force, dryRun bool) error {
+	force, dryRun bool) error {
 
 	// Build filter from flags
-	versionFilter, err := buildDeleteVersionFilter(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan, olderThanDays, newerThanDays)
+	versionFilter, err := buildDeleteVersionFilter(tagPattern, onlyTagged, onlyUntagged, olderThan, newerThan)
 	if err != nil {
 		cmd.SilenceUsage = true
 		return fmt.Errorf("invalid filter options: %w", err)
@@ -791,34 +786,31 @@ func runBulkDeleteVersion(ctx context.Context, cmd *cobra.Command, client *gh.Cl
 
 // buildDeleteVersionFilter creates a VersionFilter from command-line flags
 func buildDeleteVersionFilter(tagPattern string, onlyTagged, onlyUntagged bool,
-	olderThan, newerThan string, olderThanDays, newerThanDays int) (*filter.VersionFilter, error) {
+	olderThan, newerThan string) (*filter.VersionFilter, error) {
 	// Check for conflicting flags
 	if onlyTagged && onlyUntagged {
 		return nil, fmt.Errorf("cannot use --tagged and --untagged together")
 	}
 
 	vf := &filter.VersionFilter{
-		OnlyTagged:    onlyTagged,
-		OnlyUntagged:  onlyUntagged,
-		TagPattern:    tagPattern,
-		OlderThanDays: olderThanDays,
-		NewerThanDays: newerThanDays,
+		OnlyTagged:   onlyTagged,
+		OnlyUntagged: onlyUntagged,
+		TagPattern:   tagPattern,
 	}
 
-	// Parse older-than date
+	// Parse date/duration filters
 	if olderThan != "" {
-		t, err := filter.ParseDate(olderThan)
+		t, err := filter.ParseDateOrDuration(olderThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --older-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
+			return nil, fmt.Errorf("invalid --older-than value: %w", err)
 		}
 		vf.OlderThan = t
 	}
 
-	// Parse newer-than date
 	if newerThan != "" {
-		t, err := filter.ParseDate(newerThan)
+		t, err := filter.ParseDateOrDuration(newerThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --newer-than date format (expected YYYY-MM-DD or RFC3339): %w", err)
+			return nil, fmt.Errorf("invalid --newer-than value: %w", err)
 		}
 		vf.NewerThan = t
 	}

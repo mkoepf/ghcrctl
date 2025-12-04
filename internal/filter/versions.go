@@ -27,13 +27,9 @@ type VersionFilter struct {
 	// (they belong to tagged graphs and shouldn't be shown as "untagged")
 	TaggedGraphMembers map[int64]bool
 
-	// Date filtering
+	// Date filtering (absolute time or relative via ParseDateOrDuration)
 	OlderThan time.Time // Include versions created before this time
 	NewerThan time.Time // Include versions created after this time
-
-	// Age-based filtering (relative to current time)
-	OlderThanDays int // Include versions older than N days
-	NewerThanDays int // Include versions newer than N days
 
 	// Direct version filtering
 	VersionID int64  // Filter by exact version ID (0 means no filter)
@@ -59,21 +55,10 @@ func (f *VersionFilter) Apply(versions []gh.PackageVersionInfo) []gh.PackageVers
 		}
 	}
 
-	// Calculate cutoff times for age-based filters
-	now := time.Now()
-	var olderThanTime, newerThanTime time.Time
-
-	if f.OlderThanDays > 0 {
-		olderThanTime = now.AddDate(0, 0, -f.OlderThanDays)
-	}
-	if f.NewerThanDays > 0 {
-		newerThanTime = now.AddDate(0, 0, -f.NewerThanDays)
-	}
-
 	// Apply filters
 	result := []gh.PackageVersionInfo{}
 	for _, ver := range versions {
-		if !f.matchesVersion(ver, tagRegex, olderThanTime, newerThanTime) {
+		if !f.matchesVersion(ver, tagRegex) {
 			continue
 		}
 		result = append(result, ver)
@@ -83,7 +68,7 @@ func (f *VersionFilter) Apply(versions []gh.PackageVersionInfo) []gh.PackageVers
 }
 
 // matchesVersion checks if a single version matches all filter criteria
-func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *regexp.Regexp, olderThanTime, newerThanTime time.Time) bool {
+func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *regexp.Regexp) bool {
 	// Check version ID filter (exact match)
 	if f.VersionID != 0 && ver.ID != f.VersionID {
 		return false
@@ -126,8 +111,7 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 	}
 
 	// Only parse dates if we actually need to check date filters
-	needsDateCheck := !f.OlderThan.IsZero() || !f.NewerThan.IsZero() ||
-		!olderThanTime.IsZero() || !newerThanTime.IsZero()
+	needsDateCheck := !f.OlderThan.IsZero() || !f.NewerThan.IsZero()
 
 	if needsDateCheck {
 		// Parse creation time - try multiple formats
@@ -137,19 +121,11 @@ func (f *VersionFilter) matchesVersion(ver gh.PackageVersionInfo, tagRegex *rege
 			return false
 		}
 
-		// Check absolute date filters
+		// Check date filters
 		if !f.OlderThan.IsZero() && !createdAt.Before(f.OlderThan) {
 			return false
 		}
 		if !f.NewerThan.IsZero() && !createdAt.After(f.NewerThan) {
-			return false
-		}
-
-		// Check age-based filters
-		if !olderThanTime.IsZero() && !createdAt.Before(olderThanTime) {
-			return false
-		}
-		if !newerThanTime.IsZero() && !createdAt.After(newerThanTime) {
 			return false
 		}
 	}

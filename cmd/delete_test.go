@@ -239,16 +239,14 @@ func TestDeleteImageCommandFlagExclusivity(t *testing.T) {
 func TestBuildDeleteFilter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name          string
-		tagPattern    string
-		onlyTagged    bool
-		onlyUntagged  bool
-		olderThan     string
-		newerThan     string
-		olderThanDays int
-		newerThanDays int
-		wantErr       bool
-		errContains   string
+		name         string
+		tagPattern   string
+		onlyTagged   bool
+		onlyUntagged bool
+		olderThan    string
+		newerThan    string
+		wantErr      bool
+		errContains  string
 	}{
 		{
 			name:    "no filters",
@@ -262,10 +260,10 @@ func TestBuildDeleteFilter(t *testing.T) {
 			errContains:  "cannot use --tagged and --untagged together",
 		},
 		{
-			name:        "invalid older-than date",
+			name:        "invalid older-than value",
 			olderThan:   "invalid-date",
 			wantErr:     true,
-			errContains: "invalid --older-than date format",
+			errContains: "invalid --older-than value",
 		},
 		{
 			name:      "valid older-than date RFC3339",
@@ -282,12 +280,27 @@ func TestBuildDeleteFilter(t *testing.T) {
 			newerThan: "2025-11-01",
 			wantErr:   false,
 		},
+		{
+			name:      "valid older-than duration (days)",
+			olderThan: "7d",
+			wantErr:   false,
+		},
+		{
+			name:      "valid newer-than duration (hours)",
+			newerThan: "24h",
+			wantErr:   false,
+		},
+		{
+			name:      "valid duration (combined)",
+			olderThan: "1h30m",
+			wantErr:   false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filter, err := buildDeleteVersionFilter(tt.tagPattern, tt.onlyTagged, tt.onlyUntagged,
-				tt.olderThan, tt.newerThan, tt.olderThanDays, tt.newerThanDays)
+				tt.olderThan, tt.newerThan)
 
 			if tt.wantErr {
 				require.Error(t, err, "Expected error but got none")

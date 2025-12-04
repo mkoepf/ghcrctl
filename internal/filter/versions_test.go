@@ -164,7 +164,7 @@ func TestVersionFilter_Apply_NewerThan(t *testing.T) {
 	assert.Equal(t, int64(3), result[0].ID)
 }
 
-func TestVersionFilter_Apply_OlderThanDays(t *testing.T) {
+func TestVersionFilter_Apply_OlderThanRelative(t *testing.T) {
 	now := time.Now()
 	versions := []gh.PackageVersionInfo{
 		createTestVersion(1, []string{"v1"}, now.AddDate(0, 0, -10).Format(time.RFC3339)),
@@ -172,7 +172,10 @@ func TestVersionFilter_Apply_OlderThanDays(t *testing.T) {
 		createTestVersion(3, []string{"v3"}, now.AddDate(0, 0, -1).Format(time.RFC3339)),
 	}
 
-	filter := &VersionFilter{OlderThanDays: 7}
+	// OlderThan is now set via ParseDateOrDuration at the command level
+	// Here we simulate "7d" by computing the cutoff time
+	cutoff := now.AddDate(0, 0, -7)
+	filter := &VersionFilter{OlderThan: cutoff}
 	result := filter.Apply(versions)
 
 	// Should return versions older than 7 days
@@ -180,7 +183,7 @@ func TestVersionFilter_Apply_OlderThanDays(t *testing.T) {
 	assert.Equal(t, int64(1), result[0].ID)
 }
 
-func TestVersionFilter_Apply_NewerThanDays(t *testing.T) {
+func TestVersionFilter_Apply_NewerThanRelative(t *testing.T) {
 	now := time.Now()
 	versions := []gh.PackageVersionInfo{
 		createTestVersion(1, []string{"v1"}, now.AddDate(0, 0, -10).Format(time.RFC3339)),
@@ -188,7 +191,10 @@ func TestVersionFilter_Apply_NewerThanDays(t *testing.T) {
 		createTestVersion(3, []string{"v3"}, now.AddDate(0, 0, -1).Format(time.RFC3339)),
 	}
 
-	filter := &VersionFilter{NewerThanDays: 7}
+	// NewerThan is now set via ParseDateOrDuration at the command level
+	// Here we simulate "7d" by computing the cutoff time
+	cutoff := now.AddDate(0, 0, -7)
+	filter := &VersionFilter{NewerThan: cutoff}
 	result := filter.Apply(versions)
 
 	// Should return versions newer than 7 days
@@ -207,9 +213,10 @@ func TestVersionFilter_Apply_CombinedFilters(t *testing.T) {
 	}
 
 	// Untagged AND older than 7 days
+	cutoff := now.AddDate(0, 0, -7)
 	filter := &VersionFilter{
-		OnlyUntagged:  true,
-		OlderThanDays: 7,
+		OnlyUntagged: true,
+		OlderThan:    cutoff,
 	}
 	result := filter.Apply(versions)
 
@@ -217,9 +224,9 @@ func TestVersionFilter_Apply_CombinedFilters(t *testing.T) {
 
 	// Tagged AND matching pattern AND older than 7 days
 	filter2 := &VersionFilter{
-		OnlyTagged:    true,
-		TagPattern:    "^v[0-9]",
-		OlderThanDays: 7,
+		OnlyTagged: true,
+		TagPattern: "^v[0-9]",
+		OlderThan:  cutoff,
 	}
 	result2 := filter2.Apply(versions)
 

@@ -139,18 +139,16 @@ func outputListPackagesTable(w io.Writer, packages []string, owner string, quiet
 // newListVersionsCmd creates the list versions subcommand.
 func newListVersionsCmd() *cobra.Command {
 	var (
-		jsonOutput    bool
-		tag           string
-		tagPattern    string
-		onlyTagged    bool
-		onlyUntagged  bool
-		olderThan     string
-		newerThan     string
-		olderThanDays int
-		newerThanDays int
-		outputFormat  string
-		versionID     int64
-		digest        string
+		jsonOutput   bool
+		tag          string
+		tagPattern   string
+		onlyTagged   bool
+		onlyUntagged bool
+		olderThan    string
+		newerThan    string
+		outputFormat string
+		versionID    int64
+		digest       string
 	)
 
 	cmd := &cobra.Command{
@@ -187,10 +185,13 @@ Examples:
   ghcrctl list versions mkoepf/myimage --newer-than 2025-11-01
 
   # List versions older than 30 days
-  ghcrctl list versions mkoepf/myimage --older-than-days 30
+  ghcrctl list versions mkoepf/myimage --older-than 30d
+
+  # List versions from the last hour
+  ghcrctl list versions mkoepf/myimage --newer-than 1h
 
   # Combine filters: untagged versions older than 7 days
-  ghcrctl list versions mkoepf/myimage --untagged --older-than-days 7
+  ghcrctl list versions mkoepf/myimage --untagged --older-than 7d
 
   # Filter by specific version ID
   ghcrctl list versions mkoepf/myimage --version 12345678
@@ -254,7 +255,7 @@ Examples:
 
 			// Build filter from command-line flags
 			versionFilter, err := buildListVersionFilter(tag, tagPattern, onlyTagged, onlyUntagged,
-				olderThan, newerThan, olderThanDays, newerThanDays, versionID, digest)
+				olderThan, newerThan, versionID, digest)
 			if err != nil {
 				cmd.SilenceUsage = true
 				return fmt.Errorf("invalid filter options: %w", err)
@@ -282,10 +283,8 @@ Examples:
 	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "Filter versions by tag regex pattern")
 	cmd.Flags().BoolVar(&onlyTagged, "tagged", false, "Show only tagged versions")
 	cmd.Flags().BoolVar(&onlyUntagged, "untagged", false, "Show only untagged versions")
-	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show versions older than date (YYYY-MM-DD or RFC3339)")
-	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show versions newer than date (YYYY-MM-DD or RFC3339)")
-	cmd.Flags().IntVar(&olderThanDays, "older-than-days", 0, "Show versions older than N days")
-	cmd.Flags().IntVar(&newerThanDays, "newer-than-days", 0, "Show versions newer than N days")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show versions older than date or duration (e.g., 2025-01-01, 7d, 24h, 30m)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show versions newer than date or duration (e.g., 2025-01-01, 7d, 24h, 30m)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format (json, table)")
 	cmd.Flags().Int64Var(&versionID, "version", 0, "Filter by exact version ID")
 	cmd.Flags().StringVar(&digest, "digest", "", "Filter by digest (supports prefix matching)")
@@ -369,7 +368,7 @@ func OutputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 
 // buildListVersionFilter creates a VersionFilter from command-line flags
 func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged bool,
-	olderThan, newerThan string, olderThanDays, newerThanDays int,
+	olderThan, newerThan string,
 	versionID int64, digest string) (*filter.VersionFilter, error) {
 	// Check for conflicting flags
 	if onlyTagged && onlyUntagged {
@@ -377,13 +376,11 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 	}
 
 	vf := &filter.VersionFilter{
-		OnlyTagged:    onlyTagged,
-		OnlyUntagged:  onlyUntagged,
-		TagPattern:    tagPattern,
-		OlderThanDays: olderThanDays,
-		NewerThanDays: newerThanDays,
-		VersionID:     versionID,
-		Digest:        digest,
+		OnlyTagged:   onlyTagged,
+		OnlyUntagged: onlyUntagged,
+		TagPattern:   tagPattern,
+		VersionID:    versionID,
+		Digest:       digest,
 	}
 
 	// Handle exact tag match
@@ -391,19 +388,19 @@ func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged boo
 		vf.Tags = []string{tag}
 	}
 
-	// Parse absolute date filters
+	// Parse date/duration filters
 	if olderThan != "" {
-		t, err := filter.ParseDate(olderThan)
+		t, err := filter.ParseDateOrDuration(olderThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --older-than date format: %w", err)
+			return nil, fmt.Errorf("invalid --older-than value: %w", err)
 		}
 		vf.OlderThan = t
 	}
 
 	if newerThan != "" {
-		t, err := filter.ParseDate(newerThan)
+		t, err := filter.ParseDateOrDuration(newerThan)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --newer-than date format: %w", err)
+			return nil, fmt.Errorf("invalid --newer-than value: %w", err)
 		}
 		vf.NewerThan = t
 	}

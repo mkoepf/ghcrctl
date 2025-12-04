@@ -9,6 +9,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoggingRoundTripper(t *testing.T) {
@@ -66,14 +69,10 @@ func TestLoggingRoundTripper(t *testing.T) {
 
 			// Make request
 			req, err := http.NewRequest(tt.method, server.URL+tt.path, nil)
-			if err != nil {
-				t.Fatalf("Failed to create request: %v", err)
-			}
+			require.NoError(t, err, "Failed to create request")
 
 			resp, err := client.Do(req)
-			if err != nil {
-				t.Fatalf("Request failed: %v", err)
-			}
+			require.NoError(t, err, "Request failed")
 			defer resp.Body.Close()
 
 			// Read response body
@@ -81,30 +80,15 @@ func TestLoggingRoundTripper(t *testing.T) {
 
 			// Parse log output
 			var logEntry logEntry
-			if err := json.Unmarshal(logBuf.Bytes(), &logEntry); err != nil {
-				t.Fatalf("Failed to parse log output: %v\nOutput: %s", err, logBuf.String())
-			}
+			err = json.Unmarshal(logBuf.Bytes(), &logEntry)
+			require.NoError(t, err, "Failed to parse log output: %s", logBuf.String())
 
 			// Verify log entry (category will be "other" for test server)
-			if logEntry.Method != tt.method {
-				t.Errorf("Expected method %q, got %q", tt.method, logEntry.Method)
-			}
-
-			if logEntry.Status != tt.responseStatus {
-				t.Errorf("Expected status %d, got %d", tt.responseStatus, logEntry.Status)
-			}
-
-			if logEntry.DurationMs <= 0 {
-				t.Error("Expected positive duration")
-			}
-
-			if logEntry.Timestamp.IsZero() {
-				t.Error("Expected non-zero timestamp")
-			}
-
-			if !strings.Contains(logEntry.URL, tt.path) {
-				t.Errorf("Expected URL to contain %q, got %q", tt.path, logEntry.URL)
-			}
+			assert.Equal(t, tt.method, logEntry.Method)
+			assert.Equal(t, tt.responseStatus, logEntry.Status)
+			assert.Greater(t, logEntry.DurationMs, int64(0), "Expected positive duration")
+			assert.False(t, logEntry.Timestamp.IsZero(), "Expected non-zero timestamp")
+			assert.Contains(t, logEntry.URL, tt.path)
 		})
 	}
 }
@@ -120,24 +104,16 @@ func TestLoggingRoundTripperError(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.com/test", nil)
 
 	_, err := client.Do(req)
-	if err == nil {
-		t.Fatal("Expected error but got none")
-	}
+	require.Error(t, err, "Expected error but got none")
 
 	// Parse log output
 	var logEntry logEntry
-	if err := json.Unmarshal(logBuf.Bytes(), &logEntry); err != nil {
-		t.Fatalf("Failed to parse log output: %v", err)
-	}
+	err = json.Unmarshal(logBuf.Bytes(), &logEntry)
+	require.NoError(t, err, "Failed to parse log output")
 
 	// Verify error is logged
-	if logEntry.Error == "" {
-		t.Error("Expected error to be logged")
-	}
-
-	if !strings.Contains(logEntry.Error, "EOF") {
-		t.Errorf("Expected error to contain 'EOF', got %q", logEntry.Error)
-	}
+	assert.NotEmpty(t, logEntry.Error, "Expected error to be logged")
+	assert.Contains(t, logEntry.Error, "EOF")
 }
 
 func TestCategorizeAPICall(t *testing.T) {
@@ -176,12 +152,8 @@ func TestCategorizeAPICall(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
 			category, path := categorizeAPICall(tt.url)
-			if category != tt.want {
-				t.Errorf("Expected category %q, got %q", tt.want, category)
-			}
-			if path != tt.wantPath {
-				t.Errorf("Expected path %q, got %q", tt.wantPath, path)
-			}
+			assert.Equal(t, tt.want, category)
+			assert.Equal(t, tt.wantPath, path)
 		})
 	}
 }
@@ -191,15 +163,11 @@ func TestCallerInfo(t *testing.T) {
 
 	// Should contain file:line:function format (may be testing.go in test context)
 	// Just verify it's not "unknown" and has the right format
-	if caller == "unknown" {
-		t.Error("Expected caller info but got 'unknown'")
-	}
+	assert.NotEqual(t, "unknown", caller, "Expected caller info but got 'unknown'")
 
 	// Should have format: file:line:function
 	parts := strings.Split(caller, ":")
-	if len(parts) < 3 {
-		t.Errorf("Expected caller format 'file:line:function', got %q", caller)
-	}
+	assert.GreaterOrEqual(t, len(parts), 3, "Expected caller format 'file:line:function', got %q", caller)
 }
 
 // errorTransport is a test helper that always returns an error
@@ -213,17 +181,11 @@ func (t *errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestLoggingDisabledByDefault(t *testing.T) {
 	ctx := context.Background()
-
-	if IsLoggingEnabled(ctx) {
-		t.Error("Expected logging to be disabled by default")
-	}
+	assert.False(t, IsLoggingEnabled(ctx), "Expected logging to be disabled by default")
 }
 
 func TestEnableLogging(t *testing.T) {
 	ctx := context.Background()
 	ctx = EnableLogging(ctx)
-
-	if !IsLoggingEnabled(ctx) {
-		t.Error("Expected logging to be enabled")
-	}
+	assert.True(t, IsLoggingEnabled(ctx), "Expected logging to be enabled")
 }

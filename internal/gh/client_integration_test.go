@@ -231,10 +231,6 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 		t.Skip("Skipping integration test - GITHUB_TOKEN not set")
 	}
 
-	// This test needs access to ORAS to resolve a tag first
-	// Since we can't import due to circular dependencies, we'll use a hardcoded digest
-	// that we know exists from the workflow
-
 	// Create client
 	client, err := NewClient(token)
 	require.NoError(t, err, "Failed to create client")
@@ -258,9 +254,9 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 		t.Skip("No package versions found - integration test images may not be created yet")
 	}
 
-	// Use the first version
+	// Use the first version (Name field contains the digest for container packages)
 	firstVersion := versions[0]
-	require.NotNil(t, firstVersion.Name, "Version has nil name")
+	require.NotNil(t, firstVersion.Name, "Version has nil digest")
 	require.NotNil(t, firstVersion.ID, "Version has nil ID")
 
 	digest := *firstVersion.Name
@@ -271,7 +267,7 @@ func TestGetVersionIDByDigestWithRealImage(t *testing.T) {
 
 	// Verify it's a valid digest format
 	if !strings.HasPrefix(digest, "sha256:") {
-		t.Skipf("Version name is not a digest (got %s), skipping test", digest)
+		t.Skipf("Version digest is not in expected format (got %s), skipping test", digest)
 	}
 
 	// Now call our function to map it

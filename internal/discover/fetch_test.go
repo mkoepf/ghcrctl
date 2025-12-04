@@ -2,8 +2,10 @@ package discover
 
 import (
 	"context"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolveTag(t *testing.T) {
@@ -51,25 +53,13 @@ func TestResolveTag(t *testing.T) {
 			digest, err := ResolveTag(ctx, tt.image, tt.tag)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
-				}
-				if digest != "" {
-					t.Errorf("Expected empty digest on error, got '%s'", digest)
-				}
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errorMsg)
+				assert.Empty(t, digest, "Expected empty digest on error")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				// Digest should be in format sha256:...
-				if !strings.HasPrefix(digest, "sha256:") {
-					t.Errorf("Expected digest to start with 'sha256:', got '%s'", digest)
-				}
-				if len(digest) != 71 { // "sha256:" (7) + 64 hex chars
-					t.Errorf("Expected digest length 71, got %d", len(digest))
-				}
+				require.NoError(t, err)
+				assert.True(t, len(digest) > 0 && digest[:7] == "sha256:", "Expected digest to start with 'sha256:'")
+				assert.Len(t, digest, 71, "Expected digest length 71")
 			}
 		})
 	}
@@ -117,9 +107,7 @@ func TestValidateDigestFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			valid := ValidateDigestFormat(tt.digest)
-			if valid != tt.wantValid {
-				t.Errorf("ValidateDigestFormat(%s) = %v, want %v", tt.digest, valid, tt.wantValid)
-			}
+			assert.Equal(t, tt.wantValid, valid)
 		})
 	}
 }
@@ -175,19 +163,11 @@ func TestParseImageReference(t *testing.T) {
 			registry, path, err := ParseImageReference(tt.image)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if registry != tt.wantRegistry {
-					t.Errorf("Expected registry '%s', got '%s'", tt.wantRegistry, registry)
-				}
-				if path != tt.wantPath {
-					t.Errorf("Expected path '%s', got '%s'", tt.wantPath, path)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantRegistry, registry)
+				assert.Equal(t, tt.wantPath, path)
 			}
 		})
 	}
@@ -238,21 +218,12 @@ func TestFetchArtifactContent(t *testing.T) {
 			content, err := FetchArtifactContent(ctx, tt.image, tt.digest)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
-				}
-				if content != nil {
-					t.Errorf("Expected nil content on error, got %v", content)
-				}
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errorMsg)
+				assert.Nil(t, content, "Expected nil content on error")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if content == nil {
-					t.Error("Expected non-nil content, got nil")
-				}
+				require.NoError(t, err)
+				assert.NotNil(t, content)
 			}
 		})
 	}
@@ -303,21 +274,12 @@ func TestFetchImageConfig(t *testing.T) {
 			config, err := FetchImageConfig(ctx, tt.image, tt.digest)
 
 			if tt.wantError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
-				}
-				if config != nil {
-					t.Errorf("Expected nil config on error, got %v", config)
-				}
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errorMsg)
+				assert.Nil(t, config, "Expected nil config on error")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if config == nil {
-					t.Error("Expected non-nil config, got nil")
-				}
+				require.NoError(t, err)
+				assert.NotNil(t, config)
 			}
 		})
 	}

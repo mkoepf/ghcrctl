@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Integration tests for discover package functions that call OCI registries.
@@ -30,36 +33,18 @@ func TestResolveVersionInfo_Integration_Index(t *testing.T) {
 
 	// First resolve the "latest" tag to get the index digest
 	digest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	// Now resolve the version info for the index
 	types, size, err := resolver.resolveVersionInfo(ctx, image, digest)
-	if err != nil {
-		t.Fatalf("ResolveVersionInfo failed: %v", err)
-	}
+	require.NoError(t, err, "ResolveVersionInfo failed")
 
 	// Multi-arch image should be an index
-	if len(types) == 0 {
-		t.Error("Expected at least one type")
-	}
-
-	found := false
-	for _, typ := range types {
-		if typ == "index" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("Expected 'index' type for multi-arch image, got: %v", types)
-	}
+	require.NotEmpty(t, types, "Expected at least one type")
+	assert.Contains(t, types, "index", "Expected 'index' type for multi-arch image")
 
 	// Size should be reasonable (index manifests are typically small)
-	if size <= 0 {
-		t.Errorf("Expected positive size, got: %d", size)
-	}
+	assert.Greater(t, size, int64(0), "Expected positive size")
 	t.Logf("Index digest: %s, types: %v, size: %d", digest, types, size)
 }
 
@@ -77,28 +62,19 @@ func TestResolveVersionInfo_Integration_Platform(t *testing.T) {
 
 	// Resolve the "latest" tag
 	digest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	types, size, err := resolver.resolveVersionInfo(ctx, image, digest)
-	if err != nil {
-		t.Fatalf("ResolveVersionInfo failed: %v", err)
-	}
+	require.NoError(t, err, "ResolveVersionInfo failed")
 
-	if len(types) == 0 {
-		t.Error("Expected at least one type")
-	}
+	require.NotEmpty(t, types, "Expected at least one type")
 
 	// Single platform image should have os/arch type (e.g., "linux/amd64")
 	typ := types[0]
-	if !strings.Contains(typ, "/") && typ != "index" && typ != "manifest" {
-		t.Errorf("Expected platform type (os/arch) or index/manifest, got: %s", typ)
-	}
+	validType := strings.Contains(typ, "/") || typ == "index" || typ == "manifest"
+	assert.True(t, validType, "Expected platform type (os/arch) or index/manifest, got: %s", typ)
 
-	if size <= 0 {
-		t.Errorf("Expected positive size, got: %d", size)
-	}
+	assert.Greater(t, size, int64(0), "Expected positive size")
 	t.Logf("Platform digest: %s, types: %v, size: %d", digest, types, size)
 }
 
@@ -116,9 +92,7 @@ func TestResolveVersionInfo_Integration_InvalidDigest(t *testing.T) {
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 	_, _, err := resolver.resolveVersionInfo(ctx, image, invalidDigest)
-	if err == nil {
-		t.Error("Expected error for non-existent digest")
-	}
+	assert.Error(t, err, "Expected error for non-existent digest")
 }
 
 // =============================================================================
@@ -137,9 +111,7 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 	// First, we need to find an SBOM artifact digest
 	// Resolve the main image tag
 	mainDigest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	// Use the discoverer to find SBOM artifacts
 	resolver := newOrasResolver()
@@ -171,9 +143,7 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 
 	// Discover children of the main image
 	children, err := discoverer.childDiscoverer.discoverChildren(ctx, image, mainDigest, nil)
-	if err != nil {
-		t.Fatalf("Failed to discover children: %v", err)
-	}
+	require.NoError(t, err, "Failed to discover children")
 
 	// Find an SBOM among the children
 	var sbomDigest string
@@ -199,13 +169,8 @@ func TestFetchArtifactContent_Integration_SBOM(t *testing.T) {
 
 	// Now fetch the SBOM content
 	content, err := FetchArtifactContent(ctx, image, sbomDigest)
-	if err != nil {
-		t.Fatalf("FetchArtifactContent failed: %v", err)
-	}
-
-	if content == nil {
-		t.Error("Expected non-nil content")
-	}
+	require.NoError(t, err, "FetchArtifactContent failed")
+	assert.NotNil(t, content, "Expected non-nil content")
 
 	t.Logf("Successfully fetched SBOM content from digest: %s", sbomDigest[:19])
 }
@@ -222,9 +187,7 @@ func TestFetchArtifactContent_Integration_NonExistent(t *testing.T) {
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 	_, err := FetchArtifactContent(ctx, image, invalidDigest)
-	if err == nil {
-		t.Error("Expected error for non-existent digest")
-	}
+	assert.Error(t, err, "Expected error for non-existent digest")
 }
 
 // =============================================================================
@@ -241,18 +204,11 @@ func TestResolveTag_Integration(t *testing.T) {
 	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
 
 	digest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("ResolveTag failed: %v", err)
-	}
+	require.NoError(t, err, "ResolveTag failed")
 
 	// Should return a valid sha256 digest
-	if !strings.HasPrefix(digest, "sha256:") {
-		t.Errorf("Expected sha256 digest, got: %s", digest)
-	}
-
-	if len(digest) != 71 { // "sha256:" (7) + 64 hex chars
-		t.Errorf("Expected digest length 71, got: %d", len(digest))
-	}
+	assert.True(t, strings.HasPrefix(digest, "sha256:"), "Expected sha256 digest, got: %s", digest)
+	assert.Len(t, digest, 71, "Expected digest length 71") // "sha256:" (7) + 64 hex chars
 
 	t.Logf("Resolved 'latest' to: %s", digest)
 }
@@ -267,9 +223,7 @@ func TestResolveTag_Integration_NonExistent(t *testing.T) {
 	image := "ghcr.io/mkoepf/ghcrctl-test-with-sbom"
 
 	_, err := ResolveTag(ctx, image, "nonexistent-tag-12345")
-	if err == nil {
-		t.Error("Expected error for non-existent tag")
-	}
+	assert.Error(t, err, "Expected error for non-existent tag")
 }
 
 // =============================================================================
@@ -287,27 +241,16 @@ func TestFetchImageConfig_Integration_MultiArch(t *testing.T) {
 
 	// Resolve the "latest" tag to get the index digest
 	digest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	// Fetch the image config - this exercises the Image Index code path
 	config, err := FetchImageConfig(ctx, image, digest)
-	if err != nil {
-		t.Fatalf("FetchImageConfig failed: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("Expected non-nil config")
-	}
+	require.NoError(t, err, "FetchImageConfig failed")
+	require.NotNil(t, config, "Expected non-nil config")
 
 	// Verify config has expected fields
-	if config.OS == "" {
-		t.Error("Expected config.OS to be set")
-	}
-	if config.Architecture == "" {
-		t.Error("Expected config.Architecture to be set")
-	}
+	assert.NotEmpty(t, config.OS, "Expected config.OS to be set")
+	assert.NotEmpty(t, config.Architecture, "Expected config.Architecture to be set")
 
 	t.Logf("Multi-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
 }
@@ -323,27 +266,16 @@ func TestFetchImageConfig_Integration_SingleArch(t *testing.T) {
 
 	// Resolve the "latest" tag
 	digest, err := ResolveTag(ctx, image, "latest")
-	if err != nil {
-		t.Fatalf("Failed to resolve tag: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tag")
 
 	// Fetch the image config - this exercises the simple manifest code path
 	config, err := FetchImageConfig(ctx, image, digest)
-	if err != nil {
-		t.Fatalf("FetchImageConfig failed: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("Expected non-nil config")
-	}
+	require.NoError(t, err, "FetchImageConfig failed")
+	require.NotNil(t, config, "Expected non-nil config")
 
 	// Verify config has expected fields
-	if config.OS == "" {
-		t.Error("Expected config.OS to be set")
-	}
-	if config.Architecture == "" {
-		t.Error("Expected config.Architecture to be set")
-	}
+	assert.NotEmpty(t, config.OS, "Expected config.OS to be set")
+	assert.NotEmpty(t, config.Architecture, "Expected config.Architecture to be set")
 
 	t.Logf("Single-arch config: OS=%s, Arch=%s", config.OS, config.Architecture)
 }
@@ -360,11 +292,6 @@ func TestFetchImageConfig_Integration_NonExistent(t *testing.T) {
 	invalidDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 	_, err := FetchImageConfig(ctx, image, invalidDigest)
-	if err == nil {
-		t.Error("Expected error for non-existent digest")
-	}
-
-	if !strings.Contains(err.Error(), "failed to resolve digest") {
-		t.Errorf("Expected error to contain 'failed to resolve digest', got: %v", err)
-	}
+	assert.Error(t, err, "Expected error for non-existent digest")
+	assert.ErrorContains(t, err, "failed to resolve digest")
 }

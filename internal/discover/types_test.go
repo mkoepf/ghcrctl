@@ -3,6 +3,9 @@ package discover
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVersionInfo_JSONSerialization(t *testing.T) {
@@ -18,27 +21,16 @@ func TestVersionInfo_JSONSerialization(t *testing.T) {
 	}
 
 	data, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("failed to marshal VersionInfo: %v", err)
-	}
+	require.NoError(t, err, "failed to marshal VersionInfo")
 
 	var decoded VersionInfo
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("failed to unmarshal VersionInfo: %v", err)
-	}
+	err = json.Unmarshal(data, &decoded)
+	require.NoError(t, err, "failed to unmarshal VersionInfo")
 
-	if decoded.ID != v.ID {
-		t.Errorf("ID mismatch: got %d, want %d", decoded.ID, v.ID)
-	}
-	if decoded.Digest != v.Digest {
-		t.Errorf("Digest mismatch: got %s, want %s", decoded.Digest, v.Digest)
-	}
-	if len(decoded.Tags) != len(v.Tags) {
-		t.Errorf("Tags length mismatch: got %d, want %d", len(decoded.Tags), len(v.Tags))
-	}
-	if decoded.Size != v.Size {
-		t.Errorf("Size mismatch: got %d, want %d", decoded.Size, v.Size)
-	}
+	assert.Equal(t, v.ID, decoded.ID)
+	assert.Equal(t, v.Digest, decoded.Digest)
+	assert.Len(t, decoded.Tags, len(v.Tags))
+	assert.Equal(t, v.Size, decoded.Size)
 }
 
 func TestVersionInfo_IsReferrer(t *testing.T) {
@@ -63,9 +55,7 @@ func TestVersionInfo_IsReferrer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := VersionInfo{Types: tt.types}
-			if got := v.IsReferrer(); got != tt.expected {
-				t.Errorf("IsReferrer() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, v.IsReferrer())
 		})
 	}
 }
@@ -119,9 +109,7 @@ func TestVersionInfo_IsRoot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := allVersions[tt.digest]
-			if got := v.IsRoot(allVersions); got != tt.expected {
-				t.Errorf("IsRoot() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, v.IsRoot(allVersions))
 		})
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatTable_Basic(t *testing.T) {
@@ -26,21 +28,11 @@ func TestFormatTable_Basic(t *testing.T) {
 	FormatTable(&buf, versions, allVersions)
 
 	output := buf.String()
-	if !strings.Contains(output, "VERSION ID") {
-		t.Error("expected header with VERSION ID")
-	}
-	if !strings.Contains(output, "SIZE") {
-		t.Error("expected header with SIZE")
-	}
-	if !strings.Contains(output, "123") {
-		t.Error("expected version ID 123")
-	}
-	if !strings.Contains(output, "index") {
-		t.Error("expected type index")
-	}
-	if !strings.Contains(output, "1.2 MB") {
-		t.Error("expected size 1.2 MB in output")
-	}
+	assert.Contains(t, output, "VERSION ID")
+	assert.Contains(t, output, "SIZE")
+	assert.Contains(t, output, "123")
+	assert.Contains(t, output, "index")
+	assert.Contains(t, output, "1.2 MB")
 }
 
 func TestFormatTable_RefIndicators(t *testing.T) {
@@ -67,17 +59,11 @@ func TestFormatTable_RefIndicators(t *testing.T) {
 
 	output := buf.String()
 	// Should have [⬇✓] for found outgoing ref
-	if !strings.Contains(output, "[⬇✓]") {
-		t.Error("expected [⬇✓] for found outgoing ref")
-	}
+	assert.Contains(t, output, "[⬇✓]", "expected [⬇✓] for found outgoing ref")
 	// Should have [⬇✗] for missing outgoing ref
-	if !strings.Contains(output, "[⬇✗]") {
-		t.Error("expected [⬇✗] for missing outgoing ref")
-	}
+	assert.Contains(t, output, "[⬇✗]", "expected [⬇✗] for missing outgoing ref")
 	// Should have [⬆✓] for found incoming ref
-	if !strings.Contains(output, "[⬆✓]") {
-		t.Error("expected [⬆✓] for found incoming ref")
-	}
+	assert.Contains(t, output, "[⬆✓]", "expected [⬆✓] for found incoming ref")
 }
 
 func TestShortDigest(t *testing.T) {
@@ -92,9 +78,7 @@ func TestShortDigest(t *testing.T) {
 
 	for _, tt := range tests {
 		result := shortDigest(tt.input)
-		if result != tt.expected {
-			t.Errorf("shortDigest(%s) = %s, want %s", tt.input, result, tt.expected)
-		}
+		assert.Equal(t, tt.expected, result, "shortDigest(%s)", tt.input)
 	}
 }
 
@@ -111,9 +95,7 @@ func TestFormatTags(t *testing.T) {
 
 	for _, tt := range tests {
 		result := formatTags(tt.tags)
-		if result != tt.expected {
-			t.Errorf("formatTags(%v) = %s, want %s", tt.tags, result, tt.expected)
-		}
+		assert.Equal(t, tt.expected, result, "formatTags(%v)", tt.tags)
 	}
 }
 
@@ -155,16 +137,14 @@ func TestFormatTable_MultipleTagsAsRows(t *testing.T) {
 	}
 
 	// Each tag should appear on exactly one line, and they should be different lines
-	if linesWithV1 != 1 || linesWithLatest != 1 || linesWithStable != 1 {
-		t.Errorf("expected each tag on one line, got v1.0.0=%d, latest=%d, stable=%d\noutput:\n%s",
-			linesWithV1, linesWithLatest, linesWithStable, output)
-	}
+	assert.Equal(t, 1, linesWithV1, "v1.0.0 should appear on one line")
+	assert.Equal(t, 1, linesWithLatest, "latest should appear on one line")
+	assert.Equal(t, 1, linesWithStable, "stable should appear on one line")
 
 	// Also verify tags are NOT all on the same line
 	for _, line := range lines {
-		if strings.Contains(line, "v1.0.0") && strings.Contains(line, "latest") && strings.Contains(line, "stable") {
-			t.Errorf("all tags should not be on the same line\noutput:\n%s", output)
-		}
+		allOnSameLine := strings.Contains(line, "v1.0.0") && strings.Contains(line, "latest") && strings.Contains(line, "stable")
+		assert.False(t, allOnSameLine, "all tags should not be on the same line")
 	}
 }
 
@@ -201,9 +181,7 @@ func TestFormatTree_MultiplicityIndicator(t *testing.T) {
 
 	output := buf.String()
 	// Should contain "(2*)" indicator for shared version
-	if !strings.Contains(output, "(2*)") {
-		t.Errorf("expected multiplicity indicator (2*) for shared version\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "(2*)", "expected multiplicity indicator (2*) for shared version")
 }
 
 func TestFormatTree_Header(t *testing.T) {
@@ -234,18 +212,10 @@ func TestFormatTree_Header(t *testing.T) {
 
 	output := buf.String()
 	// Tree view should have column headers like table view
-	if !strings.Contains(output, "VERSION ID") {
-		t.Errorf("expected header with VERSION ID\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "TYPE") {
-		t.Errorf("expected header with TYPE\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "DIGEST") {
-		t.Errorf("expected header with DIGEST\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "SIZE") {
-		t.Errorf("expected header with SIZE\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "VERSION ID")
+	assert.Contains(t, output, "TYPE")
+	assert.Contains(t, output, "DIGEST")
+	assert.Contains(t, output, "SIZE")
 }
 
 func TestFormatTree_Size(t *testing.T) {
@@ -276,13 +246,9 @@ func TestFormatTree_Size(t *testing.T) {
 
 	output := buf.String()
 	// Root should show 1.5 KB
-	if !strings.Contains(output, "1.5 KB") {
-		t.Errorf("expected root size 1.5 KB in output\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "1.5 KB", "expected root size 1.5 KB in output")
 	// Child should show 50.0 MB
-	if !strings.Contains(output, "50.0 MB") {
-		t.Errorf("expected child size 50.0 MB in output\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "50.0 MB", "expected child size 50.0 MB in output")
 }
 
 func TestFormatTree_Summary(t *testing.T) {
@@ -318,19 +284,11 @@ func TestFormatTree_Summary(t *testing.T) {
 	output := buf.String()
 
 	// Should contain summary with version count
-	if !strings.Contains(output, "Total:") {
-		t.Errorf("expected summary with 'Total:'\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "3 versions") {
-		t.Errorf("expected '3 versions' in summary\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "2 graphs") {
-		t.Errorf("expected '2 graphs' in summary\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "Total:")
+	assert.Contains(t, output, "3 versions")
+	assert.Contains(t, output, "2 graphs")
 	// Should mention shared versions
-	if !strings.Contains(output, "1 version appears in multiple graphs") {
-		t.Errorf("expected shared version count in summary\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "1 version appears in multiple graphs")
 }
 
 func TestFormatTable_Summary(t *testing.T) {
@@ -353,12 +311,8 @@ func TestFormatTable_Summary(t *testing.T) {
 	output := buf.String()
 
 	// Should contain summary
-	if !strings.Contains(output, "Total:") {
-		t.Errorf("expected summary with 'Total:'\noutput:\n%s", output)
-	}
-	if !strings.Contains(output, "1 version") {
-		t.Errorf("expected '1 version' in summary\noutput:\n%s", output)
-	}
+	assert.Contains(t, output, "Total:")
+	assert.Contains(t, output, "1 version")
 }
 
 func TestFormatSize(t *testing.T) {
@@ -419,9 +373,7 @@ func TestFormatSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatSize(tt.bytes)
-			if got != tt.want {
-				t.Errorf("formatSize(%d) = %q, want %q", tt.bytes, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -464,9 +416,7 @@ func TestFormatTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatTypes(tt.types)
-			if got != tt.want {
-				t.Errorf("formatTypes(%v) = %q, want %q", tt.types, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -521,10 +471,7 @@ func TestFormatTree_AlignedVersionIDs(t *testing.T) {
 	// All version IDs should start at the same visual position
 	if len(idPositions) >= 2 {
 		for i := 1; i < len(idPositions); i++ {
-			if idPositions[i] != idPositions[0] {
-				t.Errorf("version IDs not aligned: visual positions %v\noutput:\n%s", idPositions, output)
-				break
-			}
+			assert.Equal(t, idPositions[0], idPositions[i], "version IDs not aligned: visual positions %v", idPositions)
 		}
 	}
 }

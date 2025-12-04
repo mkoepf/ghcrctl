@@ -2,6 +2,9 @@ package discover
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToMap(t *testing.T) {
@@ -15,16 +18,9 @@ func TestToMap(t *testing.T) {
 
 	m := ToMap(versions)
 
-	if len(m) != 3 {
-		t.Errorf("Expected 3 entries in map, got %d", len(m))
-	}
-
-	if m["sha256:abc"].ID != 1 {
-		t.Error("Expected ID 1 for sha256:abc")
-	}
-	if m["sha256:def"].ID != 2 {
-		t.Error("Expected ID 2 for sha256:def")
-	}
+	assert.Len(t, m, 3)
+	assert.Equal(t, int64(1), m["sha256:abc"].ID)
+	assert.Equal(t, int64(2), m["sha256:def"].ID)
 }
 
 func TestFindImageByDigest(t *testing.T) {
@@ -58,30 +54,24 @@ func TestFindImageByDigest(t *testing.T) {
 
 	// Find image by root digest
 	image := FindImageByDigest(versions, "sha256:index1")
-	if len(image) != 3 {
-		t.Errorf("Expected 3 versions in image, got %d", len(image))
-	}
+	assert.Len(t, image, 3)
 
 	// Verify all expected digests are present
 	digestSet := make(map[string]bool)
 	for _, v := range image {
 		digestSet[v.Digest] = true
 	}
-	if !digestSet["sha256:index1"] || !digestSet["sha256:platform1"] || !digestSet["sha256:sbom1"] {
-		t.Errorf("Missing expected digests in image: %v", image)
-	}
+	assert.True(t, digestSet["sha256:index1"], "missing sha256:index1")
+	assert.True(t, digestSet["sha256:platform1"], "missing sha256:platform1")
+	assert.True(t, digestSet["sha256:sbom1"], "missing sha256:sbom1")
 
 	// Find standalone version
 	image = FindImageByDigest(versions, "sha256:standalone")
-	if len(image) != 1 {
-		t.Errorf("Expected 1 version for standalone, got %d", len(image))
-	}
+	assert.Len(t, image, 1)
 
 	// Find nonexistent digest returns empty
 	image = FindImageByDigest(versions, "sha256:nonexistent")
-	if len(image) != 0 {
-		t.Errorf("Expected 0 versions for nonexistent digest, got %d", len(image))
-	}
+	assert.Empty(t, image)
 }
 
 func TestClassifyImageVersions(t *testing.T) {
@@ -113,12 +103,8 @@ func TestClassifyImageVersions(t *testing.T) {
 	toDelete, shared := ClassifyImageVersions(imageVersions)
 
 	// All versions should be exclusive (no sharing)
-	if len(toDelete) != 3 {
-		t.Errorf("Expected 3 versions to delete, got %d", len(toDelete))
-	}
-	if len(shared) != 0 {
-		t.Errorf("Expected 0 shared versions, got %d", len(shared))
-	}
+	assert.Len(t, toDelete, 3)
+	assert.Empty(t, shared)
 }
 
 func TestClassifyImageVersions_WithShared(t *testing.T) {
@@ -150,17 +136,12 @@ func TestClassifyImageVersions_WithShared(t *testing.T) {
 	toDelete, shared := ClassifyImageVersions(imageVersions)
 
 	// 2 exclusive (index1 + exclusive-sbom), 1 shared (shared-platform)
-	if len(toDelete) != 2 {
-		t.Errorf("Expected 2 versions to delete, got %d", len(toDelete))
-	}
-	if len(shared) != 1 {
-		t.Errorf("Expected 1 shared version, got %d", len(shared))
-	}
+	assert.Len(t, toDelete, 2)
+	assert.Len(t, shared, 1)
 
 	// Verify shared version is the platform
-	if len(shared) > 0 && shared[0].ID != 3 {
-		t.Errorf("Expected shared version to be ID 3, got %d", shared[0].ID)
-	}
+	require.NotEmpty(t, shared)
+	assert.Equal(t, int64(3), shared[0].ID)
 }
 
 func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
@@ -184,26 +165,19 @@ func TestClassifyImageVersions_ExternalRefCount(t *testing.T) {
 
 	toDelete, shared := ClassifyImageVersions(imageVersions)
 
-	if len(toDelete) != 1 {
-		t.Errorf("Expected 1 version to delete, got %d", len(toDelete))
-	}
-	if len(shared) != 1 {
-		t.Errorf("Expected 1 shared version, got %d", len(shared))
-	}
+	assert.Len(t, toDelete, 1)
+	assert.Len(t, shared, 1)
 
 	// Verify we can count external refs from the shared version
-	if len(shared) > 0 {
-		externalCount := 0
-		imageDigests := map[string]bool{"sha256:index1": true, "sha256:shared": true}
-		for _, inRef := range shared[0].IncomingRefs {
-			if !imageDigests[inRef] {
-				externalCount++
-			}
-		}
-		if externalCount != 3 {
-			t.Errorf("Expected 3 external refs, got %d", externalCount)
+	require.NotEmpty(t, shared)
+	externalCount := 0
+	imageDigests := map[string]bool{"sha256:index1": true, "sha256:shared": true}
+	for _, inRef := range shared[0].IncomingRefs {
+		if !imageDigests[inRef] {
+			externalCount++
 		}
 	}
+	assert.Equal(t, 3, externalCount)
 }
 
 func TestFindImagesContainingVersion(t *testing.T) {
@@ -239,39 +213,29 @@ func TestFindImagesContainingVersion(t *testing.T) {
 
 	// Find images containing shared platform - should return both images
 	result := FindImagesContainingVersion(versions, "sha256:shared-platform")
-	if len(result) != 4 {
-		t.Errorf("Expected 4 versions (both images), got %d", len(result))
-	}
+	assert.Len(t, result, 4)
 
 	// Find images containing exclusive platform - should return only index2's image
 	result = FindImagesContainingVersion(versions, "sha256:exclusive")
-	if len(result) != 3 {
-		t.Errorf("Expected 3 versions (index2 image only), got %d", len(result))
-	}
+	assert.Len(t, result, 3)
 
 	// Verify index2's image contains the right versions
 	digestSet := make(map[string]bool)
 	for _, v := range result {
 		digestSet[v.Digest] = true
 	}
-	if !digestSet["sha256:index2"] || !digestSet["sha256:shared-platform"] || !digestSet["sha256:exclusive"] {
-		t.Errorf("Missing expected digests: %v", digestSet)
-	}
-	if digestSet["sha256:index1"] {
-		t.Errorf("Should not contain index1")
-	}
+	assert.True(t, digestSet["sha256:index2"], "missing sha256:index2")
+	assert.True(t, digestSet["sha256:shared-platform"], "missing sha256:shared-platform")
+	assert.True(t, digestSet["sha256:exclusive"], "missing sha256:exclusive")
+	assert.False(t, digestSet["sha256:index1"], "should not contain index1")
 
 	// Find images containing a root - should return just that image
 	result = FindImagesContainingVersion(versions, "sha256:index1")
-	if len(result) != 2 {
-		t.Errorf("Expected 2 versions (index1 + shared-platform), got %d", len(result))
-	}
+	assert.Len(t, result, 2)
 
 	// Find nonexistent digest returns nil
 	result = FindImagesContainingVersion(versions, "sha256:nonexistent")
-	if len(result) != 0 {
-		t.Errorf("Expected 0 versions for nonexistent, got %d", len(result))
-	}
+	assert.Empty(t, result)
 }
 
 func TestCanReach(t *testing.T) {
@@ -302,29 +266,19 @@ func TestCanReach(t *testing.T) {
 	}
 
 	// Can reach self
-	if !canReach(versions, "sha256:root", "sha256:root") {
-		t.Error("Should be able to reach self")
-	}
+	assert.True(t, canReach(versions, "sha256:root", "sha256:root"), "should reach self")
 
 	// Can reach direct child
-	if !canReach(versions, "sha256:root", "sha256:child1") {
-		t.Error("Should be able to reach direct child")
-	}
+	assert.True(t, canReach(versions, "sha256:root", "sha256:child1"), "should reach direct child")
 
 	// Can reach grandchild
-	if !canReach(versions, "sha256:root", "sha256:grandchild") {
-		t.Error("Should be able to reach grandchild")
-	}
+	assert.True(t, canReach(versions, "sha256:root", "sha256:grandchild"), "should reach grandchild")
 
 	// Cannot reach nonexistent
-	if canReach(versions, "sha256:root", "sha256:nonexistent") {
-		t.Error("Should not be able to reach nonexistent")
-	}
+	assert.False(t, canReach(versions, "sha256:root", "sha256:nonexistent"), "should not reach nonexistent")
 
 	// Child cannot reach sibling (no path)
-	if canReach(versions, "sha256:child1", "sha256:child2") {
-		t.Error("Child1 should not be able to reach child2")
-	}
+	assert.False(t, canReach(versions, "sha256:child1", "sha256:child2"), "child1 should not reach child2")
 }
 
 func TestFindDigestByShortDigest(t *testing.T) {
@@ -343,36 +297,22 @@ func TestFindDigestByShortDigest(t *testing.T) {
 
 	// Find by full digest
 	result, err := FindDigestByShortDigest(versions, "sha256:abcdef123456789012345678901234567890123456789012345678901234")
-	if err != nil {
-		t.Errorf("Expected no error for full digest, got %v", err)
-	}
-	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
-		t.Errorf("Expected full digest match, got %s", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:abcdef123456789012345678901234567890123456789012345678901234", result)
 
 	// Find by short digest (12 chars)
 	result, err = FindDigestByShortDigest(versions, "abcdef123456")
-	if err != nil {
-		t.Errorf("Expected no error for short digest, got %v", err)
-	}
-	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
-		t.Errorf("Expected first digest, got %s", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:abcdef123456789012345678901234567890123456789012345678901234", result)
 
 	// Find by short digest with sha256: prefix
 	result, err = FindDigestByShortDigest(versions, "sha256:123456ab")
-	if err != nil {
-		t.Errorf("Expected no error for short digest with prefix, got %v", err)
-	}
-	if result != "sha256:123456abcdef789012345678901234567890123456789012345678901234" {
-		t.Errorf("Expected second digest, got %s", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:123456abcdef789012345678901234567890123456789012345678901234", result)
 
 	// Error for nonexistent digest
 	_, err = FindDigestByShortDigest(versions, "zzz999")
-	if err == nil {
-		t.Error("Expected error for nonexistent digest")
-	}
+	assert.Error(t, err)
 
 	// Error for ambiguous short digest (both start with similar prefixes)
 	versionsAmbiguous := map[string]VersionInfo{
@@ -386,9 +326,7 @@ func TestFindDigestByShortDigest(t *testing.T) {
 		},
 	}
 	_, err = FindDigestByShortDigest(versionsAmbiguous, "abc123")
-	if err == nil {
-		t.Error("Expected error for ambiguous short digest")
-	}
+	assert.Error(t, err)
 }
 
 func TestFindDigestByVersionID(t *testing.T) {
@@ -407,25 +345,15 @@ func TestFindDigestByVersionID(t *testing.T) {
 
 	// Find by existing version ID
 	result, err := FindDigestByVersionID(versions, 12345)
-	if err != nil {
-		t.Errorf("Expected no error for existing version ID, got %v", err)
-	}
-	if result != "sha256:abcdef123456789012345678901234567890123456789012345678901234" {
-		t.Errorf("Expected first digest, got %s", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:abcdef123456789012345678901234567890123456789012345678901234", result)
 
 	// Find second version ID
 	result, err = FindDigestByVersionID(versions, 67890)
-	if err != nil {
-		t.Errorf("Expected no error for second version ID, got %v", err)
-	}
-	if result != "sha256:123456abcdef789012345678901234567890123456789012345678901234" {
-		t.Errorf("Expected second digest, got %s", result)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "sha256:123456abcdef789012345678901234567890123456789012345678901234", result)
 
 	// Error for nonexistent version ID
 	_, err = FindDigestByVersionID(versions, 99999)
-	if err == nil {
-		t.Error("Expected error for nonexistent version ID")
-	}
+	assert.Error(t, err)
 }

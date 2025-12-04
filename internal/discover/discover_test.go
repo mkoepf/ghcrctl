@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockChildDiscoverer implements childDiscoverer for testing
@@ -53,13 +55,8 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
-	}
+	require.NoError(t, err)
+	require.Len(t, results, 2)
 
 	// Find index version
 	var indexVersion *VersionInfo
@@ -70,13 +67,8 @@ func TestDiscoverPackage_Basic(t *testing.T) {
 		}
 	}
 
-	if indexVersion == nil {
-		t.Fatal("index version not found")
-	}
-
-	if len(indexVersion.OutgoingRefs) != 1 {
-		t.Errorf("expected 1 outgoing ref, got %d", len(indexVersion.OutgoingRefs))
-	}
+	require.NotNil(t, indexVersion, "index version not found")
+	assert.Len(t, indexVersion.OutgoingRefs, 1)
 }
 
 func TestDiscoverPackage_Parallel(t *testing.T) {
@@ -126,14 +118,10 @@ func TestDiscoverPackage_Parallel(t *testing.T) {
 	}
 
 	_, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// With parallel execution, multiple goroutines should run concurrently
-	if maxConcurrent < 2 {
-		t.Errorf("expected parallel execution (maxConcurrent >= 2), but got %d", maxConcurrent)
-	}
+	assert.GreaterOrEqual(t, maxConcurrent, int32(2), "expected parallel execution")
 }
 
 func TestDiscoverPackage_ResolverFailure(t *testing.T) {
@@ -162,18 +150,12 @@ func TestDiscoverPackage_ResolverFailure(t *testing.T) {
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
-	if err != nil {
-		t.Fatalf("DiscoverPackage should not fail even when resolver fails: %v", err)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
+	require.NoError(t, err, "DiscoverPackage should not fail even when resolver fails")
+	require.Len(t, results, 1)
 
 	// When resolver fails, type should be "unknown"
-	if len(results[0].Types) != 1 || results[0].Types[0] != "unknown" {
-		t.Errorf("expected type 'unknown' when resolver fails, got %v", results[0].Types)
-	}
+	require.Len(t, results[0].Types, 1)
+	assert.Equal(t, "unknown", results[0].Types[0])
 }
 
 func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
@@ -210,9 +192,7 @@ func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 	}
 
 	results, err := discoverer.DiscoverPackage(context.Background(), "ghcr.io/test/image", versions, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Find platform version and check incoming refs
 	var platformVersion *VersionInfo
@@ -223,11 +203,7 @@ func TestDiscoverPackage_IncomingRefsInferred(t *testing.T) {
 		}
 	}
 
-	if platformVersion == nil {
-		t.Fatal("platform version not found")
-	}
-
-	if len(platformVersion.IncomingRefs) != 1 || platformVersion.IncomingRefs[0] != "sha256:index1" {
-		t.Errorf("expected incoming ref from index1, got %v", platformVersion.IncomingRefs)
-	}
+	require.NotNil(t, platformVersion, "platform version not found")
+	require.Len(t, platformVersion.IncomingRefs, 1)
+	assert.Equal(t, "sha256:index1", platformVersion.IncomingRefs[0])
 }

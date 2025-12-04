@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockResolver implements typeResolver for testing
@@ -25,12 +27,8 @@ func TestResolveVersionInfo_Index(t *testing.T) {
 	}
 
 	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(types) != 1 || types[0] != "index" {
-		t.Errorf("expected [index], got %v", types)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, []string{"index"}, types)
 }
 
 func TestResolveVersionInfo_Platform(t *testing.T) {
@@ -41,12 +39,8 @@ func TestResolveVersionInfo_Platform(t *testing.T) {
 	}
 
 	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(types) != 1 || types[0] != "linux/amd64" {
-		t.Errorf("expected [linux/amd64], got %v", types)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, []string{"linux/amd64"}, types)
 }
 
 func TestResolveVersionInfo_MultipleAttestations(t *testing.T) {
@@ -57,12 +51,8 @@ func TestResolveVersionInfo_MultipleAttestations(t *testing.T) {
 	}
 
 	types, _, err := resolver.resolveVersionInfo(context.Background(), "ghcr.io/test/image", "sha256:abc123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(types) != 2 {
-		t.Errorf("expected 2 types, got %d", len(types))
-	}
+	require.NoError(t, err)
+	assert.Len(t, types, 2)
 }
 
 func TestPredicateToRole(t *testing.T) {
@@ -128,9 +118,7 @@ func TestPredicateToRole(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := predicateToRole(tt.predicateType)
-			if got != tt.want {
-				t.Errorf("predicateToRole(%q) = %q, want %q", tt.predicateType, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -188,10 +176,7 @@ func TestIsSignature(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isSignature(tt.manifest)
-			if got != tt.want {
-				t.Errorf("isSignature() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, isSignature(tt.manifest))
 		})
 	}
 }
@@ -280,10 +265,7 @@ func TestIsAttestation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isAttestation(tt.manifest)
-			if got != tt.want {
-				t.Errorf("isAttestation() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, isAttestation(tt.manifest))
 		})
 	}
 }
@@ -361,20 +343,14 @@ func TestDetermineAttestationRoles(t *testing.T) {
 			got := determineAttestationRoles(tt.manifest)
 
 			// For multiple roles, order may vary - check containment
-			if len(got) != len(tt.want) {
-				t.Errorf("determineAttestationRoles() returned %d roles, want %d: got %v, want %v",
-					len(got), len(tt.want), got, tt.want)
-				return
-			}
+			assert.Len(t, got, len(tt.want))
 
 			gotMap := make(map[string]bool)
 			for _, r := range got {
 				gotMap[r] = true
 			}
 			for _, w := range tt.want {
-				if !gotMap[w] {
-					t.Errorf("determineAttestationRoles() missing expected role %q, got %v", w, got)
-				}
+				assert.True(t, gotMap[w], "missing expected role %q, got %v", w, got)
 			}
 		})
 	}

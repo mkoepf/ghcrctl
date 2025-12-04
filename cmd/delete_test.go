@@ -93,13 +93,18 @@ func TestDeleteVersionCommandHasFlags(t *testing.T) {
 		"untagged",
 		"older-than",
 		"newer-than",
-		"older-than-days",
-		"newer-than-days",
 	}
 
 	for _, flagName := range requiredFlags {
 		flag := deleteVersionCmd.Flags().Lookup(flagName)
 		assert.NotNil(t, flag, "delete version command should have --%s flag", flagName)
+	}
+
+	// Verify removed flags are gone
+	removedFlags := []string{"older-than-days", "newer-than-days"}
+	for _, flagName := range removedFlags {
+		flag := deleteVersionCmd.Flags().Lookup(flagName)
+		assert.Nil(t, flag, "delete version command should NOT have --%s flag (use duration with --older-than/--newer-than instead)", flagName)
 	}
 }
 

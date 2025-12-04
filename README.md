@@ -170,6 +170,15 @@ ghcrctl list images mkoepf/myimage --tag v1.0.0
 
 # Filter to images containing a specific digest
 ghcrctl list images mkoepf/myimage --digest sha256:abc123...
+
+# Filter images with ANY version older than 30 days
+ghcrctl list images mkoepf/myimage --older-than 30d
+
+# Filter images with ANY version from the last hour
+ghcrctl list images mkoepf/myimage --newer-than 1h
+
+# Filter images with ANY version older than a specific date
+ghcrctl list images mkoepf/myimage --older-than 2025-01-01
 ```
 
 **Use cases:**
@@ -232,10 +241,13 @@ ghcrctl list versions mkoepf/myimage --older-than 2025-01-01
 ghcrctl list versions mkoepf/myimage --newer-than 2025-11-01
 
 # Show versions older than 30 days
-ghcrctl list versions mkoepf/myimage --older-than-days 30
+ghcrctl list versions mkoepf/myimage --older-than 30d
+
+# Show versions from the last hour
+ghcrctl list versions mkoepf/myimage --newer-than 1h
 
 # Combine filters: untagged versions older than 7 days
-ghcrctl list versions mkoepf/myimage --untagged --older-than-days 7
+ghcrctl list versions mkoepf/myimage --untagged --older-than 7d
 ```
 
 **JSON output:**
@@ -480,29 +492,27 @@ Delete multiple versions at once using filters:
 ghcrctl delete version mkoepf/myimage --untagged
 
 # Delete untagged versions older than 30 days
-ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
+ghcrctl delete version mkoepf/myimage --untagged --older-than 30d
 
 # Delete versions matching a tag pattern older than a specific date
 ghcrctl delete version mkoepf/myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
 
 # Delete versions older than a specific date
-ghcrctl delete version mkoepf/myimage --older-than "2025-01-01"
+ghcrctl delete version mkoepf/myimage --older-than 2025-01-01
 
 # Preview what would be deleted (dry-run)
 ghcrctl delete version mkoepf/myimage --untagged --dry-run
 
 # Skip confirmation for automated cleanup
-ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force
+ghcrctl delete version mkoepf/myimage --untagged --older-than 30d --force
 ```
 
 **Available filters:**
 - `--untagged` - Delete only untagged versions
 - `--tagged` - Delete only tagged versions
 - `--tag-pattern <regex>` - Delete versions with tags matching pattern
-- `--older-than <date>` - Delete versions older than date (YYYY-MM-DD or RFC3339)
-- `--newer-than <date>` - Delete versions newer than date
-- `--older-than-days <N>` - Delete versions older than N days
-- `--newer-than-days <N>` - Delete versions newer than N days
+- `--older-than <value>` - Delete versions older than date or duration (e.g., `2025-01-01`, `30d`, `24h`)
+- `--newer-than <value>` - Delete versions newer than date or duration
 
 Filters can be combined using AND logic (all must match).
 
@@ -697,10 +707,10 @@ jq -r 'select(.duration_ms > 100) | "\(.duration_ms)ms - \(.method) \(.path)"' a
 **CI/CD cleanup script:**
 ```bash
 # Clean up old untagged images in CI (preview first with --dry-run)
-ghcrctl delete version myorg/myapp --untagged --older-than-days 30 --dry-run
+ghcrctl delete version myorg/myapp --untagged --older-than 30d --dry-run
 
 # Execute cleanup (use --force in CI to skip confirmation)
-ghcrctl delete version myorg/myapp --untagged --older-than-days 30 --force
+ghcrctl delete version myorg/myapp --untagged --older-than 30d --force
 ```
 
 **Quick audit - count versions:**

@@ -580,10 +580,10 @@ func TestParseDateOrDuration(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		input      string
-		wantErr    bool
-		checkTime  func(t *testing.T, result time.Time)
+		name      string
+		input     string
+		wantErr   bool
+		checkTime func(t *testing.T, result time.Time)
 	}{
 		// Date formats (should work like ParseDate)
 		{

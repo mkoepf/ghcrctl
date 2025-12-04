@@ -366,6 +366,57 @@ func OutputVersionsTable(w io.Writer, versions []gh.PackageVersionInfo, packageN
 	return nil
 }
 
+// filterImagesByTime filters images to those where ANY version matches the time criteria.
+// An image is included if any of its versions (including children in OutgoingRefs)
+// match the time filter.
+func filterImagesByTime(images []discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) []discover.VersionInfo {
+	var result []discover.VersionInfo
+
+	for _, img := range images {
+		if imageMatchesTimeFilter(img, allVersions, timeFilter) {
+			result = append(result, img)
+		}
+	}
+
+	return result
+}
+
+// imageMatchesTimeFilter checks if an image or any of its children match the time filter.
+func imageMatchesTimeFilter(img discover.VersionInfo, allVersions map[string]discover.VersionInfo, timeFilter *filter.VersionFilter) bool {
+	// Check if the image itself matches
+	if versionMatchesTime(img.CreatedAt, timeFilter) {
+		return true
+	}
+
+	// Check if any child (OutgoingRefs) matches
+	for _, childDigest := range img.OutgoingRefs {
+		if child, ok := allVersions[childDigest]; ok {
+			if versionMatchesTime(child.CreatedAt, timeFilter) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// versionMatchesTime checks if a version's CreatedAt matches the time filter.
+func versionMatchesTime(createdAt string, timeFilter *filter.VersionFilter) bool {
+	t, err := filter.ParseDate(createdAt)
+	if err != nil {
+		return false
+	}
+
+	if !timeFilter.OlderThan.IsZero() && !t.Before(timeFilter.OlderThan) {
+		return false
+	}
+	if !timeFilter.NewerThan.IsZero() && !t.After(timeFilter.NewerThan) {
+		return false
+	}
+
+	return true
+}
+
 // buildListVersionFilter creates a VersionFilter from command-line flags
 func buildListVersionFilter(tag, tagPattern string, onlyTagged, onlyUntagged bool,
 	olderThan, newerThan string,
@@ -417,6 +468,8 @@ func newListImagesCmd() *cobra.Command {
 		filterVersion int64
 		filterDigest  string
 		filterTag     string
+		olderThan     string
+		newerThan     string
 	)
 
 	cmd := &cobra.Command{
@@ -429,7 +482,8 @@ and signatures. By default, images are displayed in a tree format showing these
 relationships. Use --flat for a simple table view.
 
 Use --version, --digest, or --tag to filter output to only images containing
-a specific version.
+a specific version. Use --older-than or --newer-than to filter by time (an image
+is included if ANY of its versions match the time criteria).
 
 Examples:
   # List images with relationships (tree view, default)
@@ -448,7 +502,16 @@ Examples:
   ghcrctl list images mkoepf/my-package --version 12345678
 
   # Filter to images containing a specific digest
-  ghcrctl list images mkoepf/my-package --digest sha256:abc123...`,
+  ghcrctl list images mkoepf/my-package --digest sha256:abc123...
+
+  # List images with ANY version older than 30 days
+  ghcrctl list images mkoepf/my-package --older-than 30d
+
+  # List images with ANY version from the last hour
+  ghcrctl list images mkoepf/my-package --newer-than 1h
+
+  # List images with ANY version older than a specific date
+  ghcrctl list images mkoepf/my-package --older-than 2025-01-01`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/package reference (reject inline tags)
@@ -583,6 +646,42 @@ Examples:
 				}
 			}
 
+			// Apply time-based filtering (include image if ANY version matches)
+			if olderThan != "" || newerThan != "" {
+				timeFilter := &filter.VersionFilter{}
+
+				if olderThan != "" {
+					t, err := filter.ParseDateOrDuration(olderThan)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("invalid --older-than value: %w", err)
+					}
+					timeFilter.OlderThan = t
+				}
+
+				if newerThan != "" {
+					t, err := filter.ParseDateOrDuration(newerThan)
+					if err != nil {
+						cmd.SilenceUsage = true
+						return fmt.Errorf("invalid --newer-than value: %w", err)
+					}
+					timeFilter.NewerThan = t
+				}
+
+				// Filter results to images where ANY version matches the time criteria
+				results = filterImagesByTime(results, allVersions, timeFilter)
+				if len(results) == 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "No images found matching time criteria\n")
+					return nil
+				}
+
+				// Rebuild version map with filtered results
+				allVersions = make(map[string]discover.VersionInfo)
+				for _, v := range results {
+					allVersions[v.Digest] = v
+				}
+			}
+
 			// Output results
 			if jsonOutput {
 				return display.OutputJSON(cmd.OutOrStdout(), results)
@@ -605,6 +704,8 @@ Examples:
 	cmd.Flags().Int64Var(&filterVersion, "version", 0, "Filter to images containing this version ID")
 	cmd.Flags().StringVar(&filterDigest, "digest", "", "Filter to images containing this digest")
 	cmd.Flags().StringVar(&filterTag, "tag", "", "Filter to images containing this tag")
+	cmd.Flags().StringVar(&olderThan, "older-than", "", "Show images with ANY version older than date or duration (e.g., 2025-01-01, 7d, 24h)")
+	cmd.Flags().StringVar(&newerThan, "newer-than", "", "Show images with ANY version newer than date or duration (e.g., 2025-01-01, 7d, 24h)")
 	cmd.MarkFlagsMutuallyExclusive("version", "digest", "tag")
 
 	return cmd

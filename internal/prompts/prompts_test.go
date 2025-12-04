@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfirm_EOF(t *testing.T) {
@@ -14,13 +17,8 @@ func TestConfirm_EOF(t *testing.T) {
 	writer := &bytes.Buffer{}
 
 	result, err := Confirm(reader, writer, "Test prompt")
-	if err != nil {
-		t.Fatalf("EOF should not return error, got: %v", err)
-	}
-
-	if result != false {
-		t.Error("EOF should default to no (false)")
-	}
+	require.NoError(t, err, "EOF should not return error")
+	assert.False(t, result, "EOF should default to no (false)")
 }
 
 func TestConfirmWithInput(t *testing.T) {
@@ -74,19 +72,12 @@ func TestConfirmWithInput(t *testing.T) {
 			writer := &bytes.Buffer{}
 
 			result, err := ConfirmWithInput(reader, writer, "Type the name to confirm", tt.expectedValue)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-
-			if result != tt.expectedResult {
-				t.Errorf("Expected %v, got %v", tt.expectedResult, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedResult, result)
 
 			// Verify prompt was written
 			output := writer.String()
-			if !strings.Contains(output, "Type the name to confirm") {
-				t.Error("Expected prompt message in output")
-			}
+			assert.Contains(t, output, "Type the name to confirm")
 		})
 	}
 }
@@ -98,13 +89,8 @@ func TestConfirmWithInput_EOF(t *testing.T) {
 	writer := &bytes.Buffer{}
 
 	result, err := ConfirmWithInput(reader, writer, "Type to confirm", "myimage")
-	if err != nil {
-		t.Fatalf("EOF should not return error, got: %v", err)
-	}
-
-	if result != false {
-		t.Error("EOF should default to no (false)")
-	}
+	require.NoError(t, err, "EOF should not return error")
+	assert.False(t, result, "EOF should default to no (false)")
 }
 
 func TestConfirm(t *testing.T) {
@@ -161,22 +147,13 @@ func TestConfirm(t *testing.T) {
 			writer := &bytes.Buffer{}
 
 			result, err := Confirm(reader, writer, "Test prompt")
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-
-			if result != tt.expected {
-				t.Errorf("Expected %v, got %v", tt.expected, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 
 			// Verify prompt was written
 			output := writer.String()
-			if !strings.Contains(output, "Test prompt") {
-				t.Error("Expected prompt message in output")
-			}
-			if !strings.Contains(output, "[y/N]") {
-				t.Error("Expected [y/N] in output")
-			}
+			assert.Contains(t, output, "Test prompt")
+			assert.Contains(t, output, "[y/N]")
 		})
 	}
 }

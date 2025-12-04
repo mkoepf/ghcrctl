@@ -187,6 +187,92 @@ func ParseDate(dateStr string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse date %q (supported formats: YYYY-MM-DD, RFC3339)", dateStr)
 }
 
+// ParseDateOrDuration parses a string as either a date or duration.
+// Dates are detected by starting with 4 digits followed by '-' (e.g., "2025-01-15").
+// Durations support Go's time.ParseDuration units (h, m, s, ms, us, ns) plus 'd' for days.
+// For durations, returns the cutoff time relative to now (now - duration).
+//
+// Examples:
+//   - "2025-01-15" -> parsed as date
+//   - "2025-01-15T10:30:00Z" -> parsed as RFC3339 date
+//   - "7d" -> 7 days ago
+//   - "24h" -> 24 hours ago
+//   - "30m" -> 30 minutes ago
+//   - "1h30m" -> 1 hour 30 minutes ago
+//   - "2d12h" -> 2 days and 12 hours ago
+func ParseDateOrDuration(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, fmt.Errorf("date/duration string cannot be empty")
+	}
+
+	// Detect date format: starts with 4 digits followed by '-'
+	if len(s) >= 5 && isDigit(s[0]) && isDigit(s[1]) && isDigit(s[2]) && isDigit(s[3]) && s[4] == '-' {
+		return ParseDate(s)
+	}
+
+	// Parse as duration
+	return parseDuration(s)
+}
+
+// parseDuration parses a duration string with support for 'd' (days).
+// Returns the cutoff time (now - duration).
+func parseDuration(s string) (time.Time, error) {
+	now := time.Now()
+
+	// Check for day component (e.g., "7d" or "2d12h")
+	if idx := strings.Index(s, "d"); idx != -1 {
+		// Extract days part
+		daysStr := s[:idx]
+		days, err := parsePositiveInt(daysStr)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid duration %q: %w", s, err)
+		}
+
+		// Get remainder after 'd'
+		remainder := s[idx+1:]
+		result := now.AddDate(0, 0, -days)
+
+		// If there's more after 'd', parse it as standard duration
+		if remainder != "" {
+			d, err := time.ParseDuration(remainder)
+			if err != nil {
+				return time.Time{}, fmt.Errorf("invalid duration %q: %w", s, err)
+			}
+			result = result.Add(-d)
+		}
+
+		return result, nil
+	}
+
+	// No 'd', parse as standard Go duration
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid duration %q (supported: Nd, Nh, Nm, Ns or combinations like 1h30m)", s)
+	}
+
+	return now.Add(-d), nil
+}
+
+// isDigit returns true if b is an ASCII digit.
+func isDigit(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
+// parsePositiveInt parses a string as a positive integer.
+func parsePositiveInt(s string) (int, error) {
+	if s == "" {
+		return 0, fmt.Errorf("empty number")
+	}
+	var n int
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("invalid number %q", s)
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
+}
+
 // hasMatchingTag checks if any version tag matches any filter tag (exact match)
 func hasMatchingTag(versionTags []string, filterTags []string) bool {
 	for _, vTag := range versionTags {

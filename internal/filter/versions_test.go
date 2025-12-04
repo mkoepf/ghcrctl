@@ -567,6 +567,141 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
+func TestParseDateOrDuration(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	tests := []struct {
+		name       string
+		input      string
+		wantErr    bool
+		checkTime  func(t *testing.T, result time.Time)
+	}{
+		// Date formats (should work like ParseDate)
+		{
+			name:    "date only YYYY-MM-DD",
+			input:   "2025-01-15",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				assert.Equal(t, 2025, result.Year())
+				assert.Equal(t, time.January, result.Month())
+				assert.Equal(t, 15, result.Day())
+			},
+		},
+		{
+			name:    "RFC3339 with timezone",
+			input:   "2025-01-15T10:30:00Z",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				assert.Equal(t, 2025, result.Year())
+			},
+		},
+		{
+			name:    "RFC3339 with offset",
+			input:   "2025-01-15T10:30:00+01:00",
+			wantErr: false,
+		},
+		// Duration formats
+		{
+			name:    "duration days",
+			input:   "7d",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.AddDate(0, 0, -7)
+				// Allow 1 second tolerance for test execution time
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration hours",
+			input:   "24h",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.Add(-24 * time.Hour)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration minutes",
+			input:   "30m",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.Add(-30 * time.Minute)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration combined hours and minutes",
+			input:   "1h30m",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.Add(-1*time.Hour - 30*time.Minute)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration seconds",
+			input:   "90s",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.Add(-90 * time.Second)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration days and hours",
+			input:   "2d12h",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.AddDate(0, 0, -2).Add(-12 * time.Hour)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		{
+			name:    "duration 30 days",
+			input:   "30d",
+			wantErr: false,
+			checkTime: func(t *testing.T, result time.Time) {
+				expected := now.AddDate(0, 0, -30)
+				assert.InDelta(t, expected.Unix(), result.Unix(), 1)
+			},
+		},
+		// Error cases
+		{
+			name:    "empty string",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "invalid format",
+			input:   "not-valid",
+			wantErr: true,
+		},
+		{
+			name:    "invalid duration unit",
+			input:   "5x",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseDateOrDuration(tt.input)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.False(t, result.IsZero(), "parsed time should not be zero")
+				if tt.checkTime != nil {
+					tt.checkTime(t, result)
+				}
+			}
+		})
+	}
+}
+
 func TestVersionFilter_Apply_OnlyUntagged_AllInTaggedGraph(t *testing.T) {
 	// Edge case: All untagged versions are children of tagged versions
 	versions := []gh.PackageVersionInfo{

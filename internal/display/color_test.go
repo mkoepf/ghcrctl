@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatih/color"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {
@@ -77,9 +78,7 @@ func TestColorVersionType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ColorVersionType(tt.versionType)
-			if result != tt.expected {
-				t.Errorf("ColorVersionType(%q) = %q, expected %q", tt.versionType, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -120,9 +119,7 @@ func TestColorTags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ColorTags(tt.tags)
-			if result != tt.expected {
-				t.Errorf("ColorTags(%v) = %q, expected %q", tt.tags, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -148,9 +145,7 @@ func TestColorDigest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ColorDigest(tt.digest)
-			if result != tt.expected {
-				t.Errorf("ColorDigest(%q) = %q, expected %q", tt.digest, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -176,9 +171,7 @@ func TestColorHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ColorHeader(tt.header)
-			if result != tt.expected {
-				t.Errorf("ColorHeader(%q) = %q, expected %q", tt.header, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -199,49 +192,32 @@ func TestColorSeparator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ColorSeparator(tt.separator)
-			if result != tt.expected {
-				t.Errorf("ColorSeparator(%q) = %q, expected %q", tt.separator, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestColorSuccess(t *testing.T) {
 	result := ColorSuccess("Successfully deleted")
-	expected := "Successfully deleted"
-	if result != expected {
-		t.Errorf("ColorSuccess() = %q, expected %q", result, expected)
-	}
+	assert.Equal(t, "Successfully deleted", result)
 }
 
 func TestColorWarning(t *testing.T) {
 	result := ColorWarning("Are you sure?")
-	expected := "Are you sure?"
-	if result != expected {
-		t.Errorf("ColorWarning() = %q, expected %q", result, expected)
-	}
+	assert.Equal(t, "Are you sure?", result)
 }
 
 func TestColorError(t *testing.T) {
 	result := ColorError("Failed to delete")
-	expected := "Failed to delete"
-	if result != expected {
-		t.Errorf("ColorError() = %q, expected %q", result, expected)
-	}
+	assert.Equal(t, "Failed to delete", result)
 }
 
 func TestColorDryRun(t *testing.T) {
 	result := ColorDryRun("DRY RUN: No changes made")
-	expected := "DRY RUN: No changes made"
-	if result != expected {
-		t.Errorf("ColorDryRun() = %q, expected %q", result, expected)
-	}
+	assert.Equal(t, "DRY RUN: No changes made", result)
 }
 
 func TestColorCount(t *testing.T) {
 	result := ColorCount(42)
-	expected := "42"
-	if result != expected {
-		t.Errorf("ColorCount(42) = %q, expected %q", result, expected)
-	}
+	assert.Equal(t, "42", result)
 }

@@ -81,7 +81,7 @@ Examples:
   ghcrctl delete version mkoepf/myimage --untagged
 
   # Delete untagged versions older than 30 days
-  ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30
+  ghcrctl delete version mkoepf/myimage --untagged --older-than 30d
 
   # Delete versions matching tag pattern older than a date
   ghcrctl delete version mkoepf/myimage --tag-pattern ".*-rc.*" --older-than 2025-01-01
@@ -90,7 +90,7 @@ Examples:
   ghcrctl delete version mkoepf/myimage --untagged --dry-run
 
   # Skip confirmation for bulk deletion
-  ghcrctl delete version mkoepf/myimage --untagged --older-than-days 30 --force`,
+  ghcrctl delete version mkoepf/myimage --untagged --older-than 30d --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse owner/package reference (reject inline tags)

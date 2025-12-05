@@ -845,7 +845,7 @@ The scoped token used in the integration tests allows to test
 
 However, the following tests are **not possible**:
 
-1. **Listing all user/org packages** - `ghcrctl packages` requires broader `read:packages` access
+1. **Listing all user/org packages** - `ghcrctl list packages` requires broader `read:packages` access
 2. **Cross-repository operations** - Can only access packages within the ghcrctl repository
 3. **Package deletion** - Would require `write:packages` and `delete:packages` permissions
 4. **Private registry access** - Tests only work with packages in the ghcrctl repository scope

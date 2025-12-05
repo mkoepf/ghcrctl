@@ -57,3 +57,16 @@ release:
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}} v{{.Version}}"
+
+brews:
+  - repository:
+      owner: mkoepf
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/mkoepf/ghcrctl"
+    description: "CLI tool for managing GitHub Container Registry"
+    license: "MIT"
+    install: |
+      bin.install "ghcrctl"
+    test: |
+      system "#{bin}/ghcrctl", "--version"

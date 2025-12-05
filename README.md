@@ -66,7 +66,22 @@ When you run `delete version`, you delete a single package version. When you run
 
 ## Installation
 
-### Using Go Install
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap mkoepf/tap
+brew install ghcrctl
+```
+
+### Binary Download
+
+Download pre-built binaries from the [releases page](https://github.com/mkoepf/ghcrctl/releases):
+
+- **Linux:** `ghcrctl_<version>_linux_amd64.tar.gz` or `ghcrctl_<version>_linux_arm64.tar.gz`
+- **macOS:** `ghcrctl_<version>_darwin_amd64.tar.gz` or `ghcrctl_<version>_darwin_arm64.tar.gz`
+- **Windows:** `ghcrctl_<version>_windows_amd64.zip` or `ghcrctl_<version>_windows_arm64.zip`
+
+### Go Install
 
 ```bash
 go install github.com/mkoepf/ghcrctl@latest

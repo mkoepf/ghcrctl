@@ -12,13 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Commands**
 - `list packages <owner>` - List container packages with JSON output support
 - `list versions <owner/image>` - List package versions with filtering by tag, digest, version ID, date ranges, and regex patterns
-- `list images <owner/image>` - Display OCI artifact graphs in tree format showing platforms, attestations, and relationships
+- `list graphs <owner/image>` - Display OCI artifact graphs in tree format showing platforms, attestations, and relationships
 - `get labels <owner/image>` - Extract OCI annotations from images
 - `get sbom <owner/image>` - Display SBOM attestations (SPDX, CycloneDX, Syft, Docker buildx formats)
 - `get provenance <owner/image>` - Display provenance attestations (SLSA v0.2, v1.0, in-toto, Docker buildx formats)
-- `tag add <owner/image> <new-tag>` - Add tags to existing images via OCI registry API
+- `tag <owner/image> <new-tag>` - Add tags to existing images via OCI registry API
 - `delete version <owner/image>` - Delete single or multiple versions with filters
-- `delete image <owner/image>` - Delete complete OCI graphs including platforms and attestations
+- `delete graph <owner/image>` - Delete complete OCI graphs including platforms and attestations
+- `delete package <owner/image>` - Delete entire packages with all versions
 - `stats <owner/image>` - Display package statistics
 - `completion` - Shell completion for bash, zsh, fish, and PowerShell with dynamic package suggestions
 

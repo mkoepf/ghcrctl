@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mkoepf/ghcrctl/internal/gh"
 	"oras.land/oras-go/v2"
@@ -64,16 +65,31 @@ func CopyImage(ctx context.Context, srcImage, srcTag, dstImage, dstTag string) e
 	// Error is only returned if called twice, which won't happen here
 	_ = dstRepo.SetReferrersCapability(false)
 
-	// Copy the image using default concurrency for speed.
+	// Copy the image with retry logic for rate limiting (429 errors).
 	// Note: oras-go has an internal race condition in HTTP/2 auth handling
 	// that triggers with -race flag, but it doesn't affect correctness.
 	// The mutating tests are run without -race for this reason.
-	_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, oras.CopyOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to copy image: %w", err)
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 100ms, 200ms, 400ms, 800ms
+			backoff := time.Duration(100<<attempt) * time.Millisecond
+			time.Sleep(backoff)
+		}
+
+		_, err = oras.Copy(ctx, srcRepo, srcTag, dstRepo, dstTag, oras.CopyOptions{})
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		// Retry on rate limiting (429)
+		if !strings.Contains(err.Error(), "429") && !strings.Contains(err.Error(), "toomanyrequests") {
+			break
+		}
 	}
 
-	return nil
+	return fmt.Errorf("failed to copy image: %w", lastErr)
 }
 
 // DeletePackage deletes an entire package from the registry.

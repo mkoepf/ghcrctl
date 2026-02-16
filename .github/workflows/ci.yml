@@ -226,7 +226,7 @@ jobs:
 
       # 3. Trivy (scans for vulnerable deps, secrets, misconfig)
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.34.0
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret

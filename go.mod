@@ -1,6 +1,6 @@
 module github.com/mkoepf/ghcrctl
 
-go 1.25.6
+go 1.25.9
 
 require (
 	github.com/fatih/color v1.18.0

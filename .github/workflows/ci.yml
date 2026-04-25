@@ -19,6 +19,15 @@ on:
       - '.gitignore'
       - 'docs/**'
 
+# Serialize CI per ref so back-to-back merges don't run mutating tests in
+# parallel. Multiple parallel runs exhausted both the GHCR push rate limit
+# (2000/min) and the GitHub Actions installation API rate limit (5000/hr).
+# On main, queue subsequent runs so each commit still gets a result; on PR
+# branches, cancel superseded runs to save resources.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   lint:
     name: Code Quality

@@ -163,8 +163,11 @@ jobs:
       packages: write
     runs-on: ${{ matrix.os }}
     strategy:
+      # ubuntu-latest mutating tests already run in the `test` job for coverage.
+      # Running them twice in parallel against ghcr.io exceeds the 2000/min push
+      # rate limit, so only macos and windows run here.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout code

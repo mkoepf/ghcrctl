@@ -46,7 +46,7 @@ jobs:
 
       # Build and push image 1: No SBOM, no provenance, single platform
       - name: Build and push test image 1 (no SBOM, no provenance, single platform)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/no-sbom.Dockerfile
@@ -65,7 +65,7 @@ jobs:
       # Build and push image 2: With SBOM and provenance, multiarch
       - name: Build and push test image 2 (with SBOM, with provenance, multiarch)
         id: push-with-sbom
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/with-sbom.Dockerfile
@@ -88,7 +88,7 @@ jobs:
 
       # Build and push image 3: With SBOM but no provenance, single platform
       - name: Build and push test image 3 (with SBOM, no provenance, single platform)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/with-sbom-no-provenance.Dockerfile
@@ -108,7 +108,7 @@ jobs:
 
       # Build and push image 4: No SBOM, no provenance, multiarch
       - name: Build and push test image 4 (no SBOM, no provenance, multiarch)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/no-sbom-no-provenance.Dockerfile
@@ -130,7 +130,7 @@ jobs:
       # Build and push image 5: Cosign-signed (signature + SBOM attestation via cosign)
       - name: Build and push test image 5 (for cosign signing)
         id: push-cosign
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/cosign-signed.Dockerfile
@@ -196,7 +196,7 @@ jobs:
       # Build and push image 6: Cosign vuln-scan + VEX attestations
       - name: Build and push test image 6 (for cosign vuln/vex)
         id: push-cosign-vuln
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./integrationtests/cosign-vuln.Dockerfile
